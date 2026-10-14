@@ -113,4 +113,31 @@ describe('PuzzleEngine', () => {
       expect(engine.getGroup(5)).toMatchObject({ x: before.x, y: before.y });
     });
   });
+
+  describe('fromGroups', () => {
+    it('remonta grupos, posições e o encaixe continua funcionando', () => {
+      const engine = PuzzleEngine.fromGroups(puzzle, [
+        { id: 1, x: 10, y: 20, pieceIds: [1, 0] },
+        { id: 2, x: 2000, y: 0, pieceIds: [2] },
+      ]);
+      expect(engine.groupCount).toBe(2);
+      expect(engine.groupOf(0).id).toBe(1);
+      expect(engine.piecePosition(0)).toEqual({ x: 10, y: 20 });
+
+      engine.moveGroup(2, 12, 18);
+      expect(engine.dropGroup(2)).toEqual({ absorbedGroupIds: [1], completed: true });
+    });
+
+    it('recusa grupos que deixam peça de fora ou repetem peça', () => {
+      expect(() =>
+        PuzzleEngine.fromGroups(puzzle, [{ id: 0, x: 0, y: 0, pieceIds: [0, 1] }]),
+      ).toThrow(RangeError);
+      expect(() =>
+        PuzzleEngine.fromGroups(puzzle, [
+          { id: 0, x: 0, y: 0, pieceIds: [0, 1] },
+          { id: 1, x: 0, y: 0, pieceIds: [1, 2] },
+        ]),
+      ).toThrow(RangeError);
+    });
+  });
 });
