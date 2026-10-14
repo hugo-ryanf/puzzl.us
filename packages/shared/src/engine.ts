@@ -74,6 +74,36 @@ export class PuzzleEngine {
   }
 
   /**
+   * Remonta a mesa a partir de grupos já formados (snapshot de uma sala salva). Cada peça tem
+   * que aparecer em exatamente um grupo; os ids dos grupos são preservados.
+   */
+  static fromGroups(puzzle: Puzzle, groups: readonly GroupState[]): PuzzleEngine {
+    const seen = new Set<number>();
+    for (const group of groups) {
+      for (const pieceId of group.pieceIds) {
+        if (!puzzle.pieces[pieceId] || seen.has(pieceId)) {
+          throw new RangeError(`peça ${pieceId} inválida ou repetida nos grupos`);
+        }
+        seen.add(pieceId);
+      }
+    }
+    if (seen.size !== puzzle.pieces.length) {
+      throw new RangeError(`os grupos cobrem ${seen.size} de ${puzzle.pieces.length} peças`);
+    }
+
+    const engine = new PuzzleEngine(
+      puzzle,
+      puzzle.pieces.map(() => ({ x: 0, y: 0 })),
+    );
+    engine.groups.clear();
+    for (const { id, x, y, pieceIds } of groups) {
+      engine.groups.set(id, { id, x, y, pieceIds: [...pieceIds] });
+      for (const pieceId of pieceIds) engine.pieceGroup[pieceId] = id;
+    }
+    return engine;
+  }
+
+  /**
    * Reespalha as peças soltas (grupos de uma peça só) pela mesma área do começo, evitando cair
    * em cima dos blocos já montados, que ficam onde estão. Devolve os grupos que mudaram de lugar.
    *
