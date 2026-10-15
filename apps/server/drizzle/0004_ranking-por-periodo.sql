@@ -1,0 +1,1 @@
+CREATE INDEX "games_period_idx" ON "games" USING btree ("team_size","finished_at");
