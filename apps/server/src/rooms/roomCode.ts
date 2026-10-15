@@ -9,11 +9,16 @@ export function randomRoomCode(): string {
   return Array.from({ length: LENGTH }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 }
 
-/** 31^5 ≈ 28 milhões de códigos: colisão é rara, mas conferimos mesmo assim. */
-export async function uniqueRoomCode(): Promise<string> {
+/**
+ * 31^5 ≈ 28 milhões de códigos: colisão é rara, mas conferimos mesmo assim. `isReserved` barra
+ * códigos que não estão em uso agora mas podem voltar (sala salva num snapshot).
+ */
+export async function uniqueRoomCode(
+  isReserved: (code: string) => Promise<boolean> = async () => false,
+): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt++) {
     const code = randomRoomCode();
-    if (!(await matchMaker.getRoomById(code))) return code;
+    if (!(await matchMaker.getRoomById(code)) && !(await isReserved(code))) return code;
   }
   throw new Error('não foi possível gerar um código de sala livre');
 }
