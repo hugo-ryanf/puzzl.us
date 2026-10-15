@@ -1,12 +1,21 @@
 import { Client, type Room } from '@colyseus/sdk';
-import { ROOM_NAME, RoomState, type CreateRoomOptions, type JoinOptions } from '@puzzle/shared';
+import {
+  ROOM_NAME,
+  RoomState,
+  type CreateRoomOptions,
+  type JoinOptions,
+  type RestoreRoomOptions,
+} from '@puzzle/shared';
+import { loadPlayerName } from './playerName';
 
 export type PuzzleRoom = Room<unknown, RoomState>;
 
 /**
- * Em produção o mesmo servidor entrega a página, a API e o WebSocket: é o próprio endereço.
- * Em dev o servidor roda na porta 2567 da mesma máquina que serviu a página; usar o hostname
- * da página (em vez de "localhost") permite um amigo na mesma rede entrar pelo IP do PC.
+ * Endereço das salas (Colyseus). A API (/api, /auth) é sempre relativa ao próprio site: em
+ * produção o mesmo servidor entrega tudo; em dev o Vite repassa ao servidor.
+ * Em produção é o próprio endereço. Em dev o servidor roda na porta 2567 da mesma máquina que
+ * serviu a página; usar o hostname da página (em vez de "localhost") permite um amigo na mesma
+ * rede entrar pelo IP do PC.
  */
 export const SERVER_URL: string =
   import.meta.env.VITE_SERVER_URL ??
@@ -18,6 +27,11 @@ const client = new Client(SERVER_URL);
 const SESSION_KEY = 'quebra-cabeca:sessao';
 /** localStorage: o mesmo convidado entre sessões, para o ranking reconhecer a equipe. */
 const GUEST_KEY = 'quebra-cabeca:convidado';
+/**
+ * Esperas entre tentativas de voltar para a sala quando a conexão cai de vez: cobre um deploy
+ * (segundos) e o Render acordando (~1 min).
+ */
+const REJOIN_DELAYS_MS = [0, 1000, 2000, 3000, 5000, 5000, 10_000, 10_000, 15_000, 15_000];
 
 interface SavedSession {
   roomId: string;
@@ -31,11 +45,43 @@ export async function createRoom(options: WithoutGuest<CreateRoomOptions>): Prom
   return track(room);
 }
 
+/**
+ * Entra pelo código. Se a sala não está no ar, ela pode ter sumido num reinício do servidor:
+ * pede para trazê-la de volta do último snapshot (o servidor recusa se não houver).
+ */
 export async function joinRoom(
   code: string,
   options: WithoutGuest<JoinOptions>,
 ): Promise<PuzzleRoom> {
-  return track(await client.joinById(code, { ...options, guestId: guestId() }, RoomState));
+  const joinOptions = { ...options, guestId: guestId() };
+  try {
+    return track(await client.joinById(code, joinOptions, RoomState));
+  } catch (error) {
+    if (!/not found/i.test(errorMessage(error))) throw error;
+    const restore: RestoreRoomOptions = { ...joinOptions, restore: code };
+    return track(await client.joinOrCreate(ROOM_NAME, restore, RoomState));
+  }
+}
+
+/**
+ * Volta para a sala depois que a conexão caiu de vez (servidor reiniciou ou a reconexão
+ * automática desistiu), entrando de novo pelo código. Desiste na hora se a sala acabou
+ * (terminada, cheia ou sem snapshot); erro de rede tenta de novo.
+ */
+export async function rejoinRoom(code: string, name: string): Promise<PuzzleRoom | null> {
+  for (const delay of REJOIN_DELAYS_MS) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    try {
+      return await joinRoom(code, { name });
+    } catch (error) {
+      if (/not found|locked|full/i.test(errorMessage(error))) return null;
+    }
+  }
+  return null;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -43,7 +89,7 @@ export async function joinRoom(
  * vira um convidado novo: o jogo funciona, só o ranking não junta as partidas da mesma pessoa.
  */
 let fallbackGuestId: string | undefined;
-function guestId(): string {
+export function guestId(): string {
   try {
     const saved = localStorage.getItem(GUEST_KEY);
     if (saved) return saved;
@@ -73,7 +119,10 @@ export function resumeRoom(code: string): Promise<PuzzleRoom | null> {
       return track(await client.reconnect(saved.token, RoomState));
     } catch {
       forgetSession();
-      return null;
+      // O token morre junto quando o servidor reinicia: entra de novo pelo código (que também
+      // restaura a sala do snapshot). Sem nome lembrado, cai no "Entrar com código".
+      const name = loadPlayerName();
+      return name ? joinRoom(code, { name }).catch(() => null) : null;
     }
   })();
   return resuming;
