@@ -4,7 +4,8 @@ import type { RankingQuery } from '@puzzle/shared';
 import { Board } from '../board/Board';
 import { puzzleImageInfo } from '../board/images';
 import { usePuzzleImage } from '../board/usePuzzleImage';
-import { leaveRoom, type PuzzleRoom } from '../net/connection';
+import { leaveRoom, rejoinRoom, type PuzzleRoom } from '../net/connection';
+import { loadPlayerName } from '../net/playerName';
 import { useRoomSnapshot, type RoomSnapshot } from '../net/useRoomSnapshot';
 import { useVoiceChat } from '../voice/useVoiceChat';
 import { CompletedModal } from './room/CompletedModal';
@@ -14,10 +15,12 @@ import { RoomHeader } from './room/RoomHeader';
 interface RoomScreenProps {
   room: PuzzleRoom;
   onLeave: (notice?: string) => void;
+  /** Voltou para a mesma sala por uma conexão nova (o servidor reiniciou no meio do jogo). */
+  onRejoin: (room: PuzzleRoom) => void;
   onShowRanking: (query: RankingQuery) => void;
 }
 
-export function RoomScreen({ room, onLeave, onShowRanking }: RoomScreenProps) {
+export function RoomScreen({ room, onLeave, onRejoin, onShowRanking }: RoomScreenProps) {
   const snapshot = useRoomSnapshot(room);
   const solo = snapshot.maxPlayers === 1;
   // Solo não entra na chamada: não há com quem falar (e poupa a cota do LiveKit).
@@ -27,21 +30,36 @@ export function RoomScreen({ room, onLeave, onShowRanking }: RoomScreenProps) {
   const image = usePuzzleImage(snapshot.imageId);
 
   useEffect(() => {
+    let unmounted = false;
     const handleDrop = () => setReconnecting(true);
     const handleReconnect = () => setReconnecting(false);
     // Saída voluntária (botão "Sair") chega aqui como CONSENTED e já foi tratada.
     const handleLeave = (code: number) => {
-      if (code !== CloseCode.CONSENTED) onLeave('Você foi desconectado da sala.');
+      if (code === CloseCode.CONSENTED) return;
+      // Servidor reiniciou (deploy, queda) ou a reconexão automática desistiu: tenta voltar
+      // pelo código, que restaura a sala do snapshot se for preciso.
+      const name = room.state.players?.get(room.sessionId)?.name ?? loadPlayerName();
+      setReconnecting(true);
+      void rejoinRoom(room.roomId, name).then((rejoined) => {
+        if (unmounted) {
+          if (rejoined) leaveRoom(rejoined); // a pessoa clicou em "Sair" enquanto isso
+        } else if (rejoined) {
+          onRejoin(rejoined);
+        } else {
+          onLeave('Você foi desconectado da sala.');
+        }
+      });
     };
     room.onDrop(handleDrop);
     room.onReconnect(handleReconnect);
     room.onLeave(handleLeave);
     return () => {
+      unmounted = true;
       room.onDrop.remove(handleDrop);
       room.onReconnect.remove(handleReconnect);
       room.onLeave.remove(handleLeave);
     };
-  }, [room, onLeave]);
+  }, [room, onLeave, onRejoin]);
 
   function leave() {
     leaveRoom(room);
