@@ -31,6 +31,8 @@ export interface RoomSnapshot {
   durationMs: number;
   rankStatus: RankStatus;
   rank: number;
+  /** Posição só entre as partidas de hoje, na mesma categoria. */
+  rankToday: number;
   teamSize: number;
 }
 
@@ -65,6 +67,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     durationMs: state.durationMs,
     rankStatus: state.rankStatus as RankStatus,
     rank: state.rank,
+    rankToday: state.rankToday,
     teamSize: state.teamSize,
   };
 }
@@ -89,7 +92,16 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
       callbacks.onAdd('groups', refresh, false),
       callbacks.onRemove('groups', refresh),
       ...(
-        ['phase', 'hostId', 'elapsedMs', 'durationMs', 'rankStatus', 'rank', 'teamSize'] as const
+        [
+          'phase',
+          'hostId',
+          'elapsedMs',
+          'durationMs',
+          'rankStatus',
+          'rank',
+          'rankToday',
+          'teamSize',
+        ] as const
       ).map((field) => callbacks.listen(field, refresh)),
     );
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
