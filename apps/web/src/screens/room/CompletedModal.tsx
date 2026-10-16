@@ -26,9 +26,24 @@ export function CompletedModal({ snapshot, onShowRanking, onLeave }: CompletedMo
   const [open, setOpen] = useState(false);
   const [ranking, setRanking] = useState<RankingEntry[]>();
   const dialogRef = useRef<HTMLElement>(null);
-  const { imageId, pieceCount, pieces, durationMs, teamSize, rankStatus, rank, players } = snapshot;
+  const {
+    imageId,
+    pieceCount,
+    pieces,
+    durationMs,
+    teamSize,
+    rankStatus,
+    rank,
+    rankToday,
+    players,
+  } = snapshot;
   const image = puzzleImageInfo(imageId);
-  const query: RankingQuery = { image: imageId, pieces: pieceCount, players: teamSize };
+  const query: RankingQuery = {
+    image: imageId,
+    pieces: pieceCount,
+    players: teamSize,
+    period: 'all',
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setOpen(true), OPEN_DELAY_MS);
@@ -49,7 +64,7 @@ export function CompletedModal({ snapshot, onShowRanking, onLeave }: CompletedMo
   useEffect(() => {
     if (rankStatus !== 'saved') return;
     let cancelled = false;
-    fetchRanking({ image: imageId, pieces: pieceCount, players: teamSize })
+    fetchRanking({ image: imageId, pieces: pieceCount, players: teamSize, period: 'all' })
       .then((entries) => !cancelled && setRanking(entries))
       .catch(() => !cancelled && setRanking([]));
     return () => {
@@ -171,6 +186,7 @@ export function CompletedModal({ snapshot, onShowRanking, onLeave }: CompletedMo
               <p className="result-rank">
                 <TrophyIcon size={18} />
                 <strong>{rank}º lugar</strong> na categoria
+                {rankToday > 0 && <span className="result-rank-today">· {rankToday}º hoje</span>}
               </p>
               {rows.length > 0 && (
                 <ol className="result-ranking">
