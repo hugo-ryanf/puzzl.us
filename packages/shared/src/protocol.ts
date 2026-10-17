@@ -94,6 +94,19 @@ export const CreateRoomOptions = JoinOptions.extend({
 });
 export type CreateRoomOptions = z.infer<typeof CreateRoomOptions>;
 
+/** Código da sala (é também o roomId no Colyseus): 5 caracteres, sem O/0, I/1/L. */
+export const ROOM_CODE_PATTERN = /^[A-HJKMNP-Z2-9]{5}$/;
+
+/**
+ * Trazer de volta uma sala que sumiu num reinício do servidor (ver "Snapshot da sala" na
+ * arquitetura). Vai por joinOrCreate filtrado por `restore`: se dois amigos pedem ao mesmo
+ * tempo, o matchmaker cria uma sala só e coloca os dois nela.
+ */
+export const RestoreRoomOptions = JoinOptions.extend({
+  restore: z.string().regex(ROOM_CODE_PATTERN),
+});
+export type RestoreRoomOptions = z.infer<typeof RestoreRoomOptions>;
+
 // ── Cliente → servidor durante o jogo ───────────────────────────────────────
 
 export const GrabMessage = z.object({ groupId });
@@ -122,18 +135,71 @@ export interface CursorBroadcast {
 export type VoiceTokenResponse =
   { available: false } | { available: true; url: string; token: string };
 
+// ── Contas (login com Google) ───────────────────────────────────────────────
+
+/** A conta logada, como o site a vê. */
+export interface AccountView {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  /** Código que um amigo digita para te adicionar. */
+  friendCode: string;
+  isAdmin: boolean;
+}
+
+/** GET /api/me — `user: null` = convidado; `googleLogin: false` = servidor sem login. */
+export interface MeResponse {
+  user: AccountView | null;
+  googleLogin: boolean;
+}
+
+/** POST /api/me/link-guest — passa para a conta o histórico do convidado deste navegador. */
+export const LinkGuestRequest = z.object({ guestId: z.uuid() });
+export type LinkGuestRequest = z.infer<typeof LinkGuestRequest>;
+
 // ── API REST de ranking ─────────────────────────────────────────────────────
 
 /**
- * GET /api/ranking?image=praia&pieces=100&players=2
+ * Janela do ranking: hoje, esta semana (começa na segunda), este mês ou desde sempre. Dias,
+ * semanas e meses viram no horário de Brasília, não no UTC do servidor.
+ */
+export const RANKING_PERIODS = ['day', 'week', 'month', 'all'] as const;
+export type RankingPeriod = (typeof RANKING_PERIODS)[number];
+export const RANKING_TIME_ZONE = 'America/Sao_Paulo';
+
+const teamSize = z.coerce.number().int().min(1).max(MAX_PLAYERS);
+const period = z.enum(RANKING_PERIODS).default('all');
+
+/**
+ * GET /api/ranking?image=praia&pieces=100&players=2&period=week
  * Categoria = imagem + tamanho escolhido + tamanho da equipe (só compara partidas iguais).
  */
 export const RankingQuery = z.object({
   image: catalogImageId, // fotos enviadas não têm ranking
   pieces: z.coerce.number().pipe(pieceCount),
-  players: z.coerce.number().int().min(1).max(MAX_PLAYERS),
+  players: teamSize,
+  period,
 });
 export type RankingQuery = z.infer<typeof RankingQuery>;
+
+/**
+ * GET /api/ranking/general?players=2&period=month
+ * Ranking geral de uma modalidade (solo, dupla, trio, quarteto): soma de todas as fotos.
+ */
+export const GeneralRankingQuery = z.object({ players: teamSize, period });
+export type GeneralRankingQuery = z.infer<typeof GeneralRankingQuery>;
+
+/**
+ * Uma linha do ranking geral. Pontos = peças somadas dos quebra-cabeças completados no período
+ * (montar um de 500 vale mais que um de 24); empate, ganha quem gastou menos tempo no total.
+ */
+export interface GeneralRankingEntry {
+  position: number;
+  players: string[];
+  points: number;
+  puzzles: number;
+  totalMs: number;
+}
 
 /** Uma linha do ranking: o melhor tempo de cada equipe na categoria. */
 export interface RankingEntry {
