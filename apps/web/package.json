@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@puzzle/shared": "workspace:*",
+    "pixi.js": "^8.22.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
