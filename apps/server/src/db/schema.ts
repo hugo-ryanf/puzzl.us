@@ -1,7 +1,9 @@
 import {
+  boolean,
   customType,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -18,10 +20,49 @@ const bytea = customType<{ data: Buffer; driverData: Buffer | Uint8Array }>({
   fromDriver: (value) => Buffer.from(value),
 });
 
-/** Um navegador = um convidado (guestId no localStorage). Contas de verdade vêm depois. */
+/**
+ * Conta de verdade (login com Google). O e-mail não é guardado: no login ele só é comparado com
+ * ADMIN_EMAILS para marcar `is_admin`. `friend_code` é o código que um amigo digita para adicionar.
+ */
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  /** Identificador estável da conta no Google (o "sub" do id_token). */
+  googleSub: text('google_sub').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  avatarUrl: text('avatar_url'),
+  friendCode: text('friend_code').notNull().unique(),
+  isAdmin: boolean('is_admin').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Sessão de login. O cookie leva um token aleatório; aqui fica só o hash SHA-256 dele, então um
+ * vazamento do banco não entrega sessões válidas.
+ */
+export const sessions = pgTable(
+  'sessions',
+  {
+    tokenHash: text('token_hash').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('sessions_user_idx').on(table.userId)],
+);
+
+/**
+ * Quem aparece nas partidas. Convidado: um navegador (guestId no localStorage). Com conta, o
+ * jogador fica ligado a ela (`user_id`) e vale em qualquer aparelho.
+ */
 export const players = pgTable('players', {
   id: uuid('id').primaryKey().defaultRandom(),
   guestId: uuid('guest_id').notNull().unique(),
+  /** A conta dona deste jogador (no máximo um jogador por conta). */
+  userId: uuid('user_id')
+    .unique()
+    .references(() => users.id, { onDelete: 'set null' }),
   nickname: text('nickname').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -54,6 +95,8 @@ export const games = pgTable(
       table.teamSize,
       table.durationMs,
     ),
+    // Ranking geral e filtros de hoje/semana/mês: por modalidade e data de fim.
+    index('games_period_idx').on(table.teamSize, table.finishedAt),
   ],
 );
 
@@ -88,4 +131,20 @@ export const uploads = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('uploads_last_used_idx').on(table.lastUsedAt)],
+);
+
+/**
+ * Última foto de cada sala em andamento, para ela sobreviver a um reinício do servidor (deploy,
+ * Render dormindo, queda). Some quando a partida termina ou todo mundo sai; as esquecidas são
+ * apagadas depois de SNAPSHOT_TTL_HOURS sem atualização.
+ */
+export const roomSnapshots = pgTable(
+  'room_snapshots',
+  {
+    roomCode: text('room_code').primaryKey(),
+    /** RoomSnapshot (rooms/snapshot.ts) em JSON; o campo `version` protege contra formatos antigos. */
+    data: jsonb('data').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('room_snapshots_updated_idx').on(table.updatedAt)],
 );
