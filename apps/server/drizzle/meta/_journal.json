@@ -22,6 +22,27 @@
       "when": 1792552886461,
       "tag": "0002_fotos-enviadas",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792593679739,
+      "tag": "0003_salas-salvas",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792595038598,
+      "tag": "0004_ranking-por-periodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792596397105,
+      "tag": "0005_contas",
+      "breakpoints": true
     }
   ]
 }
