@@ -18,5 +18,7 @@ export async function createMemoryDatabase(): Promise<AppDatabase> {
 
 /** Apaga todos os dados, mantendo as tabelas: bem mais rápido que subir outro PGlite. */
 export async function clearDatabase(db: AppDatabase): Promise<void> {
-  await db.execute(sql`TRUNCATE game_players, games, players, uploads`);
+  await db.execute(
+    sql`TRUNCATE game_players, games, players, uploads, room_snapshots, sessions, users`,
+  );
 }
