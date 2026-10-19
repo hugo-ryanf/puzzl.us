@@ -1,0 +1,60 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #1e1f24;
+  color: #e8e8ea;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #2a2c33;
+  border-bottom: 1px solid #3a3d46;
+}
+
+.toolbar .file input {
+  display: none;
+}
+
+.toolbar .file,
+.toolbar button {
+  cursor: pointer;
+  padding: 4px 10px;
+  border: 1px solid #555a66;
+  border-radius: 6px;
+  background: #343741;
+  color: inherit;
+  font: inherit;
+}
+
+.toolbar .progress {
+  font-weight: 600;
+}
+
+.toolbar .hint {
+  margin-left: auto;
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+/* min-height: 0 deixa o flex encolher o tabuleiro; senão o canvas empurra a página. */
+.board {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
