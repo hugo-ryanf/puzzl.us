@@ -2,9 +2,12 @@ import { join, sep } from 'node:path';
 import { Server } from '@colyseus/core';
 import express from 'express';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { PIECE_COUNT_PRESETS, ROOM_NAME, RankingQuery } from '@puzzle/shared';
+import { GeneralRankingQuery, PIECE_COUNT_PRESETS, ROOM_NAME, RankingQuery } from '@puzzle/shared';
+import type { AccountStore } from './auth/accounts';
+import { registerAuthRoutes, type AuthOptions } from './auth/routes';
 import type { GameStore } from './db/gameStore';
 import { PuzzleRoom } from './rooms/PuzzleRoom';
+import type { SnapshotStore } from './rooms/snapshots';
 import { registerUploadRoutes } from './uploads/routes';
 import type { UploadStore } from './uploads/uploadStore';
 import type { VoiceTokenIssuer } from './voice';
@@ -16,6 +19,13 @@ export interface GameServerOptions {
   uploads?: UploadStore;
   /** Sem voice (LIVEKIT_* não configuradas) o jogo funciona e a chamada fica indisponível. */
   voice?: VoiceTokenIssuer;
+  /** Sem snapshots (também depende do banco) as salas não sobrevivem a um reinício. */
+  snapshots?: SnapshotStore;
+  /**
+   * Contas (login com Google). Sem banco fica undefined: todo mundo joga como convidado e o
+   * /api/me responde que não há login.
+   */
+  auth?: AuthOptions;
   /**
    * Pasta do site já compilado (apps/web/dist). Em produção o mesmo servidor entrega o site,
    * a API e o WebSocket: uma URL só e nada de CORS. Em dev fica undefined (quem serve é o Vite).
@@ -36,16 +46,20 @@ export function createGameServer({
   store,
   uploads,
   voice,
+  snapshots,
+  auth,
   webDist,
   trustProxy = false,
 }: GameServerOptions = {}): Server {
+  const accounts: AccountStore | undefined = auth?.accounts;
   const server = new Server({
     transport: new WebSocketTransport(),
     greet: false,
     express: (app) => {
       if (trustProxy) app.set('trust proxy', 1); // confia em um salto: o proxy do Render
-      // API pública e sem cookies: qualquer origem pode usar (o front pode estar em outro
-      // domínio). O POST de foto manda bytes crus, então o navegador faz um "preflight" OPTIONS.
+      // Qualquer origem pode LER a API pública (o "*" não libera cookies: as rotas da conta só
+      // respondem com a sessão para o próprio site). O POST de foto manda bytes crus, então o
+      // navegador faz um "preflight" OPTIONS.
       app.use('/api', (req, res, next) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         if (req.method === 'OPTIONS') {
@@ -69,6 +83,12 @@ export function createGameServer({
 
       registerUploadRoutes(app, uploads);
 
+      if (auth) registerAuthRoutes(app, auth);
+      else {
+        // Servidor sem banco: sem contas. O site só esconde o botão de entrar.
+        app.get('/api/me', (_req, res) => res.json({ user: null, googleLogin: false }));
+      }
+
       app.get('/api/ranking', async (req, res) => {
         const query = RankingQuery.safeParse(req.query);
         if (!query.success) {
@@ -82,20 +102,40 @@ export function createGameServer({
         res.json(await store.leaderboard(query.data));
       });
 
+      // Ranking geral da modalidade (soma de todas as fotos) no período.
+      app.get('/api/ranking/general', async (req, res) => {
+        const query = GeneralRankingQuery.safeParse(req.query);
+        if (!query.success) {
+          res.status(400).json({ error: 'parâmetros inválidos', issues: query.error.issues });
+          return;
+        }
+        if (!store) {
+          res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
+          return;
+        }
+        res.json(await store.generalLeaderboard(query.data));
+      });
+
       if (webDist) serveWebApp(app, webDist);
     },
   });
 
   // A sala recebe as dependências por herança: assim elas nunca passam pelas opções que o
   // cliente envia ao criar/entrar (que ele controla).
-  server.define(
-    ROOM_NAME,
-    class extends PuzzleRoom {
-      protected override store = store;
-      protected override uploads = uploads;
-      protected override voice = voice;
-    },
-  );
+  // filterBy(['restore']): o joinOrCreate de quem volta depois de um reinício só encontra a
+  // sala restaurada com aquele código; pedidos simultâneos acabam todos na mesma sala.
+  server
+    .define(
+      ROOM_NAME,
+      class extends PuzzleRoom {
+        protected override store = store;
+        protected override uploads = uploads;
+        protected override voice = voice;
+        protected override snapshots = snapshots;
+        protected override accounts = accounts;
+      },
+    )
+    .filterBy(['restore']);
   return server;
 }
 
@@ -112,8 +152,8 @@ function serveWebApp(app: express.Application, webDist: string) {
       },
     }),
   );
-  // /api e /matchmake (Colyseus) ficam de fora: lá uma rota inexistente deve dar 404 de verdade.
-  app.get(/^\/(?!api\/|matchmake\/).*/, (_req, res) => {
+  // /api, /auth e /matchmake (Colyseus) ficam de fora: lá rota inexistente deve dar 404 de verdade.
+  app.get(/^\/(?!api\/|auth\/|matchmake\/).*/, (_req, res) => {
     // Sempre a versão mais nova: é ele que aponta para os arquivos com hash do deploy atual.
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(join(webDist, 'index.html'));
