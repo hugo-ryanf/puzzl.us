@@ -1,5 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { Room, validate, type Client, type Delayed } from '@colyseus/core';
+import {
+  CloseCode,
+  ErrorCode,
+  Room,
+  ServerError,
+  matchMaker,
+  validate,
+  type AuthContext,
+  type Client,
+  type Delayed,
+} from '@colyseus/core';
 import {
   CATALOG,
   CreateRoomOptions,
@@ -14,6 +24,7 @@ import {
   PuzzleConfigSchema,
   PuzzleEngine,
   RANDOM_IMAGE,
+  RestoreRoomOptions,
   RoomState,
   findCatalogImage,
   generatePuzzle,
@@ -24,10 +35,13 @@ import {
   type RankStatus,
   type VoiceTokenResponse,
 } from '@puzzle/shared';
+import type { AccountStore } from '../auth/accounts';
+import { accountFromCookieHeader } from '../auth/routes';
 import type { GameStore } from '../db/gameStore';
 import type { UploadStore } from '../uploads/uploadStore';
 import type { VoiceTokenIssuer } from '../voice';
 import { uniqueRoomCode } from './roomCode';
+import { SNAPSHOT_VERSION, type RoomSnapshot, type SnapshotStore } from './snapshots';
 
 /** Quanto tempo o servidor segura a vaga de quem caiu (rede instável, F5). */
 const RECONNECT_SECONDS = 30;
@@ -35,6 +49,10 @@ const RECONNECT_SECONDS = 30;
 const CLOCK_UPDATE_MS = 1000;
 /** "Espalhar" mexe na mesa de todos: no máximo uma vez a cada 2 s, para não virar bagunça. */
 const SCATTER_COOLDOWN_MS = 2000;
+/** Snapshot periódico (só se algo mudou): numa queda sem aviso, perde-se no máximo isso. */
+const SNAPSHOT_EVERY_MS = 10_000;
+
+type SavedPlayer = RoomSnapshot['players'][number];
 
 /**
  * Uma sala = um quebra-cabeça. O PuzzleEngine (o mesmo do modo local) é a autoridade:
@@ -43,6 +61,9 @@ const SCATTER_COOLDOWN_MS = 2000;
  *
  * Ciclo: lobby (esperando o anfitrião) → playing (relógio correndo) → completed (grava no ranking).
  * Sala solo (maxPlayers = 1) pula o lobby: começa assim que o jogador entra.
+ *
+ * Com banco, a sala guarda snapshots (ver "Snapshot da sala" na arquitetura): se o servidor
+ * reiniciar, o primeiro a voltar pelo código recria a sala de onde ela parou.
  */
 export class PuzzleRoom extends Room<{ state: RoomState }> {
   /** Ajustado no onCreate para as vagas escolhidas; cheia, o Colyseus trava a sala sozinho. */
@@ -56,13 +77,30 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   protected uploads?: UploadStore;
   /** Emissor de tokens do LiveKit; injetado por createGameServer. Sem LiveKit, fica undefined. */
   protected voice?: VoiceTokenIssuer;
+  /** Snapshots para sobreviver a reinícios; injetado por createGameServer. Sem banco, undefined. */
+  protected snapshots?: SnapshotStore;
+  /** Contas (login com Google); injetado por createGameServer. Sem banco, undefined. */
+  protected accounts?: AccountStore;
 
   private engine!: PuzzleEngine;
-  /** guestId de cada sessão: identifica o jogador no ranking sem ir para o estado público. */
-  private readonly guests = new Map<string, string>();
+  /**
+   * Quem é cada sessão (conta logada ou convidado): identifica o jogador no ranking sem ir para o
+   * estado público.
+   */
+  private readonly identities = new Map<string, Identity>();
+  /** Início real da partida (vai para o ranking). */
   private startedAt = 0;
+  /** elapsed = agora − clockOrigin. Numa sala restaurada, o tempo com o servidor fora não conta. */
+  private clockOrigin = 0;
   private lastScatterAt = 0;
   private clockTimer?: Delayed;
+  /** Jogadores do snapshot que ainda não voltaram, pela chave da pessoa (identityKey). */
+  private readonly returning = new Map<string, SavedPlayer>();
+  /** Algo mudou desde o último snapshot. */
+  private dirty = false;
+  private shuttingDown = false;
+  /** Gravações e remoções de snapshot em fila, para nunca chegarem fora de ordem ao banco. */
+  private persistence = Promise.resolve();
 
   messages = {
     start: (client: Client) => this.start(client),
@@ -79,7 +117,19 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   };
 
   async onCreate(rawOptions: unknown) {
-    const options = CreateRoomOptions.parse(rawOptions);
+    const restore = RestoreRoomOptions.safeParse(rawOptions);
+    if (restore.success) await this.restoreFrom(restore.data.restore);
+    else await this.createNew(CreateRoomOptions.parse(rawOptions));
+
+    if (this.snapshots) {
+      void this.saveSnapshot(); // já a partir do lobby: o convite tem que continuar valendo
+      this.clock.setInterval(() => {
+        if (this.dirty) void this.saveSnapshot();
+      }, SNAPSHOT_EVERY_MS);
+    }
+  }
+
+  private async createNew(options: CreateRoomOptions) {
     const { pieceCount, maxPlayers } = options;
     // "Aleatória": o servidor sorteia, assim ninguém escolhe a foto pelo console do navegador.
     const imageId =
@@ -89,7 +139,7 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     this.maxClients = maxPlayers;
     // O puzzle usa o tamanho real da imagem (em pixels).
     const { width, height } = await this.imageSize(imageId);
-    this.roomId = await uniqueRoomCode();
+    this.roomId = await uniqueRoomCode(async (code) => (await this.snapshots?.has(code)) ?? false);
     const { rows, cols } = gridForPieceCount(pieceCount, width / height);
     const seed = randomUUID().slice(0, 8);
     this.engine = PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height }));
@@ -106,6 +156,38 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
         maxPlayers,
       }),
     });
+    this.mirrorBoard();
+  }
+
+  /** Recria a sala que sumiu num reinício do servidor, a partir do último snapshot. */
+  private async restoreFrom(code: string) {
+    // Corrida rara: alguém já trouxe a sala de volta entre o "não encontrada" e este pedido.
+    if (await matchMaker.getRoomById(code)) {
+      throw new ServerError(ErrorCode.MATCHMAKE_UNHANDLED, `a sala ${code} já está aberta`);
+    }
+    const snapshot = await this.snapshots?.load(code);
+    // Mesma mensagem do joinById: para o cliente é só uma sala que não existe.
+    if (!snapshot) {
+      throw new ServerError(ErrorCode.MATCHMAKE_INVALID_ROOM_ID, `room "${code}" not found`);
+    }
+
+    const { config } = snapshot;
+    await this.imageSize(config.imageId); // foto enviada: confere que ainda existe e adia a expiração
+    this.roomId = code;
+    this.maxClients = config.maxPlayers;
+    this.engine = PuzzleEngine.fromGroups(generatePuzzle(config), snapshot.groups);
+    this.state = new RoomState({
+      config: new PuzzleConfigSchema(config),
+      phase: snapshot.phase,
+    });
+    this.mirrorBoard();
+    for (const player of snapshot.players) this.returning.set(player.guestId, player);
+    if (snapshot.phase === 'playing') this.startClock(snapshot.startedAt, snapshot.elapsedMs);
+    console.log(`[sala ${code}] restaurada do snapshot`);
+  }
+
+  /** Copia grupos e posições do engine para o estado sincronizado (sala nova ou restaurada). */
+  private mirrorBoard() {
     for (const group of this.engine.allGroups()) {
       this.state.groups.set(String(group.id), new GroupSchema({ x: group.x, y: group.y }));
     }
@@ -125,12 +207,33 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     return size;
   }
 
+  /**
+   * Quem está logado é reconhecido pelo cookie da sessão, que o navegador manda na conexão do
+   * WebSocket. Sem sessão (ou sem banco) a pessoa entra como convidado: nunca é recusada.
+   */
+  async onAuth(_client: Client, _options: unknown, context: AuthContext) {
+    const account = await accountFromCookieHeader(this.accounts, context.headers?.get('cookie'));
+    return account ? { userId: account.id } : true;
+  }
+
   onJoin(client: Client, rawOptions: unknown) {
     const { name, guestId } = JoinOptions.parse(rawOptions);
+    const identity: Identity = { guestId, userId: (client.auth as Partial<Identity>)?.userId };
+    const key = identityKey(identity);
+    // Voltando para uma sala restaurada: recupera a cor (se ainda livre) e os encaixes.
+    const saved = this.returning.get(key);
+    this.returning.delete(key);
     const usedColors = new Set([...this.state.players.values()].map((p) => p.color));
-    const color = PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? PLAYER_COLORS[0];
-    this.state.players.set(client.sessionId, new PlayerSchema({ name, color }));
-    this.guests.set(client.sessionId, guestId);
+    const color =
+      saved && !usedColors.has(saved.color)
+        ? saved.color
+        : (PLAYER_COLORS.find((c) => !usedColors.has(c)) ?? PLAYER_COLORS[0]);
+    this.state.players.set(
+      client.sessionId,
+      new PlayerSchema({ name, color, snaps: saved?.snaps ?? 0 }),
+    );
+    this.identities.set(client.sessionId, identity);
+    this.dirty = true;
     if (!this.state.hostId) this.state.hostId = client.sessionId;
     // Solo não tem ninguém para esperar: o relógio começa já.
     if (this.state.config.maxPlayers === 1) this.startPlaying();
@@ -152,7 +255,8 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   onLeave(client: Client) {
     this.releaseHeldBy(client.sessionId);
     this.state.players.delete(client.sessionId);
-    this.guests.delete(client.sessionId);
+    this.identities.delete(client.sessionId);
+    this.dirty = true;
     // O anfitrião saiu: o próximo da lista herda o botão "Começar".
     if (this.state.hostId === client.sessionId) {
       this.state.hostId = this.state.players.keys().next().value ?? '';
@@ -161,6 +265,15 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
 
   onDispose() {
     this.clockTimer?.clear();
+    // Todo mundo saiu: não há a quem devolver a sala. No desligamento o snapshot fica.
+    if (!this.shuttingDown) void this.forgetSnapshot();
+  }
+
+  /** Desligamento (deploy, Render dormindo): grava o snapshot antes de derrubar os jogadores. */
+  async onBeforeShutdown() {
+    this.shuttingDown = true;
+    await this.saveSnapshot();
+    await this.disconnect(CloseCode.SERVER_SHUTDOWN).catch(() => {});
   }
 
   private get phase(): GamePhase {
@@ -176,10 +289,21 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   private startPlaying() {
     if (this.phase !== 'lobby') return;
     this.state.phase = 'playing' satisfies GamePhase;
-    this.startedAt = Date.now();
+    this.startClock(Date.now(), 0);
+    this.dirty = true;
+  }
+
+  private startClock(startedAt: number, elapsedMs: number) {
+    this.startedAt = startedAt;
+    this.clockOrigin = Date.now() - elapsedMs;
+    this.state.elapsedMs = elapsedMs;
     this.clockTimer = this.clock.setInterval(() => {
-      this.state.elapsedMs = Date.now() - this.startedAt;
+      this.state.elapsedMs = this.elapsed();
     }, CLOCK_UPDATE_MS);
+  }
+
+  private elapsed(): number {
+    return Date.now() - this.clockOrigin;
   }
 
   /**
@@ -211,6 +335,7 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     this.engine.moveGroup(groupId, x, y);
     group.x = x;
     group.y = y;
+    this.dirty = true;
   }
 
   private drop(client: Client, { groupId, x, y }: MoveMessage) {
@@ -235,6 +360,7 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     for (const pieceId of merged.pieceIds) {
       if (this.state.pieceGroup[pieceId] !== groupId) this.state.pieceGroup[pieceId] = groupId;
     }
+    this.dirty = true;
     if (completed) this.finish();
   }
 
@@ -253,6 +379,7 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
       group.x = x;
       group.y = y;
     }
+    this.dirty = true;
   }
 
   /** Para o relógio, fecha a sala e registra o tempo (sem travar o jogo esperando o banco). */
@@ -260,14 +387,16 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     const finishedAt = Date.now();
     this.clockTimer?.clear();
     this.state.phase = 'completed' satisfies GamePhase;
-    this.state.durationMs = this.state.elapsedMs = finishedAt - this.startedAt;
+    this.state.durationMs = this.state.elapsedMs = this.elapsed();
+    // Partida terminada não volta: o resultado já está no estado (e no ranking).
+    void this.forgetSnapshot();
     // Equipe = quem está na sala na hora do fim (inclui quem caiu e pode voltar).
-    // Mesma pessoa em duas abas conta uma vez, como no banco.
+    // Mesma pessoa em duas abas (ou dois aparelhos, com conta) conta uma vez, como no banco.
     const team = [...this.state.players.entries()].map(([sessionId, player]) => ({
-      guestId: this.guests.get(sessionId)!,
+      ...this.identities.get(sessionId)!,
       nickname: player.name,
     }));
-    this.state.teamSize = new Set(team.map((p) => p.guestId)).size;
+    this.state.teamSize = new Set(team.map(identityKey)).size;
     void this.lock();
 
     // Foto enviada é única: não há com quem comparar, então não entra no ranking.
@@ -294,14 +423,91 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
         durationMs: this.state.durationMs,
         players: team,
       })
-      .then(({ rank }) => {
+      .then(({ rank, rankToday }) => {
         this.state.rank = rank;
+        this.state.rankToday = rankToday;
         this.state.rankStatus = 'saved' satisfies RankStatus;
       })
       .catch((error: unknown) => {
         console.error(`[sala ${this.roomId}] falha ao gravar no ranking`, error);
         this.state.rankStatus = 'unavailable' satisfies RankStatus;
       });
+  }
+
+  /** Enfileira a gravação do estado atual. Partida terminada não tem snapshot. */
+  private saveSnapshot(): Promise<void> {
+    const store = this.snapshots;
+    if (!store || this.phase === 'completed') return this.persistence;
+    this.dirty = false;
+    const snapshot = this.snapshot(); // tirado agora, não quando a fila chegar nele
+    return this.enqueue(
+      () => store.save(this.roomId, snapshot),
+      (error) => {
+        console.error(`[sala ${this.roomId}] falha ao gravar o snapshot`, error);
+        this.dirty = true; // tenta de novo no próximo ciclo
+      },
+    );
+  }
+
+  private forgetSnapshot(): Promise<void> {
+    const store = this.snapshots;
+    if (!store) return this.persistence;
+    return this.enqueue(
+      () => store.delete(this.roomId),
+      (error) => console.error(`[sala ${this.roomId}] falha ao apagar o snapshot`, error),
+    );
+  }
+
+  /** Falha no banco não derruba a sala nem trava a fila: só vai para `onError`. */
+  private enqueue(task: () => Promise<void>, onError: (error: unknown) => void): Promise<void> {
+    this.persistence = this.persistence.then(task).catch(onError);
+    return this.persistence;
+  }
+
+  private snapshot(): RoomSnapshot {
+    const { config } = this.state;
+    const players = new Map<string, SavedPlayer>();
+    for (const [sessionId, player] of this.state.players) {
+      const key = identityKey(this.identities.get(sessionId)!);
+      const same = players.get(key); // a mesma pessoa em duas abas: soma os encaixes
+      if (same) same.snaps += player.snaps;
+      else {
+        players.set(key, {
+          guestId: key,
+          name: player.name,
+          color: player.color,
+          snaps: player.snaps,
+        });
+      }
+    }
+    // Quem estava antes do último reinício e ainda não voltou continua com a vaga guardada.
+    for (const saved of this.returning.values()) {
+      if (!players.has(saved.guestId)) players.set(saved.guestId, saved);
+    }
+    const playing = this.phase === 'playing';
+    return {
+      version: SNAPSHOT_VERSION,
+      config: {
+        imageId: config.imageId,
+        seed: config.seed,
+        rows: config.rows,
+        cols: config.cols,
+        width: config.width,
+        height: config.height,
+        pieceCount: config.pieceCount,
+        maxPlayers: config.maxPlayers,
+      },
+      phase: playing ? 'playing' : 'lobby',
+      startedAt: this.startedAt,
+      elapsedMs: playing ? this.elapsed() : 0,
+      players: [...players.values()],
+      groups: [...this.engine.allGroups()].map(({ id, x, y, pieceIds }) => ({
+        id,
+        x,
+        y,
+        pieceIds: [...pieceIds],
+      })),
+    };
   }
 
   /** O grupo, se existir e for este cliente quem está segurando. */
@@ -316,3 +522,12 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     }
   }
 }
+
+/** Quem é a pessoa: a conta (vale em qualquer aparelho) ou, sem login, o convidado do navegador. */
+interface Identity {
+  guestId: string;
+  userId?: string;
+}
+
+/** Chave única da pessoa (para somar duas abas e reconhecer quem volta depois de um reinício). */
+const identityKey = ({ guestId, userId }: Identity) => (userId ? `user:${userId}` : guestId);
