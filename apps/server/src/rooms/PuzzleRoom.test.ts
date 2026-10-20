@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import {
   CATALOG,
   ROOM_NAME,
+  type GeneralRankingEntry,
   type GrabMessage,
   type RankingEntry,
   type RoomState,
@@ -18,9 +19,11 @@ import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
 import { createUploadStore } from '../uploads/uploadStore';
 import { createVoiceTokenIssuer, voiceRoomName } from '../voice';
 import type { PuzzleRoom } from './PuzzleRoom';
+import { createSnapshotStore, type SnapshotStore } from './snapshots';
 
 let colyseus: ColyseusTestServer;
 let db: AppDatabase;
+let snapshots: SnapshotStore;
 
 const voiceConfig = {
   url: 'wss://teste.livekit.cloud',
@@ -33,7 +36,8 @@ beforeAll(async () => {
   const store = createGameStore(db);
   const uploads = createUploadStore(db);
   const voice = createVoiceTokenIssuer(voiceConfig);
-  colyseus = await boot(createGameServer({ store, uploads, voice }), 2568);
+  snapshots = createSnapshotStore(db);
+  colyseus = await boot(createGameServer({ store, uploads, voice, snapshots }), 2568);
 });
 afterAll(() => colyseus.shutdown());
 beforeEach(async () => {
@@ -322,6 +326,7 @@ describe('PuzzleRoom — fim e ranking', () => {
     await waitForRankStatus(room, state);
     expect(state.rankStatus).toBe('saved');
     expect(state.rank).toBe(1);
+    expect(state.rankToday).toBe(1);
   });
 
   it('o tempo gravado aparece na API de ranking da categoria', async () => {
@@ -335,6 +340,35 @@ describe('PuzzleRoom — fim e ranking', () => {
     expect(data).toHaveLength(1);
     expect(data[0]).toMatchObject({ position: 1, players: ['Ana', 'Bia'] });
     expect(data[0]!.durationMs).toBe(game.state.durationMs);
+
+    // Acabou de terminar: aparece também no ranking de hoje.
+    const today = await colyseus.http.get<RankingEntry[]>(
+      `/api/ranking?image=${IMAGE.id}&pieces=24&players=2&period=day`,
+    );
+    expect(today.data).toHaveLength(1);
+  });
+
+  it('a partida soma no ranking geral da modalidade (dupla)', async () => {
+    const game = await setup();
+    await solve(game);
+    await waitForRankStatus(game.room, game.state);
+
+    const { data } = await colyseus.http.get<GeneralRankingEntry[]>(
+      '/api/ranking/general?players=2&period=week',
+    );
+    expect(data).toEqual([
+      {
+        position: 1,
+        players: ['Ana', 'Bia'],
+        points: 24,
+        puzzles: 1,
+        totalMs: game.state.durationMs,
+      },
+    ]);
+    // Período inválido é recusado.
+    await expect(
+      colyseus.http.get('/api/ranking/general?players=2&period=ano'),
+    ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('a API rejeita categoria inválida', async () => {
@@ -427,5 +461,101 @@ describe('Fotos enviadas', () => {
         imageId: `upload:${'z'.repeat(22)}`,
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe('PuzzleRoom — snapshot e reinício do servidor', () => {
+  const ana = { name: 'Ana', guestId: randomUUID() };
+  const bia = { name: 'Bia', guestId: randomUUID() };
+
+  /** Espera a fila de gravação da sala chegar ao banco. */
+  async function waitForSnapshot(code: string, exists: boolean) {
+    for (let i = 0; i < 50 && (await snapshots.has(code)) !== exists; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return snapshots.has(code);
+  }
+
+  /** Partida em andamento com um encaixe da Ana; depois o servidor "desliga" a sala. */
+  async function playThenShutdown() {
+    const room = await colyseus.createRoom<PuzzleRoom>(ROOM_NAME, {
+      ...ana,
+      pieceCount: 24,
+      imageId: IMAGE.id,
+    });
+    const anaClient = await colyseus.connectTo(room, ana);
+    await colyseus.connectTo(room, bia);
+    const state = room.state as RoomState;
+    const send = async (type: 'start' | 'grab' | 'drop', payload?: object) => {
+      anaClient.send(type, payload);
+      await room.waitForNextMessage();
+    };
+    await send('start');
+    const anchor = state.groups.get('0')!;
+    await send('grab', { groupId: 1 });
+    await send('drop', { groupId: 1, x: anchor.x, y: anchor.y });
+
+    const before = {
+      code: room.roomId,
+      config: state.config.toJSON(),
+      pieceGroup: [...state.pieceGroup],
+      group1: { x: state.groups.get('1')!.x, y: state.groups.get('1')!.y },
+      anaColor: state.players.get(anaClient.sessionId)!.color,
+    };
+    await room.onBeforeShutdown();
+    return before;
+  }
+
+  const restore = (who: typeof ana, code: string) =>
+    colyseus.sdk.joinOrCreate(ROOM_NAME, { ...who, restore: code });
+
+  it('volta com o mesmo código, a mesa como estava e o relógio andando', async () => {
+    const before = await playThenShutdown();
+    expect(await snapshots.has(before.code)).toBe(true);
+    expect(colyseus.getRoomById(before.code)).toBeUndefined();
+
+    const client = await restore(ana, before.code);
+    expect(client.roomId).toBe(before.code);
+    const room = colyseus.getRoomById<RoomState>(before.code);
+    const state = room.state as RoomState;
+    expect(state.config.toJSON()).toEqual(before.config);
+    expect(state.phase).toBe('playing');
+    expect([...state.pieceGroup]).toEqual(before.pieceGroup);
+    expect(state.groups.get('1')).toMatchObject(before.group1);
+    expect(state.groups.has('0')).toBe(false);
+
+    // Quem volta recupera a cor e os encaixes que tinha.
+    const restoredAna = state.players.get(client.sessionId)!;
+    expect(restoredAna.color).toBe(before.anaColor);
+    expect(restoredAna.snaps).toBe(1);
+  });
+
+  it('dois amigos voltando ao mesmo tempo caem na mesma sala', async () => {
+    const { code } = await playThenShutdown();
+    const [a, b] = await Promise.all([restore(ana, code), restore(bia, code)]);
+    expect(a.roomId).toBe(code);
+    expect(b.roomId).toBe(code);
+    expect((colyseus.getRoomById(code).state as RoomState).players.size).toBe(2);
+  });
+
+  it('sem snapshot, a sala simplesmente não existe', async () => {
+    await expect(restore(ana, 'ZZZZZ')).rejects.toThrow(/not found/);
+  });
+
+  it('partida terminada não deixa snapshot', async () => {
+    const game = await setup();
+    expect(await waitForSnapshot(game.room.roomId, true)).toBe(true); // salvo ao criar
+    await solve(game);
+    expect(game.state.phase).toBe('completed');
+    expect(await waitForSnapshot(game.room.roomId, false)).toBe(false);
+  });
+
+  it('se todo mundo sai, o snapshot é apagado', async () => {
+    const { room, ana: anaClient, bia: biaClient } = await setup();
+    const code = room.roomId;
+    expect(await waitForSnapshot(code, true)).toBe(true);
+    await anaClient.leave();
+    await biaClient.leave();
+    expect(await waitForSnapshot(code, false)).toBe(false);
   });
 });
