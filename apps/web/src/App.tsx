@@ -1,56 +1,55 @@
-import { useState, type ChangeEvent } from 'react';
-import { PIECE_COUNT_PRESETS } from '@puzzle/shared';
-import { Board } from './board/Board';
-import type { Progress } from './board/BoardScene';
-import { createSampleImage, loadImageFile } from './board/images';
+import { useCallback, useEffect, useState } from 'react';
+import type { RankingQuery } from '@puzzle/shared';
+import { hasSavedSession, resumeRoom, type PuzzleRoom } from './net/connection';
+import { HomeScreen } from './screens/HomeScreen';
+import { RankingScreen } from './screens/RankingScreen';
+import { RoomScreen } from './screens/RoomScreen';
 
-const newSeed = () => Math.random().toString(36).slice(2, 10);
+/** O link de convite é só o código no caminho: https://site/K7QF2 */
+function codeFromUrl(): string {
+  const code = location.pathname.slice(1).toUpperCase();
+  return /^[A-Z2-9]{5}$/.test(code) ? code : '';
+}
 
 export function App() {
-  const [image, setImage] = useState(() => createSampleImage());
-  const [pieceCount, setPieceCount] = useState<number>(48);
-  const [seed, setSeed] = useState(newSeed);
-  const [progress, setProgress] = useState<Progress | null>(null);
+  const [room, setRoom] = useState<PuzzleRoom | null>(null);
+  // Ranking aberto por cima (da home ou do fim da partida); a sala continua conectada por trás.
+  const [ranking, setRanking] = useState<RankingQuery | null>(null);
+  const [notice, setNotice] = useState<string>();
+  // F5 dentro de uma sala: tenta voltar para ela com o token salvo antes de mostrar a home.
+  const [resuming, setResuming] = useState(() => hasSavedSession(codeFromUrl()));
 
-  async function handleFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setImage(await loadImageFile(file));
-    setSeed(newSeed());
+  useEffect(() => {
+    if (!resuming) return;
+    void resumeRoom(codeFromUrl()).then((resumed) => {
+      if (resumed) setRoom(resumed);
+      setResuming(false);
+    });
+  }, [resuming]);
+
+  const enter = useCallback((joined: PuzzleRoom) => {
+    history.replaceState(null, '', `/${joined.roomId}`);
+    setNotice(undefined);
+    setRoom(joined);
+  }, []);
+
+  const leave = useCallback((message?: string) => {
+    history.replaceState(null, '', '/');
+    setRoom(null);
+    setNotice(message);
+  }, []);
+
+  if (resuming) return <p className="loading">Voltando para a sala…</p>;
+  if (ranking) return <RankingScreen initial={ranking} onBack={() => setRanking(null)} />;
+  if (room) {
+    return <RoomScreen key={room.roomId} room={room} onLeave={leave} onShowRanking={setRanking} />;
   }
-
-  // Encaixes feitos = peças - grupos; o puzzle completo tem (peças - 1) encaixes.
-  const percent = progress
-    ? Math.round(((progress.pieces - progress.groups) / Math.max(1, progress.pieces - 1)) * 100)
-    : 0;
-
   return (
-    <div className="app">
-      <header className="toolbar">
-        <strong>Quebra-cabeça</strong>
-        <label>
-          Peças{' '}
-          <select value={pieceCount} onChange={(e) => setPieceCount(Number(e.target.value))}>
-            {PIECE_COUNT_PRESETS.map((count) => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="file">
-          Usar minha foto
-          <input type="file" accept="image/*" onChange={handleFile} />
-        </label>
-        <button onClick={() => setSeed(newSeed())}>Embaralhar de novo</button>
-        <span className="progress">
-          {progress?.completed ? '🎉 Completo!' : `${percent}% montado`}
-        </span>
-        <span className="hint">
-          arraste as peças · roda do mouse = zoom · arraste o fundo = mover
-        </span>
-      </header>
-      <Board image={image} pieceCount={pieceCount} seed={seed} onProgress={setProgress} />
-    </div>
+    <HomeScreen
+      initialCode={codeFromUrl()}
+      notice={notice}
+      onEnter={enter}
+      onShowRanking={setRanking}
+    />
   );
 }
