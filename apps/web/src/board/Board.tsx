@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { BoardScene, type GameOptions } from './BoardScene';
+import type { PuzzleRoom } from '../net/connection';
+import { BoardScene } from './BoardScene';
 
-export function Board({ image, pieceCount, seed, onProgress }: GameOptions) {
+interface BoardProps {
+  room: PuzzleRoom;
+  image: HTMLImageElement;
+}
+
+export function Board({ room, image }: BoardProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<BoardScene | null>(null);
 
@@ -24,8 +30,8 @@ export function Board({ image, pieceCount, seed, onProgress }: GameOptions) {
   }, []);
 
   useEffect(() => {
-    scene?.start({ image, pieceCount, seed, onProgress });
-  }, [scene, image, pieceCount, seed, onProgress]);
+    scene?.attach(room, image);
+  }, [scene, room, image]);
 
   return <div ref={hostRef} className="board" />;
 }
