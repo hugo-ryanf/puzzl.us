@@ -1,5 +1,4 @@
 import { findCatalogImage, uploadIdOf } from '@puzzle/shared';
-import { SERVER_URL } from '../net/connection';
 
 /** Imagens do catálogo ficam em public/catalog (geradas por `pnpm catalog`). */
 export const catalogThumbUrl = (id: string) => `/catalog/${id}-mini.webp`;
@@ -7,7 +6,7 @@ export const catalogThumbUrl = (id: string) => `/catalog/${id}-mini.webp`;
 /** Endereço da foto do puzzle: do catálogo (front) ou enviada (servidor do jogo). */
 export function puzzleImageUrl(imageId: string): string {
   const uploadId = uploadIdOf(imageId);
-  return uploadId ? `${SERVER_URL}/api/uploads/${uploadId}` : `/catalog/${imageId}.webp`;
+  return uploadId ? `/api/uploads/${uploadId}` : `/catalog/${imageId}.webp`;
 }
 
 /** Título para mostrar na sala; fotos enviadas não têm título nem crédito. */
