@@ -11,6 +11,178 @@ body {
   color: #e8e8ea;
 }
 
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid #555a66;
+  border-radius: 6px;
+  background: #343741;
+}
+
+button:hover:not(:disabled) {
+  background: #3f4350;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input,
+select {
+  padding: 6px 10px;
+  border: 1px solid #555a66;
+  border-radius: 6px;
+  background: #24262c;
+}
+
+/* ── Home ─────────────────────────────────────────────── */
+
+.home {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.home h1 {
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  margin-top: 0;
+  opacity: 0.7;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 16px 0;
+}
+
+/* Uma coluna: o card de criar sala precisa da largura toda para a grade de imagens. */
+.cards {
+  display: grid;
+  gap: 16px;
+}
+
+/* ── Catálogo de imagens ─────────────────────────────── */
+
+.image-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.image-picker button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 2px solid transparent;
+  background: #24262c;
+  text-align: left;
+}
+
+.image-picker button.selected {
+  border-color: #4dabf7;
+  background: #1f3247;
+}
+
+.image-picker img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.image-picker span {
+  overflow: hidden;
+  font-size: 0.85em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Tile "Enviar sua foto": mesmo tamanho das miniaturas, borda tracejada. */
+.upload-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 140px;
+  border: 2px dashed #555a66;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85em;
+}
+
+.upload-tile:hover {
+  border-color: #74c0fc;
+}
+
+.upload-tile.busy {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.upload-icon {
+  font-size: 2em;
+}
+
+.caption .credit {
+  opacity: 0.6;
+  font-size: 0.85em;
+}
+
+.board-loading {
+  margin: auto;
+  opacity: 0.7;
+}
+
+.card {
+  padding: 16px;
+  border: 1px solid #3a3d46;
+  border-radius: 10px;
+  background: #2a2c33;
+}
+
+.card h2 {
+  margin: 0;
+  font-size: 1.1em;
+}
+
+.code-input {
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.error {
+  color: #ff8787;
+}
+
+.notice {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #3b3420;
+}
+
+.loading {
+  padding: 48px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* ── Sala ─────────────────────────────────────────────── */
+
 .app {
   display: flex;
   flex-direction: column;
@@ -21,40 +193,201 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 12px 16px;
   padding: 10px 16px;
   background: #2a2c33;
   border-bottom: 1px solid #3a3d46;
 }
 
-.toolbar .file input {
-  display: none;
+.room-code {
+  font-family: ui-monospace, monospace;
+  font-size: 1.1em;
+  letter-spacing: 0.15em;
 }
 
-.toolbar .file,
-.toolbar button {
-  cursor: pointer;
-  padding: 4px 10px;
-  border: 1px solid #555a66;
-  border-radius: 6px;
-  background: #343741;
-  color: inherit;
-  font: inherit;
+.players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.toolbar .progress {
-  font-weight: 600;
+.players li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.toolbar .hint {
-  margin-left: auto;
+.players li.offline {
+  opacity: 0.4;
+}
+
+.players .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: box-shadow 0.15s;
+}
+
+/* Anel na cor do jogador enquanto ele fala (currentColor vem do style inline). */
+.players .dot.speaking {
+  box-shadow:
+    0 0 0 3px #2a2c33,
+    0 0 0 5px currentColor;
+}
+
+.voice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice button.muted {
+  border-color: #ff8787;
+}
+
+.voice-off {
   opacity: 0.6;
+  font-size: 0.9em;
+}
+
+.voice-notice {
+  color: #ffd43b;
   font-size: 0.85em;
 }
 
+.progress {
+  font-weight: 600;
+}
+
+.leave {
+  margin-left: auto;
+}
+
+.banner {
+  padding: 6px 16px;
+  background: #5c3b1e;
+  text-align: center;
+}
+
+.clock {
+  font-variant-numeric: tabular-nums; /* dígitos com largura fixa: o relógio não "treme" */
+  font-weight: 600;
+}
+
 /* min-height: 0 deixa o flex encolher o tabuleiro; senão o canvas empurra a página. */
-.board {
+.board-area {
+  position: relative;
+  display: flex;
   flex: 1;
   min-height: 0;
+}
+
+.board {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
+}
+
+/* Painéis por cima do tabuleiro: as peças continuam visíveis atrás (lobby e fim). */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(20, 21, 25, 0.55);
+}
+
+/* No fim, a imagem montada é a estrela: painel no topo e sem escurecer o tabuleiro. */
+.overlay.completed {
+  place-items: start center;
+  background: none;
+  pointer-events: none; /* deixa dar zoom/pan na imagem montada... */
+}
+
+.overlay.completed .panel {
+  pointer-events: auto; /* ...mas os botões continuam clicáveis */
+}
+
+.panel {
+  max-width: 420px;
+  padding: 24px;
+  border: 1px solid #3a3d46;
+  border-radius: 12px;
+  background: #2a2c33;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.panel .rank {
+  font-size: 1.15em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+button.primary {
+  border-color: #4dabf7;
+  background: #1c64a8;
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #2474c0;
+}
+
+button.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #74c0fc;
+  text-decoration: underline;
+}
+
+button.link:hover:not(:disabled) {
+  background: none;
+}
+
+/* ── Ranking ──────────────────────────────────────────── */
+
+.ranking {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 16px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ranking table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ranking th,
+.ranking td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #3a3d46;
+  text-align: left;
+}
+
+.ranking .time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
