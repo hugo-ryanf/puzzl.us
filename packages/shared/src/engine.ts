@@ -94,28 +94,33 @@ export class PuzzleEngine {
    * Solta o grupo: se alguma peça dele estiver perto da posição certa em relação a uma vizinha
    * de outro grupo, o grupo solto "pula" para o alinhamento e absorve o outro. Repete até
    * não haver mais encaixes, porque um encaixe pode alinhar o grupo com um terceiro.
+   *
+   * `canAbsorb` permite vetar alvos — no multiplayer, grupos que outro jogador está segurando.
    */
-  dropGroup(groupId: number): DropResult {
+  dropGroup(groupId: number, canAbsorb: (other: GroupState) => boolean = () => true): DropResult {
     const group = this.getGroup(groupId);
     const absorbedGroupIds: number[] = [];
 
-    let other = this.findSnapTarget(group);
+    let other = this.findSnapTarget(group, canAbsorb);
     while (other) {
       group.x = other.x;
       group.y = other.y;
       this.absorb(group, other);
       absorbedGroupIds.push(other.id);
-      other = this.findSnapTarget(group);
+      other = this.findSnapTarget(group, canAbsorb);
     }
 
     return { absorbedGroupIds, completed: this.isComplete() };
   }
 
-  private findSnapTarget(group: GroupState): GroupState | undefined {
+  private findSnapTarget(
+    group: GroupState,
+    canAbsorb: (other: GroupState) => boolean,
+  ): GroupState | undefined {
     for (const pieceId of group.pieceIds) {
       for (const neighborId of neighborsOf(this.puzzle, pieceId)) {
         const other = this.groupOf(neighborId);
-        if (other.id === group.id) continue;
+        if (other.id === group.id || !canAbsorb(other)) continue;
         if (Math.hypot(other.x - group.x, other.y - group.y) <= this.snapDistance) return other;
       }
     }
