@@ -52,6 +52,13 @@ describe('PuzzleEngine', () => {
     expect(result.completed).toBe(true);
   });
 
+  it('não absorve grupos vetados por canAbsorb', () => {
+    const engine = farApart();
+    engine.moveGroup(1, 0, 500);
+    expect(engine.dropGroup(1, (other) => other.id !== 0).absorbedGroupIds).toEqual([]);
+    expect(engine.groupCount).toBe(3);
+  });
+
   it('espalha as peças de forma reproduzível', () => {
     const a = PuzzleEngine.scattered(puzzle);
     const b = PuzzleEngine.scattered(puzzle);
