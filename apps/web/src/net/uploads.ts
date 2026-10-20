@@ -1,5 +1,4 @@
 import type { UploadResponse } from '@puzzle/shared';
-import { SERVER_URL } from './connection';
 
 /** O servidor reduz para 2048 de qualquer jeito: reduzir antes poupa o upload (8 MB → ~600 kB). */
 const MAX_SIDE = 2048;
@@ -40,7 +39,7 @@ export async function uploadImage(file: File): Promise<UploadedImage> {
   const blob = await prepareImage(file);
   let response: Response;
   try {
-    response = await fetch(`${SERVER_URL}/api/uploads`, {
+    response = await fetch('/api/uploads', {
       method: 'POST',
       body: blob,
       headers: { 'Content-Type': 'image/jpeg' },
