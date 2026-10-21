@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { uploadIdOf, type SavedGameSummary } from '@puzzle/shared';
-import { catalogThumbUrl, puzzleImageInfo, puzzleImageUrl } from '../board/images';
+import type { SavedGameSummary } from '@puzzle/shared';
+import { puzzleImageInfo, puzzleThumbUrl } from '../board/images';
 import { formatDuration } from '../format';
 import { resumeSavedGame, type PuzzleRoom } from '../net/connection';
 import { ArrowRightIcon } from '../ui/icons';
@@ -13,10 +13,6 @@ interface SavedScreenProps {
 }
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-
-/** Foto enviada não tem miniatura: usa a própria foto (já é pequena o bastante). */
-const thumbUrl = (imageId: string) =>
-  uploadIdOf(imageId) ? puzzleImageUrl(imageId) : catalogThumbUrl(imageId);
 
 /** Partidas salvas pela conta, da mais recente para a mais antiga; continuar abre uma sala nova. */
 export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScreenProps) {
@@ -99,7 +95,7 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
             const mode = game.maxPlayers === 1 ? 'Solo' : `até ${game.maxPlayers} jogadores`;
             return (
               <li key={game.id}>
-                <img src={thumbUrl(game.imageId)} alt="" loading="lazy" />
+                <img src={puzzleThumbUrl(game.imageId)} alt="" loading="lazy" />
                 <span className="records-title">
                   <strong>{title}</strong>
                   <small>
