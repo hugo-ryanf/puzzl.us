@@ -73,6 +73,8 @@ export function App() {
   const [createRequested, setCreateRequested] = useState(false);
   // Link de convite (/K7QF2) sem sessão salva: abre "Entrar com código" já preenchido.
   const [joinOpen, setJoinOpen] = useState(() => codeFromUrl() !== '');
+  /** Código digitado no campo da barra lateral (vale mais que o do link). */
+  const [joinCode, setJoinCode] = useState('');
   // F5 dentro de uma sala: tenta voltar para ela com o token salvo antes de mostrar o início.
   const [resuming, setResuming] = useState(() => hasSavedSession(codeFromUrl()));
 
@@ -181,12 +183,14 @@ export function App() {
           if (!onExplore) setSection('explore'); // os diálogos moram no Explorar
           setCreateRequested(true);
         }}
-        onJoinRoom={() => {
+        onJoinRoom={(code) => {
           setRanking(null);
           if (!onExplore) setSection('explore');
+          setJoinCode(code ?? '');
           setJoinOpen(true);
         }}
         account={account}
+        friends={friends.data?.friends}
         friendRequests={friends.data?.incoming.length}
       >
         {ranking ? (
@@ -230,7 +234,7 @@ export function App() {
             onNameChange={setName}
             createRequested={createRequested}
             joinOpen={joinOpen}
-            initialCode={codeFromUrl()}
+            initialCode={joinCode || codeFromUrl()}
             onCloseCreate={() => setCreateRequested(false)}
             onCloseJoin={() => setJoinOpen(false)}
             onEnter={enter}
