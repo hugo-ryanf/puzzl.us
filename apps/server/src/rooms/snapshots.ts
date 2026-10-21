@@ -35,6 +35,10 @@ export interface RoomSnapshot {
    */
   players: Array<{ guestId: string; name: string; color: string; snaps: number }>;
   groups: GroupState[];
+  /** Conta de quem criou a sala (o único que pode salvar e retomar). Sem conta, ausente. */
+  ownerUserId?: string;
+  /** A partida salva de onde a sala veio (retomada): ao terminar ou salvar de novo, é ela. */
+  savedId?: string;
 }
 
 export interface SnapshotStore {
