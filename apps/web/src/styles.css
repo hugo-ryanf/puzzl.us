@@ -75,6 +75,26 @@ select {
   outline-offset: 2px;
 }
 
+/*
+ * Interface 10% menor que o desenho original. O zoom vai em cada bloco de interface, e NÃO no
+ * tabuleiro: zoom em volta do <canvas> mexe na conta de onde o mouse está, e as peças passariam
+ * a "fugir" do cursor em alguns navegadores (a mesa já tem o zoom dela). Só blocos de primeiro
+ * nível: dentro deles o zoom é herdado, e repetir multiplicaria (0,9 × 0,9).
+ */
+#root > .shell,
+#root > .main.standalone,
+#root > .loading,
+.room-header,
+.banner,
+.people,
+.board-tools,
+.reference-image,
+.result-reopen,
+.overlay > .panel,
+.result {
+  zoom: 0.9;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -509,9 +529,16 @@ select {
 
 /* ── Cards da grade ─────────────────────────────────────────────────────── */
 
+/*
+ * Colunas de no mínimo 232px e no máximo 4 por linha: a coluna nunca fica mais estreita que
+ * 1/4 da largura (descontados os 3 vãos). Em tela estreita, o min(100%, …) evita estourar.
+ */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(232px, 100%), 1fr));
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, max(232px, (100% - 3 * 24px) / 4)), 1fr)
+  );
   gap: 24px;
 }
 
