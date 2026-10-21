@@ -40,21 +40,22 @@ mouse sem esperar o servidor) e o servidor confirma/corrige.
 
 ## Stack
 
-| Camada              | Escolha                                                            | Por quê                                                                             |
-| ------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| Monorepo            | **pnpm workspaces**                                                | compartilhar tipos e a geometria do puzzle entre front e server                     |
-| Front               | **Vite + React + TS**                                              | lobby, ranking, UI; simples e rápido                                                |
-| Render do tabuleiro | **PixiJS v8** (WebGL)                                              | aguenta 500–1000 peças com máscara de imagem a 60 fps; DOM/SVG engasga              |
-| Tempo real          | **Colyseus** (Node)                                                | salas, sync de estado por _schema_ (delta binário), reconexão e matchmaking prontos |
-| REST                | Express (mesmo processo do Colyseus)                               | criar sala, ranking, upload, token de áudio                                         |
-| Áudio               | **LiveKit Cloud** (free) + `livekit-client`                        | SFU gerenciado, resolve NAT/TURN; P2P puro exigiria TURN próprio                    |
-| Banco               | **Postgres (Neon free)** + **Drizzle ORM**                         | relacional serve bem pro ranking; Drizzle é TS-first                                |
-| Imagens             | **Cloudflare R2** (S3-compat, 10 GB free) + `sharp`                | upload por URL pré-assinada; redimensiona/limpa EXIF                                |
-| Auth (MVP)          | **convidado**: apelido + `guestId` no localStorage                 | zero fricção pra amigos; contas (OAuth Discord/Google) depois                       |
-| Validação           | **zod** em `packages/shared`                                       | mesmos schemas validam mensagens no cliente e no servidor                           |
-| Deploy              | Front: **Cloudflare Pages/Vercel** · Server: **Render/Koyeb free** | WebSocket precisa de processo long-running (não serve serverless)                   |
+| Camada              | Escolha                                                         | Por quê                                                                              |
+| ------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Monorepo            | **pnpm workspaces**                                             | compartilhar tipos e a geometria do puzzle entre front e server                      |
+| Front               | **Vite + React + TS**                                           | lobby, ranking, UI; simples e rápido                                                 |
+| Render do tabuleiro | **PixiJS v8** (WebGL)                                           | aguenta 500–1000 peças com máscara de imagem a 60 fps; DOM/SVG engasga               |
+| Tempo real          | **Colyseus** (Node)                                             | salas, sync de estado por _schema_ (delta binário), reconexão e matchmaking prontos  |
+| REST                | Express (mesmo processo do Colyseus)                            | criar sala, ranking, upload, token de áudio                                          |
+| Áudio               | **LiveKit Cloud** (free) + `livekit-client`                     | SFU gerenciado, resolve NAT/TURN; P2P puro exigiria TURN próprio                     |
+| Banco               | **Postgres (Neon free)** + **Drizzle ORM**                      | relacional serve bem pro ranking; Drizzle é TS-first                                 |
+| Imagens             | **Cloudflare R2** (S3-compat, 10 GB free) + `sharp`             | upload por URL pré-assinada; redimensiona/limpa EXIF                                 |
+| Auth (MVP)          | **convidado**: apelido + `guestId` no localStorage              | zero fricção pra amigos; contas (OAuth Discord/Google) depois                        |
+| Validação           | **zod** em `packages/shared`                                    | mesmos schemas validam mensagens no cliente e no servidor                            |
+| Deploy              | **Render free**: um serviço Node entrega site + API + WebSocket | WebSocket precisa de processo long-running (não serve serverless); uma URL, sem CORS |
 
-> Render free “dorme” após ~15 min (cold start ~30 s) — aceitável pra jogar com amigos.
+> Render free “dorme” após ~15 min (a primeira visita leva ~1 min) — aceitável pra jogar com
+> amigos. A configuração fica em `render.yaml`; os segredos só no painel do Render.
 
 ---
 
@@ -207,7 +208,13 @@ Implementado na fase 4 (`apps/server/src/voice.ts`, `apps/web/src/voice/`):
    (~570 kB) só é baixado quando alguém entra na chamada, e só depois de o servidor confirmar
    que há LiveKit configurado.
 4. Áudio é totalmente independente do Colyseus — se cair, o jogo continua. Sem `LIVEKIT_*`, o
-   jogo funciona e aparece "Chamada indisponível".
+   jogo funciona e o ícone do microfone aparece cortado.
+
+Depois (polimento antes do deploy): quem entra na sala já entra na chamada (entrar na sala foi
+o gesto que o navegador exige); para não falar ou não ouvir, desliga microfone e/ou som. Há
+câmera opcional (começa desligada; 384×216 a 15 fps, sem simulcast, `adaptiveStream`): quem
+liga vira um quadro de vídeo na coluna da direita. O token só permite publicar microfone e
+câmera (`canPublishSources`), nunca compartilhamento de tela.
 
 ## Upload de foto
 
@@ -256,7 +263,7 @@ e posição no ranking, câmera enquadrando a imagem montada. _Fase 4:_ áudio n
 4. **Áudio** — LiveKit token + UI.
 5. **Catálogo e tamanhos** — algumas imagens fixas no R2, presets de peças.
 6. **Upload de foto** — fluxo R2 + sharp.
-7. **Polimento** — snapshot do estado da sala (sobreviver a restart), contas OAuth, sons, rotação de peças opcional, deploy.
+7. **Polimento e deploy** — feito: redesign da sala, câmera, ferramentas da mesa (zoom, centralizar, ver imagem, espalhar), tela de resultado com encaixes por jogador, deploy no Render. Ideias para depois: snapshot do estado da sala (sobreviver a restart), contas OAuth, sons, rotação de peças opcional.
 
 ---
 
