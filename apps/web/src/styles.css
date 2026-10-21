@@ -3464,7 +3464,7 @@ a.btn {
   text-align: center;
 }
 
-/* ── Ranking (estilo "gamificado": cantos retos, números em mono) ──────── */
+/* ── Ranking (estilo "gamificado": pódio, números em mono; cantos como o resto do site) */
 
 .rk {
   display: flex;
@@ -3523,6 +3523,7 @@ a.btn {
 }
 
 .rk-square-btn {
+  border-radius: var(--radius-control);
   width: 44px;
   height: 44px;
   display: flex;
@@ -3568,6 +3569,7 @@ a.btn {
 }
 
 .rk-card {
+  border-radius: var(--radius-card);
   flex: 0 0 248px;
   display: flex;
   flex-direction: column;
@@ -3614,6 +3616,7 @@ a.btn {
 }
 
 .rk-card-rank {
+  border-radius: 8px;
   position: absolute;
   top: 10px;
   left: 10px;
@@ -3645,6 +3648,7 @@ a.btn {
 }
 
 .rk-track-bar {
+  border-radius: 999px;
   position: relative;
   height: 3px;
   margin-top: -6px;
@@ -3652,6 +3656,7 @@ a.btn {
 }
 
 .rk-track-bar span {
+  border-radius: 999px;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -3686,6 +3691,7 @@ a.btn {
 }
 
 .rk-segmented {
+  border-radius: var(--radius-control);
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
@@ -3694,6 +3700,7 @@ a.btn {
 }
 
 .rk-segmented button {
+  border-radius: 10px;
   height: 40px;
   padding: 0 14px;
   border: 0;
@@ -3713,6 +3720,7 @@ a.btn {
 }
 
 .rk-select {
+  border-radius: var(--radius-control);
   position: relative;
   box-sizing: border-box;
   display: flex;
@@ -3775,6 +3783,7 @@ a.btn {
 }
 
 .rk-picker-panel {
+  border-radius: 16px;
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -3801,6 +3810,7 @@ a.btn {
 }
 
 .rk-picker-panel li button {
+  border-radius: 10px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3826,6 +3836,7 @@ a.btn {
 }
 
 .rk-picker-panel img {
+  border-radius: 6px;
   width: 40px;
   height: 30px;
   flex: none;
@@ -3833,6 +3844,8 @@ a.btn {
 }
 
 .rk-board {
+  overflow: hidden;
+  border-radius: var(--radius-card);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border);
@@ -3873,6 +3886,7 @@ a.btn {
 }
 
 .rk-avatars > span {
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3906,6 +3920,7 @@ a.btn {
 }
 
 .rk-podium-block {
+  border-radius: 14px 14px 0 0;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
@@ -4007,6 +4022,7 @@ a.btn {
 }
 
 .rk-empty {
+  border-radius: var(--radius-card);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4036,7 +4052,6 @@ a.btn {
 
 .rk-square {
   margin-top: 6px;
-  border-radius: 0;
 }
 
 @media (max-width: 680px) {
@@ -4063,6 +4078,7 @@ a.btn {
 }
 
 .rk-card-hot {
+  border-radius: 999px;
   position: absolute;
   top: 10px;
   right: 10px;
@@ -4184,6 +4200,7 @@ a.btn {
 
 /* "Sua posição": fixa no pé da tela enquanto o placar rola. */
 .rk-me {
+  border-radius: var(--radius-card);
   position: sticky;
   bottom: 16px;
   z-index: 5;
@@ -4227,6 +4244,7 @@ a.btn {
 }
 
 .rk-me-you {
+  border-radius: 999px;
   flex: none;
   padding: 2px 7px;
   background: var(--primary);
@@ -4251,6 +4269,8 @@ a.btn {
 }
 
 .rk-me-bar {
+  overflow: hidden;
+  border-radius: 999px;
   display: block;
   height: 6px;
   background: #d6e6ea;
@@ -4266,4 +4286,20 @@ a.btn {
   font-size: 18px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* Card escolhido: mostra que dá para desmarcar (clicar de novo volta para Pontos). */
+.rk-card-selected {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
 }

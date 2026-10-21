@@ -30,6 +30,7 @@ import {
 import { avatarColor, initials } from '../ui/avatar';
 import {
   ChevronDownIcon,
+  CloseIcon,
   CrownIcon,
   FlameIcon,
   PlusIcon,
@@ -284,7 +285,12 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
         ? `Nenhum Bullet de ${bulletCategory.minutes} min com ${bulletCategory.pieces} peças em ${teamLabel(players).toLowerCase()} ${PERIOD_PHRASES[period]}. Seja o primeiro!`
         : `Ninguém jogou em ${teamLabel(players).toLowerCase()} ${PERIOD_PHRASES[period]}. Seja o primeiro!`;
 
+  /** Clicar no card abre o ranking da foto; clicar de novo no selecionado volta para Pontos. */
   function pickImage(id: string) {
+    if (tab === 'puzzle' && query.image === id) {
+      setTab('general');
+      return;
+    }
     setTab('puzzle');
     setQuery({ ...query, image: id });
   }
@@ -738,16 +744,24 @@ function Trending({
             type="button"
             className="rk-card"
             aria-pressed={image.id === selected}
+            title={image.id === selected ? 'Clique de novo para desmarcar' : 'Ver o ranking'}
             onClick={() => onPick(image.id)}
           >
             <span className="rk-card-thumb">
               <img src={image.thumb} alt="" loading="lazy" />
               <span className="rk-mono rk-card-rank">#{index + 1}</span>
-              {isTrending(popular) && (
-                <span className="rk-mono rk-card-hot">
-                  <FlameIcon size={12} />
-                  EM ALTA
+              {image.id === selected ? (
+                <span className="rk-card-selected">
+                  <CloseIcon size={12} />
+                  Desmarcar
                 </span>
+              ) : (
+                isTrending(popular) && (
+                  <span className="rk-mono rk-card-hot">
+                    <FlameIcon size={12} />
+                    EM ALTA
+                  </span>
+                )
               )}
             </span>
             <span className="rk-card-body">
