@@ -5,3 +5,8 @@ packages:
 # pnpm 10 bloqueia scripts de pós-instalação por padrão; liberamos só o que precisa compilar binário.
 onlyBuiltDependencies:
   - esbuild
+
+# Aceleração nativa opcional do msgpack (usado pelo Colyseus): sem ela cai para JS puro, que
+# basta para o tráfego do jogo. Ignorado de propósito para não compilar nada nativo.
+ignoredBuiltDependencies:
+  - msgpackr-extract
