@@ -84,6 +84,8 @@ export const games = pgTable(
     /** Ids dos jogadores ordenados e unidos: identifica "a mesma equipe" entre partidas. */
     teamKey: text('team_key').notNull(),
     durationMs: integer('duration_ms').notNull(),
+    /** Pontos do ranking por pontos, calculados ao gravar (peças × fator de velocidade). */
+    points: integer('points').notNull().default(0),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     finishedAt: timestamp('finished_at', { withTimezone: true }).notNull(),
   },
