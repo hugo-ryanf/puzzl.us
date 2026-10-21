@@ -1,10 +1,29 @@
-import type { CatalogImage } from '@puzzle/shared';
-import { catalogThumbUrl } from '../../board/images';
+import { useState } from 'react';
+import type { CommunityPuzzle } from '@puzzle/shared';
 import { formatDuration } from '../../format';
-import { BookmarkIcon, CheckIcon, TrophyIcon } from '../../ui/icons';
+import { BookmarkIcon, CheckIcon, FlagIcon, MoreIcon, TrophyIcon } from '../../ui/icons';
+import { Popover } from '../../ui/Popover';
+
+/** O que o card precisa de uma foto, seja do catálogo ou da comunidade. */
+export interface PuzzleImage {
+  id: string;
+  title: string;
+  credit: string;
+  width: number;
+  height: number;
+}
+
+/** Ações de moderação de um quebra-cabeça da comunidade (só as permitidas vêm preenchidas). */
+export interface CommunityActions {
+  puzzle: CommunityPuzzle;
+  onReport?: () => Promise<void>;
+  onRemove?: () => Promise<void>;
+  onRestore?: () => Promise<void>;
+}
 
 interface PuzzleCardProps {
-  image: CatalogImage;
+  image: PuzzleImage;
+  thumbUrl: string;
   onPlay: () => void;
   onShowRanking: () => void;
   /** Melhor tempo, se a pessoa já montou esta foto (mostra o selo "Montado"). */
@@ -12,6 +31,8 @@ interface PuzzleCardProps {
   favorite?: boolean;
   /** Sem ele (servidor sem login), o marcador de favorito não aparece. */
   onToggleFavorite?: () => void;
+  /** Publicado por um jogador: selo "Comunidade", autor e o menu de denunciar/remover. */
+  community?: CommunityActions;
 }
 
 export const orientationOf = (image: { width: number; height: number }) =>
@@ -26,19 +47,28 @@ const shortCredit = (credit: string) => /^Foto de (.+) no \S+$/.exec(credit)?.[1
  */
 export function PuzzleCard({
   image,
+  thumbUrl,
   onPlay,
   onShowRanking,
   completedMs,
   favorite = false,
   onToggleFavorite,
+  community,
 }: PuzzleCardProps) {
+  const hidden = community?.puzzle.status === 'hidden';
   return (
-    <article className="card">
+    <article className={hidden ? 'card hidden-puzzle' : 'card'}>
       <button type="button" className="card-hit" onClick={onPlay}>
         <span className="card-thumb">
-          <img src={catalogThumbUrl(image.id)} alt="" loading="lazy" />
+          <img src={thumbUrl} alt="" loading="lazy" />
           <span className="card-badges">
             <span className="card-badge">{orientationOf(image)}</span>
+            {community && <span className="card-badge community">Comunidade</span>}
+            {hidden && (
+              <span className="card-badge warning">
+                Oculta · {community.puzzle.reports} denúncias
+              </span>
+            )}
             {completedMs !== undefined && (
               <span
                 className="card-badge done"
@@ -68,8 +98,9 @@ export function PuzzleCard({
       <div className="card-meta">
         {/* O crédito completo fica no title e aparece inteiro no diálogo e na sala. */}
         <span className="credit" title={image.credit}>
-          {image.credit ? shortCredit(image.credit) : 'Foto do catálogo'}
+          {community ? image.credit : image.credit ? shortCredit(image.credit) : 'Foto do catálogo'}
         </span>
+        {community && <CommunityMenu title={image.title} actions={community} />}
         <button
           type="button"
           className="btn"
@@ -81,5 +112,98 @@ export function PuzzleCard({
         </button>
       </div>
     </article>
+  );
+}
+
+type Pending = 'report' | 'remove';
+
+/** "⋯" do card da comunidade: denunciar, remover (autor/admin) e restaurar (admin). */
+function CommunityMenu({ title, actions }: { title: string; actions: CommunityActions }) {
+  const { puzzle, onReport, onRemove, onRestore } = actions;
+  const [confirming, setConfirming] = useState<Pending>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function run(action: (() => Promise<void>) | undefined) {
+    if (!action) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await action();
+      setConfirming(undefined);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Popover
+      label={`Opções de ${title}`}
+      triggerClassName="btn btn-ghost icon-only card-more"
+      trigger={<MoreIcon size={18} />}
+    >
+      <div className="menu-list">
+        <p className="popover-note">
+          Publicado por <strong>{puzzle.authorName}</strong>
+        </p>
+        {confirming === 'report' ? (
+          <>
+            <p className="popover-note">Denunciar como imprópria ou sem direito de uso?</p>
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={busy}
+              onClick={() => void run(onReport)}
+            >
+              <FlagIcon size={16} />
+              Confirmar denúncia
+            </button>
+          </>
+        ) : confirming === 'remove' ? (
+          <>
+            <p className="popover-note">Tirar do Explorar para todo mundo?</p>
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={busy}
+              onClick={() => void run(onRemove)}
+            >
+              Confirmar remoção
+            </button>
+          </>
+        ) : (
+          <>
+            {puzzle.reported ? (
+              <p className="popover-note">Você já denunciou esta foto.</p>
+            ) : (
+              onReport && (
+                <button type="button" className="btn" onClick={() => setConfirming('report')}>
+                  <FlagIcon size={16} />
+                  Denunciar
+                </button>
+              )
+            )}
+            {onRestore && (
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => void run(onRestore)}
+              >
+                Voltar ao ar
+              </button>
+            )}
+            {onRemove && (
+              <button type="button" className="btn" onClick={() => setConfirming('remove')}>
+                Remover
+              </button>
+            )}
+          </>
+        )}
+        {error && <p className="popover-note error">{error}</p>}
+      </div>
+    </Popover>
   );
 }
