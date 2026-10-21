@@ -1,4 +1,4 @@
-# Quebra-cabeça
+# puzzl.us
 
 Quebra-cabeça colaborativo online: amigos entram na mesma sala, montam juntos em tempo real,
 veem o cursor uns dos outros, conversam por áudio e disputam o ranking de tempo.
