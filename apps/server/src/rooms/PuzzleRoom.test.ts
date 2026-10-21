@@ -10,6 +10,7 @@ import {
   type GeneralRankingEntry,
   type GrabMessage,
   type RankingEntry,
+  type RankingPage,
   type RoomState,
   type UploadResponse,
 } from '@puzzle/shared';
@@ -353,18 +354,19 @@ describe('PuzzleRoom — fim e ranking', () => {
     await solve(game);
     await waitForRankStatus(game.room, game.state);
 
-    const { data } = await colyseus.http.get<RankingEntry[]>(
+    const { data } = await colyseus.http.get<RankingPage<RankingEntry>>(
       `/api/ranking?image=${IMAGE.id}&pieces=24&players=2`,
     );
-    expect(data).toHaveLength(1);
-    expect(data[0]).toMatchObject({ position: 1, players: ['Ana', 'Bia'] });
-    expect(data[0]!.durationMs).toBe(game.state.durationMs);
+    expect(data.entries).toHaveLength(1);
+    expect(data.entries[0]).toMatchObject({ position: 1, players: ['Ana', 'Bia'] });
+    expect(data.entries[0]!.durationMs).toBe(game.state.durationMs);
 
     // Acabou de terminar: aparece também no ranking de hoje.
-    const today = await colyseus.http.get<RankingEntry[]>(
+    const today = await colyseus.http.get<RankingPage<RankingEntry>>(
       `/api/ranking?image=${IMAGE.id}&pieces=24&players=2&period=day`,
     );
-    expect(today.data).toHaveLength(1);
+    expect(today.data.entries).toHaveLength(1);
+    expect(today.data.entries[0]).toMatchObject({ change: null, streak: 1 });
   });
 
   it('a partida soma no ranking geral da modalidade (dupla)', async () => {
@@ -373,10 +375,11 @@ describe('PuzzleRoom — fim e ranking', () => {
     await waitForRankStatus(game.room, game.state);
     expect(game.state.points).toBe(24); // sem partidas para comparar: vale as peças
 
-    const { data } = await colyseus.http.get<GeneralRankingEntry[]>(
+    const { data } = await colyseus.http.get<RankingPage<GeneralRankingEntry>>(
       '/api/ranking/general?players=2&period=week',
     );
-    expect(data).toEqual([
+    expect(data.total).toBe(1);
+    expect(data.entries).toMatchObject([
       {
         position: 1,
         players: ['Ana', 'Bia'],
@@ -504,9 +507,9 @@ describe('Fotos enviadas', () => {
     expect(state.rankStatus).toBe('saved');
     expect(state.rank).toBe(1);
     const ranking = await fetch(`${API}/ranking?image=${imageId}&pieces=24&players=1`);
-    expect(((await ranking.json()) as RankingEntry[]).map((entry) => entry.players)).toEqual([
-      ['Ana'],
-    ]);
+    expect(
+      ((await ranking.json()) as RankingPage<RankingEntry>).entries.map((entry) => entry.players),
+    ).toEqual([['Ana']]);
   });
 
   it('recusa criar sala com foto que não existe (ou expirou)', async () => {
