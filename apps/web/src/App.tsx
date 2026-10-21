@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CATALOG, type RankingQuery } from '@puzzle/shared';
 import { useAccount } from './net/account';
+import { useLibrary } from './net/library';
 import { hasSavedSession, resumeRoom, type PuzzleRoom } from './net/connection';
 import { loadPlayerName } from './net/playerName';
 import { ExploreScreen } from './screens/explore/ExploreScreen';
 import { PrivacyScreen } from './screens/PrivacyScreen';
 import { RankingScreen } from './screens/RankingScreen';
+import { RecordsScreen } from './screens/RecordsScreen';
 import { RoomScreen } from './screens/RoomScreen';
-import { AppShell } from './ui/AppShell';
+import { AppShell, type Section } from './ui/AppShell';
 import { ArrowLeftIcon } from './ui/icons';
 
 /** O link de convite é só o código no caminho: https://site/K7QF2 */
@@ -27,12 +29,16 @@ export function App() {
   const [room, setRoom] = useState<PuzzleRoom | null>(null);
   // Ranking aberto por cima (do menu ou do fim da partida); a sala continua conectada por trás.
   const [ranking, setRanking] = useState<RankingQuery | null>(null);
+  /** Tela da barra lateral (o ranking, quando aberto, fica por cima dela). */
+  const [section, setSection] = useState<Exclude<Section, 'ranking'>>('explore');
   const [notice, setNotice] = useState<string>();
   const [name, setName] = useState(loadPlayerName);
   const account = useAccount();
   // Logado e sem nome digitado ainda: começa com o primeiro nome da conta.
   const accountName = account.user?.name.split(' ')[0];
   const playerName = name.trim() ? name : (accountName ?? name);
+  const library = useLibrary(account.user);
+  const signedIn = !!account.user;
   const [createRequested, setCreateRequested] = useState(false);
   // Link de convite (/K7QF2) sem sessão salva: abre "Entrar com código" já preenchido.
   const [joinOpen, setJoinOpen] = useState(() => codeFromUrl() !== '');
@@ -56,12 +62,17 @@ export function App() {
     setRoom(joined);
   }, []);
 
-  const leave = useCallback((message?: string) => {
-    history.replaceState(null, '', '/');
-    setRoom(null);
-    setRanking(null);
-    setNotice(message);
-  }, []);
+  const { refresh: refreshLibrary } = library;
+  const leave = useCallback(
+    (message?: string) => {
+      history.replaceState(null, '', '/');
+      setRoom(null);
+      setRanking(null);
+      setNotice(message);
+      refreshLibrary(); // a partida pode ter terminado: selo "Montado" e record novo
+    },
+    [refreshLibrary],
+  );
 
   // Página fixa (o Google exige o link da política de privacidade para liberar o login).
   if (location.pathname === '/privacidade') return <PrivacyScreen />;
@@ -93,14 +104,20 @@ export function App() {
 
   return (
     <AppShell
-      active={ranking ? 'ranking' : 'explore'}
-      onNavigate={(section) => setRanking(section === 'ranking' ? DEFAULT_RANKING : null)}
+      active={ranking ? 'ranking' : section}
+      onNavigate={(next) => {
+        if (next === 'ranking') return setRanking(DEFAULT_RANKING);
+        setRanking(null);
+        setSection(next);
+      }}
       onCreateRoom={() => {
         setRanking(null);
+        if (section === 'records') setSection('explore'); // os diálogos moram no Explorar
         setCreateRequested(true);
       }}
       onJoinRoom={() => {
         setRanking(null);
+        if (section === 'records') setSection('explore');
         setJoinOpen(true);
       }}
       account={account}
@@ -108,8 +125,19 @@ export function App() {
       {ranking ? (
         // `key`: abrir o ranking de outra foto recomeça os filtros a partir dela.
         <RankingScreen key={JSON.stringify(ranking)} initial={ranking} />
+      ) : section === 'records' ? (
+        <RecordsScreen
+          library={library}
+          signedIn={signedIn}
+          googleLogin={account.googleLogin}
+          onShowRanking={setRanking}
+        />
       ) : (
         <ExploreScreen
+          view={section === 'favorites' ? 'favorites' : 'all'}
+          library={library}
+          signedIn={signedIn}
+          googleLogin={account.googleLogin}
           notice={notice ?? account.loginNotice}
           name={playerName}
           onNameChange={setName}
