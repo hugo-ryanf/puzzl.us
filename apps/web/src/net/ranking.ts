@@ -4,6 +4,7 @@ import type {
   GeneralRankingEntry,
   GeneralRankingQuery,
   PopularImage,
+  PopularQuery,
   RankingEntry,
   RankingQuery,
 } from '@puzzle/shared';
@@ -34,6 +35,9 @@ export function fetchBulletRanking(query: BulletRankingQuery): Promise<BulletRan
 }
 
 /** Fotos mais jogadas na modalidade e no período (a escolha da foto no ranking). */
-export function fetchPopularImages(query: GeneralRankingQuery): Promise<PopularImage[]> {
-  return getRanking('/api/ranking/popular', query);
+export function fetchPopularImages(query: PopularQuery): Promise<PopularImage[]> {
+  return getRanking(
+    '/api/ranking/popular',
+    Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined)),
+  );
 }
