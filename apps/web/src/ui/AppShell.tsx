@@ -1,17 +1,19 @@
-import type { ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
+import type { FriendStatus, FriendView } from '@puzzle/shared';
 import logoUrl from '../assets/logo.webp';
 import type { Account } from '../net/account';
 import {
+  ArrowRightIcon,
   BookmarkIcon,
   CompassIcon,
   HourglassIcon,
-  LogInIcon,
+  MoreIcon,
   PlusIcon,
-  SettingsIcon,
   TimerIcon,
   TrophyIcon,
   UsersIcon,
 } from './icons';
+import { Popover } from './Popover';
 
 export type Section = 'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking';
 
@@ -19,25 +21,35 @@ interface AppShellProps {
   active: Section;
   onNavigate: (section: Section) => void;
   onCreateRoom: () => void;
-  onJoinRoom: () => void;
+  /** Com código (digitado na barra): abre "Entrar com código" já preenchido. */
+  onJoinRoom: (code?: string) => void;
   account: Account;
-  /** Pedidos de amizade esperando resposta (aparece como número no item "Amigos"). */
+  /** Amigos aceitos (com status); a barra mostra os primeiros, online antes. */
+  friends?: FriendView[];
+  /** Pedidos de amizade esperando resposta (número ao lado de "Ver todos"). */
   friendRequests?: number;
   children: ReactNode;
 }
 
-/** Itens do menu que ainda não existem: aparecem, mas desabilitados e marcados "em breve". */
-function SoonLink({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <button type="button" className="nav-link" disabled aria-label={`${label} (em breve)`}>
-      {icon}
-      {label}
-      <span className="soon" aria-hidden="true">
-        em breve
-      </span>
-    </button>
-  );
-}
+/** Quantos amigos cabem na barra; o resto fica na página Amigos. */
+const SIDEBAR_FRIENDS = 4;
+const STATUS_ORDER: Record<FriendStatus, number> = { playing: 0, online: 1, offline: 2 };
+const STATUS_LABELS: Record<FriendStatus, string> = {
+  playing: 'Jogando',
+  online: 'Online',
+  offline: 'Offline',
+};
+/** Cor do avatar sem foto: fixa por pessoa (pela soma das letras do nome). */
+const AVATAR_COLORS = ['#2B59FF', '#0B7A5E', '#B4235A', '#8A5A00', '#6B3FA0', '#2C5866'];
+const avatarColor = (name: string) =>
+  AVATAR_COLORS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
 
 /** Barra lateral + conteúdo. Em telas estreitas a barra vai para cima (flex-wrap). */
 export function AppShell({
@@ -46,10 +58,34 @@ export function AppShell({
   onCreateRoom,
   onJoinRoom,
   account,
+  friends,
   friendRequests = 0,
   children,
 }: AppShellProps) {
   const current = (section: Section) => (section === active ? ('page' as const) : undefined);
+  const [code, setCode] = useState('');
+  const ready = code.length === 5;
+
+  function joinWithCode(event: FormEvent) {
+    event.preventDefault();
+    onJoinRoom(ready ? code : undefined);
+    setCode('');
+  }
+
+  const navLink = (section: Section, icon: ReactNode, label: string, extra?: ReactNode) => (
+    <li>
+      <button
+        type="button"
+        className="nav-link"
+        aria-current={current(section)}
+        onClick={() => onNavigate(section)}
+      >
+        {icon}
+        {label}
+        {extra}
+      </button>
+    </li>
+  );
 
   return (
     <div className="shell">
@@ -62,82 +98,71 @@ export function AppShell({
         </button>
 
         <div className="sidebar-actions">
-          <button type="button" className="btn btn-primary btn-lg" onClick={onCreateRoom}>
+          <button
+            type="button"
+            className="btn btn-primary btn-lg create-btn"
+            onClick={onCreateRoom}
+          >
             <PlusIcon size={18} />
             Criar sala
           </button>
-          <button type="button" className="btn btn-lg" onClick={onJoinRoom}>
-            <LogInIcon size={18} />
-            Entrar com código
-          </button>
+          <form className="join-code" onSubmit={joinWithCode}>
+            <label htmlFor="sidebar-code" className="sr-only">
+              Código da sala
+            </label>
+            <input
+              id="sidebar-code"
+              className="input join-code-input"
+              autoComplete="off"
+              maxLength={5}
+              placeholder="Código da sala"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            />
+            <button
+              type="submit"
+              className={ready ? 'btn join-code-go ready' : 'btn join-code-go'}
+              aria-label="Entrar na sala"
+            >
+              <ArrowRightIcon size={18} />
+            </button>
+          </form>
         </div>
 
         <nav className="nav" aria-label="Principal">
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={current('explore')}
-            onClick={() => onNavigate('explore')}
-          >
-            <CompassIcon />
-            Explorar
-          </button>
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={current('friends')}
-            onClick={() => onNavigate('friends')}
-          >
-            <UsersIcon />
-            Amigos
-            {friendRequests > 0 && (
-              <span className="nav-count" aria-label={`${friendRequests} pedidos`}>
-                {friendRequests}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={current('saved')}
-            onClick={() => onNavigate('saved')}
-          >
-            <HourglassIcon />
-            Em andamento
-          </button>
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={current('favorites')}
-            onClick={() => onNavigate('favorites')}
-          >
-            <BookmarkIcon />
-            Favoritos
-          </button>
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={current('records')}
-            onClick={() => onNavigate('records')}
-          >
-            <TimerIcon />
-            Meus records
-          </button>
-          <button
-            type="button"
-            className="nav-link"
-            aria-current={current('ranking')}
-            onClick={() => onNavigate('ranking')}
-          >
-            <TrophyIcon />
-            Ranking
-          </button>
+          <ul>
+            {navLink('explore', <CompassIcon />, 'Explorar')}
+            {navLink('saved', <HourglassIcon />, 'Em andamento')}
+            {navLink('favorites', <BookmarkIcon />, 'Favoritos')}
+            {navLink('records', <TimerIcon />, 'Meus records')}
+            {navLink('ranking', <TrophyIcon />, 'Ranking')}
+            {/* No celular a seção de amigos não cabe: vira um item do menu. */}
+            <li className="mobile-only">
+              <button
+                type="button"
+                className="nav-link"
+                aria-current={current('friends')}
+                onClick={() => onNavigate('friends')}
+              >
+                <UsersIcon />
+                Amigos
+                {friendRequests > 0 && <span className="nav-count">{friendRequests}</span>}
+              </button>
+            </li>
+          </ul>
         </nav>
 
-        <AccountBox account={account} />
+        {account.user && (
+          <SidebarFriends
+            friends={friends}
+            requests={friendRequests}
+            active={active === 'friends'}
+            onOpen={() => onNavigate('friends')}
+          />
+        )}
 
         <div className="sidebar-footer">
-          <SoonLink icon={<SettingsIcon />} label="Configurações" />
+          <AccountBox account={account} onFriends={() => onNavigate('friends')} />
           <p className="credits">
             Feito por{' '}
             <a href="https://github.com/hugo-ryanf" target="_blank" rel="noreferrer">
@@ -154,8 +179,78 @@ export function AppShell({
   );
 }
 
-/** Conta na barra lateral: entrar com Google (convidado) ou foto, nome e "Sair" (logado). */
-function AccountBox({ account }: { account: Account }) {
+/** Amigos na barra: quem está jogando e online primeiro; o resto na página Amigos. */
+function SidebarFriends({
+  friends = [],
+  requests,
+  active,
+  onOpen,
+}: {
+  friends?: FriendView[];
+  requests: number;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  const online = friends.filter((friend) => friend.status !== 'offline').length;
+  const shown = [...friends]
+    .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+    .slice(0, SIDEBAR_FRIENDS);
+
+  return (
+    <section className="sidebar-friends" aria-labelledby="sidebar-friends-title">
+      <div className="sidebar-friends-header">
+        <h2 id="sidebar-friends-title">
+          Amigos {friends.length > 0 && <span>{online} online</span>}
+        </h2>
+        <button
+          type="button"
+          className={active ? 'btn-link see-all current' : 'btn-link see-all'}
+          onClick={onOpen}
+        >
+          Ver todos
+          {requests > 0 && (
+            <span className="nav-count" aria-label={`${requests} pedidos`}>
+              {requests}
+            </span>
+          )}
+        </button>
+      </div>
+      {shown.length === 0 ? (
+        <p className="sidebar-friends-empty">
+          Adicione amigos pelo código para ver quem está online.
+        </p>
+      ) : (
+        <ul>
+          {shown.map((friend) => (
+            <li key={friend.id}>
+              <button type="button" className="sidebar-friend" onClick={onOpen}>
+                <span className="sidebar-friend-avatar" aria-hidden="true">
+                  {friend.avatarUrl ? (
+                    <img src={friend.avatarUrl} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <span style={{ background: avatarColor(friend.name) }}>
+                      {friend.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className={`status-dot ${friend.status}`} />
+                </span>
+                <span className="sidebar-friend-text">
+                  <strong className={friend.status === 'offline' ? 'offline' : undefined}>
+                    {friend.name}
+                  </strong>
+                  <small>{STATUS_LABELS[friend.status]}</small>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Conta no rodapé: entrar com Google (convidado) ou foto, nome e o menu "⋯" (logado). */
+function AccountBox({ account, onFriends }: { account: Account; onFriends: () => void }) {
   const { user, googleLogin, logout } = account;
   if (user === undefined) return <div className="sidebar-account" />; // carregando
   if (!user) {
@@ -177,12 +272,25 @@ function AccountBox({ account }: { account: Account }) {
         // Foto do Google: sem enviar de qual site veio o pedido (o Google bloqueia com referrer).
         <img className="account-avatar" src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
       ) : (
-        <span className="account-avatar">{user.name.charAt(0).toUpperCase()}</span>
+        <span className="account-avatar">{initials(user.name)}</span>
       )}
       <span className="account-name">{user.name}</span>
-      <button type="button" className="btn-link" onClick={() => void logout()}>
-        Sair
-      </button>
+      <Popover
+        label="Menu da conta"
+        triggerClassName="btn btn-ghost icon-only account-menu"
+        trigger={<MoreIcon size={18} />}
+        align="end"
+      >
+        <div className="menu-list">
+          <button type="button" className="btn" onClick={onFriends}>
+            <UsersIcon size={16} />
+            Amigos e código
+          </button>
+          <button type="button" className="btn" onClick={() => void logout()}>
+            Sair
+          </button>
+        </div>
+      </Popover>
     </div>
   );
 }
