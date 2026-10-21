@@ -8,9 +8,11 @@ import type { AppDatabase } from '../db/database';
 import { createGameStore } from '../db/gameStore';
 import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
 import { players } from '../db/schema';
-import { CATALOG, type LibraryResponse } from '@puzzle/shared';
+import { CATALOG, type LibraryResponse, type SavedGameSummary } from '@puzzle/shared';
 import { createLibraryStore } from '../library/library';
-import { createAccountStore, type GoogleProfile } from './accounts';
+import { createSavedGameStore, type SavedGameStore } from '../rooms/savedGames';
+import { SNAPSHOT_VERSION, type RoomSnapshot } from '../rooms/snapshots';
+import { createAccountStore, type AccountStore, type GoogleProfile } from './accounts';
 import type { GoogleAuth } from './google';
 
 const PORT = 2571;
@@ -33,17 +35,22 @@ const fakeGoogle: GoogleAuth = {
 
 let db: AppDatabase;
 let server: Server;
+let accounts: AccountStore;
+let savedGames: SavedGameStore;
 beforeAll(async () => {
   db = await createMemoryDatabase();
+  accounts = createAccountStore(db);
+  savedGames = createSavedGameStore(db);
   server = createGameServer({
     store: createGameStore(db),
     auth: {
-      accounts: createAccountStore(db),
+      accounts,
       google: fakeGoogle,
       publicUrl: PUBLIC_URL,
       adminEmails: ['hugo@exemplo.com'],
       secureCookies: false,
       library: createLibraryStore(db),
+      savedGames,
     },
   });
   await server.listen(PORT);
@@ -160,5 +167,46 @@ describe('login com Google', () => {
 
     expect((await call('DELETE', session)).status).toBe(204);
     expect((await library(session)).favorites).toEqual([]);
+  });
+
+  it('partidas salvas: só logado, só as da conta, e só o dono descarta', async () => {
+    const list = async (cookie: string) =>
+      (await (
+        await fetch(`${base}/api/me/saved`, { headers: { cookie } })
+      ).json()) as SavedGameSummary[];
+    const discard = (cookie: string, id: string) =>
+      fetch(`${base}/api/me/saved/${id}`, { method: 'DELETE', headers: { cookie } });
+
+    expect((await fetch(`${base}/api/me/saved`)).status).toBe(401);
+    const { session } = await login();
+    const hugo = (await me(session)).user!;
+    const other = await accounts.signInWithGoogle({ sub: 'outra', name: 'Bia' }, false);
+    const snapshot: RoomSnapshot = {
+      version: SNAPSHOT_VERSION,
+      config: {
+        imageId: CATALOG[0]!.id,
+        seed: 'abc',
+        rows: 4,
+        cols: 6,
+        width: 1200,
+        height: 800,
+        pieceCount: 24,
+        maxPlayers: 1,
+      },
+      phase: 'playing',
+      startedAt: Date.now(),
+      elapsedMs: 30_000,
+      players: [],
+      groups: [],
+    };
+    const mine = await savedGames.save(hugo.id, snapshot, { pieces: 24, placed: 4 });
+    const theirs = await savedGames.save(other.id, snapshot, { pieces: 24, placed: 8 });
+
+    expect((await list(session)).map((game) => game.id)).toEqual([mine]);
+    expect((await discard(session, 'nao-e-uuid')).status).toBe(400);
+    expect((await discard(session, theirs)).status).toBe(204); // não é dele: nada acontece
+    expect(await savedGames.list(other.id)).toHaveLength(1);
+    expect((await discard(session, mine)).status).toBe(204);
+    expect(await list(session)).toEqual([]);
   });
 });
