@@ -152,6 +152,20 @@ export function createGameServer({
         res.json(await store.generalLeaderboard(query.data));
       });
 
+      // Fotos mais jogadas na modalidade e no período: a escolha da foto no ranking.
+      app.get('/api/ranking/popular', async (req, res) => {
+        const query = GeneralRankingQuery.safeParse(req.query);
+        if (!query.success) {
+          res.status(400).json({ error: 'parâmetros inválidos', issues: query.error.issues });
+          return;
+        }
+        if (!store) {
+          res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
+          return;
+        }
+        res.json(await store.popular(query.data));
+      });
+
       // Ranking do Bullet: quantos quebra-cabeças em X minutos, por tamanho e modalidade.
       app.get('/api/ranking/bullet', async (req, res) => {
         const query = BulletRankingQuery.safeParse(req.query);
