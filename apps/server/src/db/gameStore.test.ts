@@ -199,5 +199,11 @@ describe('GameStore — pontos', () => {
       { imageId: 'lago', plays: 2 },
       { imageId: 'praia', plays: 1 },
     ]);
+    // Sem modalidade: todas juntas (o destaque "Mais jogados da semana").
+    expect(await store.popular({})).toEqual([
+      { imageId: 'lago', plays: 2 },
+      { imageId: 'deserto', plays: 1 },
+      { imageId: 'praia', plays: 1 },
+    ]);
   });
 });
