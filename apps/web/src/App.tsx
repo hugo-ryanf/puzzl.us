@@ -9,6 +9,7 @@ import { PrivacyScreen } from './screens/PrivacyScreen';
 import { RankingScreen } from './screens/RankingScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { RoomScreen } from './screens/RoomScreen';
+import { SavedScreen } from './screens/SavedScreen';
 import { AppShell, type Section } from './ui/AppShell';
 import { ArrowLeftIcon } from './ui/icons';
 
@@ -102,6 +103,7 @@ export function App() {
     );
   }
 
+  const onExplore = section === 'explore' || section === 'favorites';
   return (
     <AppShell
       active={ranking ? 'ranking' : section}
@@ -112,12 +114,12 @@ export function App() {
       }}
       onCreateRoom={() => {
         setRanking(null);
-        if (section === 'records') setSection('explore'); // os diálogos moram no Explorar
+        if (!onExplore) setSection('explore'); // os diálogos moram no Explorar
         setCreateRequested(true);
       }}
       onJoinRoom={() => {
         setRanking(null);
-        if (section === 'records') setSection('explore');
+        if (!onExplore) setSection('explore');
         setJoinOpen(true);
       }}
       account={account}
@@ -125,6 +127,13 @@ export function App() {
       {ranking ? (
         // `key`: abrir o ranking de outra foto recomeça os filtros a partir dela.
         <RankingScreen key={JSON.stringify(ranking)} initial={ranking} />
+      ) : section === 'saved' ? (
+        <SavedScreen
+          signedIn={signedIn}
+          googleLogin={account.googleLogin}
+          name={playerName}
+          onEnter={enter}
+        />
       ) : section === 'records' ? (
         <RecordsScreen
           library={library}
