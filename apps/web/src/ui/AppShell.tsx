@@ -13,6 +13,7 @@ import {
   TrophyIcon,
   UsersIcon,
 } from './icons';
+import { avatarColor, initials } from './avatar';
 import { Popover } from './Popover';
 
 export type Section = 'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking';
@@ -39,18 +40,6 @@ const STATUS_LABELS: Record<FriendStatus, string> = {
   online: 'Online',
   offline: 'Offline',
 };
-/** Cor do avatar sem foto: fixa por pessoa (pela soma das letras do nome). */
-const AVATAR_COLORS = ['#2B59FF', '#0B7A5E', '#B4235A', '#8A5A00', '#6B3FA0', '#2C5866'];
-const avatarColor = (name: string) =>
-  AVATAR_COLORS[[...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('');
-
 /** Barra lateral + conteúdo. Em telas estreitas a barra vai para cima (flex-wrap). */
 export function AppShell({
   active,
