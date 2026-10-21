@@ -3,6 +3,7 @@ import { LinkGuestRequest, type MeResponse } from '@puzzle/shared';
 import type { AccountStore } from './accounts';
 import type { GoogleAuth } from './google';
 import { registerLibraryRoutes, type LibraryStore } from '../library/library';
+import type { SavedGameStore } from '../rooms/savedGames';
 
 export const SESSION_COOKIE = 'sid';
 const STATE_COOKIE = 'oauth_state';
@@ -22,6 +23,8 @@ export interface AuthOptions {
   secureCookies: boolean;
   /** Records e favoritos da conta (rotas /api/me/library e /api/me/favorites). */
   library?: LibraryStore;
+  /** Partidas salvas da conta (rotas /api/me/saved); a sala também grava nele. */
+  savedGames?: SavedGameStore;
 }
 
 /** "a=1; sid=abc" → { a: '1', sid: 'abc' }. Express não lê cookie sem o cookie-parser. */
@@ -115,7 +118,7 @@ export function registerAuthRoutes(app: Application, options: AuthOptions) {
     res.json(body);
   });
 
-  if (options.library) registerLibraryRoutes(app, accounts, options.library);
+  if (options.library) registerLibraryRoutes(app, accounts, options.library, options.savedGames);
 
   app.post('/api/me/link-guest', express.json(), async (req, res) => {
     const account = await accountFromCookieHeader(accounts, req.headers.cookie);
