@@ -51,7 +51,7 @@ export function AppShell({
           <span className="brand-mark">
             <PuzzleIcon />
           </span>
-          Quebra-cabeça
+          puzzl.us
         </button>
 
         <div className="sidebar-actions">
