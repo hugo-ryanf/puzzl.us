@@ -3943,7 +3943,7 @@ a.btn {
 
 .rk-row {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 140px;
+  grid-template-columns: 56px 60px minmax(0, 1fr) 110px 140px;
   align-items: center;
   gap: 12px;
   box-sizing: border-box;
@@ -4049,7 +4049,221 @@ a.btn {
   }
 
   .rk-row {
-    grid-template-columns: 40px minmax(0, 1fr) 96px;
+    grid-template-columns: 36px 44px minmax(0, 1fr) 96px;
     padding: 8px 12px;
   }
+
+  .rk-col-streak {
+    display: none !important;
+  }
+
+  .rk-me {
+    bottom: 8px;
+  }
+}
+
+.rk-card-hot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.rk-card-hot .icon,
+.rk-streak.hot .icon {
+  fill: #f2b705;
+  color: #c98f00;
+}
+
+.rk-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rk-trend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rk-trend.up,
+.rk-change.up {
+  color: #1f8a4c;
+}
+
+.rk-trend.down,
+.rk-change.down {
+  color: #c2410c;
+}
+
+.rk-see-all {
+  min-height: 44px;
+  padding: 0 10px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* "Ver todos": a faixa vira uma grade com todas as fotos. */
+.rk-track.all {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  overflow: visible;
+}
+
+.rk-track.all .rk-card {
+  flex: none;
+}
+
+.rk-change {
+  color: var(--text-3);
+  font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rk-change.new {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.rk-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rk-streak .icon {
+  color: #8a8f9c;
+}
+
+.rk-podium-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rk-more {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 20px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.rk-more span {
+  width: 4px;
+  height: 4px;
+  background: var(--border-hover);
+}
+
+.rk-more span:last-of-type {
+  margin-right: 8px;
+}
+
+/* "Sua posição": fixa no pé da tela enquanto o placar rola. */
+.rk-me {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 20px;
+  padding: 14px 20px;
+  border: 1px solid var(--accent);
+  background: linear-gradient(rgba(58, 154, 173, 0.09), rgba(58, 154, 173, 0.09)), var(--surface);
+  box-shadow: 0 16px 36px -20px rgba(21, 23, 28, 0.35);
+}
+
+.rk-me-pos {
+  color: var(--brand-ink-2);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rk-me-who {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rk-me-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rk-me-name strong {
+  overflow: hidden;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rk-me-you {
+  flex: none;
+  padding: 2px 7px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rk-me-progress {
+  display: flex;
+  flex: 1 1 200px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.rk-me-progress-label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.rk-me-bar {
+  display: block;
+  height: 6px;
+  background: #d6e6ea;
+}
+
+.rk-me-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.rk-me-value {
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
 }
