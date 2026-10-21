@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import type { GamePhase } from '@puzzle/shared';
 import type { PuzzleRoom } from '../net/connection';
 import { BoardScene } from './BoardScene';
+import { BoardToolbar } from './BoardToolbar';
 
 interface BoardProps {
   room: PuzzleRoom;
   image: HTMLImageElement;
+  phase: GamePhase;
 }
 
-export function Board({ room, image }: BoardProps) {
+export function Board({ room, image, phase }: BoardProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [scene, setScene] = useState<BoardScene | null>(null);
 
@@ -33,5 +36,17 @@ export function Board({ room, image }: BoardProps) {
     scene?.attach(room, image);
   }, [scene, room, image]);
 
-  return <div ref={hostRef} className="board" />;
+  return (
+    <>
+      <div ref={hostRef} className="board" />
+      {scene && (
+        <BoardToolbar
+          scene={scene}
+          image={image}
+          canScatter={phase === 'playing'}
+          onScatter={() => room.send('scatter')}
+        />
+      )}
+    </>
+  );
 }
