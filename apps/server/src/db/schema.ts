@@ -231,3 +231,30 @@ export const puzzleReports = pgTable(
   },
   (table) => [primaryKey({ columns: [table.puzzleId, table.userId] })],
 );
+
+/**
+ * Amizade entre duas contas, guardada uma vez só: `user_low` é o menor dos dois ids. `pending`
+ * espera quem não pediu aceitar; `accepted` vale para os dois lados.
+ */
+export const friendships = pgTable(
+  'friendships',
+  {
+    userLow: uuid('user_low')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userHigh: uuid('user_high')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: ['pending', 'accepted'] })
+      .notNull()
+      .default('pending'),
+    requestedBy: uuid('requested_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userLow, table.userHigh] }),
+    index('friendships_high_idx').on(table.userHigh),
+  ],
+);
