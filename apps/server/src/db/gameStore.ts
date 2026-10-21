@@ -22,6 +22,7 @@ import {
   type RankingPeriod,
   type RankingQuery,
 } from '@puzzle/shared';
+import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { AppDatabase } from './database';
 import { gamePlayers, games, players } from './schema';
 
@@ -39,15 +40,15 @@ export interface GameResult {
   players: Array<{ guestId: string; userId?: string; nickname: string }>;
 }
 
-type TeamMember = GameResult['players'][number];
-type Transaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
+export type TeamMember = GameResult['players'][number];
+export type Transaction = Parameters<Parameters<AppDatabase['transaction']>[0]>[0];
 
 /**
  * O jogador do ranking para cada participante. Com conta: o jogador ligado a ela (na primeira
  * partida logado, o convidado deste navegador vira o jogador da conta). Sem conta: o convidado.
  * O apelido mais recente vence.
  */
-async function resolvePlayer(tx: Transaction, member: TeamMember): Promise<string> {
+export async function resolvePlayer(tx: Transaction, member: TeamMember): Promise<string> {
   const { guestId, userId, nickname } = member;
   if (userId) {
     const [mine] = await tx
@@ -77,6 +78,45 @@ async function resolvePlayer(tx: Transaction, member: TeamMember): Promise<strin
   return row!.id;
 }
 
+/** A mesma pessoa em duas abas (ou dois aparelhos, com conta) conta uma vez só. */
+export function uniqueTeam(members: TeamMember[]): TeamMember[] {
+  return [...new Map(members.map((p) => [p.userId ?? p.guestId, p])).values()];
+}
+
+/** Jogadores da equipe e a chave dela (ids ordenados): identifica "a mesma equipe" entre partidas. */
+export async function resolveTeam(tx: Transaction, team: TeamMember[]) {
+  const playerIds: string[] = [];
+  for (const member of team) playerIds.push(await resolvePlayer(tx, member));
+  return { playerIds, teamKey: [...playerIds].sort().join(',') };
+}
+
+/** Nome de cada equipe pela team_key: os apelidos mais recentes, em ordem alfabética. */
+export async function teamNames(
+  db: AppDatabase,
+  teamKeys: string[],
+): Promise<Map<string, string[]>> {
+  const ids = [...new Set(teamKeys.flatMap((key) => key.split(',')))];
+  const names = new Map(
+    ids.length === 0
+      ? []
+      : (
+          await db
+            .select({ id: players.id, nickname: players.nickname })
+            .from(players)
+            .where(inArray(players.id, ids))
+        ).map((p) => [p.id, p.nickname]),
+  );
+  return new Map(
+    teamKeys.map((key) => [
+      key,
+      key
+        .split(',')
+        .map((id) => names.get(id) ?? '?')
+        .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    ]),
+  );
+}
+
 /** Como na URL: sem período, vale "desde sempre". */
 type WithOptionalPeriod<T extends { period: RankingPeriod }> = Omit<T, 'period'> &
   Partial<Pick<T, 'period'>>;
@@ -100,10 +140,15 @@ const PERIOD_UNIT = { day: 'day', week: 'week', month: 'month' } as const;
  * roda em UTC: sem isso, "hoje" viraria às 21h). No Postgres a semana começa na segunda.
  */
 function inPeriod(period: RankingPeriod): SQL | undefined {
+  return finishedInPeriod(games.finishedAt, period);
+}
+
+/** O mesmo filtro de período para outra tabela (a coluna de quando terminou). */
+export function finishedInPeriod(column: AnyPgColumn, period: RankingPeriod): SQL | undefined {
   if (period === 'all') return undefined;
   const unit = PERIOD_UNIT[period];
   return gte(
-    games.finishedAt,
+    column,
     sql`date_trunc(${unit}, now() at time zone ${RANKING_TIME_ZONE}) at time zone ${RANKING_TIME_ZONE}`,
   );
 }
@@ -120,13 +165,10 @@ function sameCategory(imageId: string, pieceCount: number, teamSize: number) {
 export function createGameStore(db: AppDatabase): GameStore {
   return {
     async saveGame(result) {
-      // A mesma pessoa em duas abas (ou dois aparelhos, com conta) conta uma vez só.
-      const team = [...new Map(result.players.map((p) => [p.userId ?? p.guestId, p])).values()];
+      const team = uniqueTeam(result.players);
 
       return db.transaction(async (tx) => {
-        const playerIds: string[] = [];
-        for (const member of team) playerIds.push(await resolvePlayer(tx, member));
-        const teamKey = [...playerIds].sort().join(',');
+        const { playerIds, teamKey } = await resolveTeam(tx, team);
 
         const [game] = await tx
           .insert(games)
@@ -226,22 +268,14 @@ export function createGameStore(db: AppDatabase): GameStore {
       if (top.length === 0) return [];
 
       // team_key = ids dos jogadores unidos por vírgula; o nome mostrado é o apelido mais recente.
-      const ids = [...new Set(top.flatMap((row) => row.teamKey.split(',')))];
-      const names = new Map(
-        (
-          await db
-            .select({ id: players.id, nickname: players.nickname })
-            .from(players)
-            .where(inArray(players.id, ids))
-        ).map((p) => [p.id, p.nickname]),
+      const names = await teamNames(
+        db,
+        top.map((row) => row.teamKey),
       );
 
       return top.map((row, index) => ({
         position: index + 1,
-        players: row.teamKey
-          .split(',')
-          .map((id) => names.get(id) ?? '?')
-          .sort((a, b) => a.localeCompare(b, 'pt-BR')),
+        players: names.get(row.teamKey)!,
         points: row.points,
         puzzles: row.puzzles,
         totalMs: Number(row.totalMs),
