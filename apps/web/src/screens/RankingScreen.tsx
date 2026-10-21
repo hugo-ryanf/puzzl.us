@@ -4,19 +4,21 @@ import {
   MAX_PLAYERS,
   PIECE_COUNT_PRESETS,
   RANKING_PERIODS,
-  findCatalogImage,
+  type CommunityPuzzle,
   type GeneralRankingEntry,
   type RankingEntry,
   type RankingPeriod,
   type RankingQuery,
 } from '@puzzle/shared';
-import { catalogThumbUrl } from '../board/images';
+import { catalogThumbUrl, puzzleImageInfo } from '../board/images';
 import { formatDuration } from '../format';
 import { fetchGeneralRanking, fetchRanking } from '../net/ranking';
 import { Pips, difficultyOf } from '../ui/difficulty';
 
 interface RankingScreenProps {
   initial: RankingQuery;
+  /** Fotos publicadas também têm ranking (depois do catálogo nos filtros). */
+  community: CommunityPuzzle[];
 }
 
 /** Por quebra-cabeça (melhor tempo numa foto) ou geral (peças somadas de todas as fotos). */
@@ -47,7 +49,21 @@ const TEAM_LABELS: Record<number, string> = { 1: 'Solo', 2: 'Duplas', 3: 'Trios'
 const teamLabel = (n: number) => TEAM_LABELS[n] ?? `${n} jogadores`;
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
 
-export function RankingScreen({ initial }: RankingScreenProps) {
+export function RankingScreen({ initial, community }: RankingScreenProps) {
+  const images = [
+    ...CATALOG.map((image) => ({
+      id: image.id,
+      title: image.title,
+      thumb: catalogThumbUrl(image.id),
+    })),
+    ...community
+      .filter((puzzle) => puzzle.status === 'published')
+      .map((puzzle) => ({
+        id: puzzle.imageId,
+        title: puzzle.title,
+        thumb: `/api/puzzles/${puzzle.id}/mini`,
+      })),
+  ];
   const [tab, setTab] = useState<Tab>('puzzle');
   const [query, setQuery] = useState(initial);
   const [loaded, setLoaded] = useState<Loaded>();
@@ -78,7 +94,7 @@ export function RankingScreen({ initial }: RankingScreenProps) {
   }, [tab, query, key]);
 
   const result = loaded?.key === key ? loaded : undefined;
-  const imageTitle = findCatalogImage(query.image)?.title;
+  const imageTitle = puzzleImageInfo(query.image)?.title;
 
   return (
     <>
@@ -152,7 +168,7 @@ export function RankingScreen({ initial }: RankingScreenProps) {
           <div className="filter-group" role="radiogroup" aria-labelledby="filter-image">
             <span id="filter-image">Imagem</span>
             <div className="chips">
-              {CATALOG.map((image) => (
+              {images.map((image) => (
                 <button
                   key={image.id}
                   type="button"
@@ -161,7 +177,7 @@ export function RankingScreen({ initial }: RankingScreenProps) {
                   className="chip image-chip"
                   onClick={() => setQuery({ ...query, image: image.id })}
                 >
-                  <img src={catalogThumbUrl(image.id)} alt="" />
+                  <img src={image.thumb} alt="" />
                   {image.title}
                 </button>
               ))}
