@@ -220,7 +220,7 @@ export function CreateRoomDialog({
                 className="input"
                 value={name}
                 maxLength={20}
-                autoFocus
+                data-autofocus
                 onChange={(e) => onNameChange(e.target.value)}
               />
               <small className="field-hint">
@@ -242,8 +242,7 @@ export function CreateRoomDialog({
               </button>
             </div>
 
-            {/* No fim do formulário (mas desenhado no canto): o diálogo foca o primeiro
-                elemento clicável ao abrir, e esse deve ser o campo de nome, não o X. */}
+            {/* No fim do formulário (desenhado no canto): na ordem do Tab, o X vem por último. */}
             <button
               type="button"
               className="tool icon-only play-close"

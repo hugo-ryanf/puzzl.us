@@ -20,7 +20,11 @@ export function Dialog({ open, onClose, labelledBy, className, children }: Dialo
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      dialog.showModal();
+      // O navegador foca o primeiro elemento clicável; quem marca data-autofocus escolhe outro.
+      dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
