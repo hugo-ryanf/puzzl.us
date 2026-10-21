@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CloseCode } from '@colyseus/sdk';
-import { uploadIdOf, type RankingQuery } from '@puzzle/shared';
+import { uploadIdOf } from '@puzzle/shared';
 import { Board } from '../board/Board';
 import { puzzleImageInfo } from '../board/images';
 import { usePuzzleImage } from '../board/usePuzzleImage';
@@ -11,6 +11,11 @@ import { leaveRoom, rejoinRoom, type PuzzleRoom } from '../net/connection';
 import { loadPlayerName } from '../net/playerName';
 import { useRoomSnapshot, type RoomSnapshot } from '../net/useRoomSnapshot';
 import { useVoiceChat } from '../voice/useVoiceChat';
+import { BattleBoards } from './battle/BattleBoards';
+import { BattleLobby, BattleResult } from './battle/BattlePanels';
+import { BulletBoard } from './bullet/BulletBoard';
+import { BulletResult } from './bullet/BulletResult';
+import type { RankingOpen } from './RankingScreen';
 import { CompletedModal } from './room/CompletedModal';
 import { PlayerAvatars } from './room/PlayerAvatars';
 import { RoomHeader } from './room/RoomHeader';
@@ -20,7 +25,7 @@ interface RoomScreenProps {
   onLeave: (notice?: string) => void;
   /** Voltou para a mesma sala por uma conexão nova (o servidor reiniciou no meio do jogo). */
   onRejoin: (room: PuzzleRoom) => void;
-  onShowRanking: (query: RankingQuery) => void;
+  onShowRanking: (query: RankingOpen) => void;
   /** Logado: nome da conta e como publicar (a foto própria, no fim da partida). */
   account?: { name: string; publish: Community['publish'] };
   /** Logado: amigos para chamar pelo "Convidar". */
@@ -124,7 +129,11 @@ export function RoomScreen({
       {reconnecting && <div className="banner">Conexão caiu — reconectando…</div>}
       {saveError && <div className="banner">Não deu para salvar agora. Tente de novo.</div>}
       <div className="board-area">
-        {image?.image ? (
+        {snapshot.mode === 'bullet' ? (
+          <BulletBoard room={room} snapshot={snapshot} />
+        ) : snapshot.mode === 'battle' ? (
+          <BattleBoards room={room} snapshot={snapshot} />
+        ) : image?.image ? (
           <Board room={room} image={image.image} phase={snapshot.phase} />
         ) : (
           <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>
@@ -137,14 +146,33 @@ export function RoomScreen({
             voice={voice}
           />
         )}
-        {snapshot.phase === 'lobby' && (
+        {snapshot.phase === 'lobby' && snapshot.mode === 'battle' && (
+          <BattleLobby room={room} snapshot={snapshot} />
+        )}
+        {snapshot.phase === 'completed' && snapshot.mode === 'battle' && (
+          <BattleResult
+            // Cada partida (revanche) abre o resultado de novo.
+            key={snapshot.round}
+            room={room}
+            snapshot={snapshot}
+            onLeave={leave}
+          />
+        )}
+        {snapshot.phase === 'lobby' && snapshot.mode !== 'battle' && (
           <LobbyPanel
             snapshot={snapshot}
             isHost={snapshot.hostId === room.sessionId}
             onStart={() => room.send('start')}
           />
         )}
-        {snapshot.phase === 'completed' && (
+        {snapshot.phase === 'completed' && snapshot.mode === 'bullet' && (
+          <BulletResult
+            snapshot={snapshot}
+            onShowRanking={(bullet) => onShowRanking({ bullet })}
+            onLeave={leave}
+          />
+        )}
+        {snapshot.phase === 'completed' && snapshot.mode === 'classic' && (
           <CompletedModal
             snapshot={snapshot}
             onShowRanking={onShowRanking}
@@ -180,18 +208,29 @@ interface LobbyPanelProps {
 }
 
 function LobbyPanel({ snapshot, isHost, onStart }: LobbyPanelProps) {
+  const bullet = snapshot.mode === 'bullet';
   const hostName = snapshot.players.find((p) => p.sessionId === snapshot.hostId)?.name;
   return (
     <div className="overlay">
       <div className="panel">
-        <h2>Sala de espera</h2>
-        <ImageCaption imageId={snapshot.imageId} />
+        <h2>{bullet ? 'Bullet' : 'Sala de espera'}</h2>
+        {/* No Bullet as fotos são sorteadas: a primeira não diz nada sobre a partida. */}
+        {!bullet && <ImageCaption imageId={snapshot.imageId} />}
         <p>
+          {bullet && `${snapshot.timeLimitMs / 60_000} min · `}
           {snapshot.pieceCount} peças · {snapshot.players.length} de {snapshot.maxPlayers} jogadores
         </p>
+        {bullet && (
+          <p>
+            Montem o máximo de quebra-cabeças que conseguirem até o tempo acabar. Terminou um, entra
+            outro na hora.
+          </p>
+        )}
         {isHost ? (
           <>
-            {snapshot.elapsedMs > 0 ? (
+            {bullet ? (
+              <p>Mande o convite e comece quando todo mundo tiver chegado.</p>
+            ) : snapshot.elapsedMs > 0 ? (
               <p>
                 Partida retomada com {formatDuration(snapshot.elapsedMs)} de jogo. Chame quem estava
                 e comece: o tempo continua de onde parou.
