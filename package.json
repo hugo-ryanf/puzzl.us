@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @puzzle/web --filter @puzzle/server dev",
     "build": "pnpm -r build",
+    "build:deploy": "pnpm --filter @puzzle/web build && pnpm --filter @puzzle/server build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck && tsc --noEmit -p scripts",
     "catalog": "tsx scripts/build-catalog.ts",
