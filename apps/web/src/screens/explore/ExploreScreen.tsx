@@ -1,13 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { CATALOG, type CatalogImage } from '@puzzle/shared';
 import { catalogThumbUrl } from '../../board/images';
 import type { PuzzleRoom } from '../../net/connection';
-import type { UploadedImage } from '../../net/uploads';
 import { ChevronDownIcon, FilterIcon, SearchIcon } from '../../ui/icons';
-import { CreateRoomDialog, type PuzzleChoice } from './CreateRoomDialog';
+import { CreateRoomDialog, type CreateRoomSource, type PuzzleChoice } from './CreateRoomDialog';
 import { JoinRoomDialog } from './JoinRoomDialog';
 import { PuzzleCard, orientationOf } from './PuzzleCard';
-import { UploadCard } from './UploadCard';
 
 type Orientation = 'Todas' | 'Horizontal' | 'Vertical';
 const ORIENTATIONS: { value: Orientation; label: string }[] = [
@@ -61,15 +59,7 @@ export function ExploreScreen({
 }: ExploreScreenProps) {
   const [query, setQuery] = useState('');
   const [orientation, setOrientation] = useState<Orientation>('Todas');
-  const [uploaded, setUploaded] = useState<UploadedImage>();
   const [choice, setChoice] = useState<PuzzleChoice | null>(null);
-
-  // A pré-visualização da foto enviada é um object URL: libera ao trocar de foto ou sair da tela.
-  useEffect(() => {
-    return () => {
-      if (uploaded) URL.revokeObjectURL(uploaded.previewUrl);
-    };
-  }, [uploaded]);
 
   const q = normalize(query);
   const items = CATALOG.filter(
@@ -79,16 +69,9 @@ export function ExploreScreen({
   );
   const filtering = q !== '' || orientation !== 'Todas';
 
-  // "Criar sala" da barra lateral: sem imagem escolhida ainda, começa pela primeira do catálogo.
-  const dialogChoice = choice ?? (createRequested ? catalogChoice(CATALOG[0]!) : null);
-  const uploadChoice: PuzzleChoice | null = uploaded
-    ? {
-        imageId: uploaded.imageId,
-        title: 'Sua foto',
-        subtitle: 'Fora do ranking',
-        thumbUrl: uploaded.previewUrl,
-      }
-    : null;
+  // Clique num card = jogar aquela foto; "Criar sala" da barra lateral = sala personalizada
+  // (o único caminho para jogar com uma foto própria).
+  const dialogSource: CreateRoomSource = choice ?? (createRequested ? 'custom' : null);
 
   return (
     <>
@@ -122,8 +105,7 @@ export function ExploreScreen({
         <div>
           <h1>Explorar</h1>
           <p>
-            {items.length === 1 ? '1 imagem' : `${items.length} imagens`} · escolha uma para criar a
-            sala
+            {items.length === 1 ? '1 imagem' : `${items.length} imagens`} · escolha uma para jogar
           </p>
         </div>
         <div className="chips" role="group" aria-label="Orientação">
@@ -142,11 +124,6 @@ export function ExploreScreen({
       </div>
 
       <div className="grid">
-        <UploadCard
-          uploaded={uploaded}
-          onUploaded={setUploaded}
-          onPlay={() => setChoice(uploadChoice)}
-        />
         {items.map((image) => (
           <PuzzleCard
             key={image.id}
@@ -175,8 +152,9 @@ export function ExploreScreen({
       )}
 
       <CreateRoomDialog
-        key={`criar:${dialogChoice?.imageId ?? 'fechado'}`} // estado novo (peças, erro) a cada imagem
-        choice={dialogChoice}
+        // Estado novo (modo, peças, foto enviada, erro) a cada abertura.
+        key={`criar:${typeof dialogSource === 'string' ? dialogSource : (dialogSource?.imageId ?? 'fechado')}`}
+        source={dialogSource}
         name={name}
         onNameChange={onNameChange}
         onClose={() => {

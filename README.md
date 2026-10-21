@@ -52,9 +52,17 @@ As salas usam fotos de um catálogo fixo.
 
 O ranking é separado por imagem + número de peças + tamanho da equipe.
 
+### Como jogar: solo, multiplayer e sala personalizada
+
+- **Clique numa foto do catálogo** → **Solo** (começa na hora, sem sala de espera nem chamada) ou
+  **Multiplayer** (escolhe 2, 3 ou 4 jogadores e se a foto é a clicada ou **aleatória**, sorteada
+  pelo servidor). A sala trava quando enche; o máximo é o quarteto.
+- **Criar sala** (barra lateral) = **sala personalizada**: é o único lugar para jogar com uma foto
+  sua, também em solo ou multiplayer.
+
 ### Foto própria
 
-Na criação da sala, **📷 Enviar sua foto** usa uma foto do computador. O navegador reduz a foto
+Na sala personalizada, **Escolher foto** usa uma foto do computador. O navegador reduz a foto
 antes de enviar; o servidor reprocessa tudo (confere que é imagem, apaga EXIF/GPS, WebP ≤ 2048 px)
 e guarda no banco com um id aleatório. Partidas com foto própria **ficam fora do ranking**, e a
 foto é apagada depois de **7 dias sem uso**. Precisa do banco configurado (`DATABASE_URL`).

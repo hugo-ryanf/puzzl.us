@@ -19,7 +19,9 @@ interface RoomScreenProps {
 
 export function RoomScreen({ room, onLeave, onShowRanking }: RoomScreenProps) {
   const snapshot = useRoomSnapshot(room);
-  const voice = useVoiceChat(room);
+  const solo = snapshot.maxPlayers === 1;
+  // Solo não entra na chamada: não há com quem falar (e poupa a cota do LiveKit).
+  const voice = useVoiceChat(room, !solo);
   const [reconnecting, setReconnecting] = useState(false);
 
   const image = usePuzzleImage(snapshot.imageId);
@@ -56,12 +58,14 @@ export function RoomScreen({ room, onLeave, onShowRanking }: RoomScreenProps) {
         ) : (
           <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>
         )}
-        <PlayerAvatars
-          players={snapshot.players}
-          selfId={room.sessionId}
-          hostId={snapshot.hostId}
-          voice={voice}
-        />
+        {!solo && (
+          <PlayerAvatars
+            players={snapshot.players}
+            selfId={room.sessionId}
+            hostId={snapshot.hostId}
+            voice={voice}
+          />
+        )}
         {snapshot.phase === 'lobby' && (
           <LobbyPanel
             snapshot={snapshot}
@@ -91,8 +95,7 @@ function LobbyPanel({ snapshot, isHost, onStart }: LobbyPanelProps) {
         <h2>Sala de espera</h2>
         <ImageCaption imageId={snapshot.imageId} />
         <p>
-          {snapshot.pieceCount} peças · {snapshot.players.length}{' '}
-          {snapshot.players.length === 1 ? 'jogador' : 'jogadores'}
+          {snapshot.pieceCount} peças · {snapshot.players.length} de {snapshot.maxPlayers} jogadores
         </p>
         {isHost ? (
           <>

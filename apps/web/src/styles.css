@@ -741,77 +741,263 @@ select {
   gap: 8px;
 }
 
-/* ── Criar sala: escolha do tamanho ─────────────────────────────────────── */
+/* ── Criar sala: modo, jogadores e foto ─────────────────────────────────── */
 
-.size-preview {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-/* Miniatura com as linhas de corte por cima (--cols × --rows vêm do componente). */
-.size-thumb {
+/* Legendas dos grupos do diálogo: mesmo estilo da "TAMANHO". */
+.mode-options legend,
+.choice-row legend {
+  padding: 0 0 10px;
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.mode-option:hover {
+  border-color: var(--border-hover);
+}
+
+.mode-option strong {
+  margin-top: 4px;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+
+.mode-option small {
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.mode-option:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.choice-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Pílula de rádio (rádio nativo escondido dentro), no visual dos chips. */
+.radio-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.radio-chip:hover {
+  border-color: var(--border-hover);
+}
+
+.radio-chip:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+/* Rádios escondidos: o foco do teclado aparece no quadro/pílula inteiro. */
+.mode-option:has(input:focus-visible),
+.radio-chip:has(input:focus-visible) {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* ── Criar sala: duas colunas (foto à esquerda, opções à direita) ──────── */
+
+.dialog.dialog-split {
+  width: min(840px, calc(100% - 32px));
+}
+
+.dialog-split .dialog-body {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.play-media {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.play-media .upload-card {
+  min-height: 260px;
+}
+
+.play-photo {
   position: relative;
-  flex: none;
+  width: 100%;
   overflow: hidden;
-  border-radius: var(--radius-thumb);
+  border-radius: var(--radius-card);
   background: var(--hover);
 }
 
-.size-thumb img {
+.play-photo img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
 }
 
-.size-thumb::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.75) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.75) 1px, transparent 1px);
-  background-size:
-    calc(100% / var(--cols)) 100%,
-    100% calc(100% / var(--rows));
-  /* Sombra fina embaixo das linhas: aparecem também em fotos claras (céu, neve). */
-  filter: drop-shadow(0 0 0.5px rgba(21, 23, 28, 0.6));
-  transition: background-size 0.2s ease;
+/* Foto aleatória: ainda não se sabe qual, então só o símbolo do sorteio. */
+.play-photo.random {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
 }
 
-.size-summary {
-  min-width: 0;
+.play-count {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(21, 23, 28, 0.78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.play-caption {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
 }
 
-.size-summary p {
+.play-caption strong {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.play-caption p {
   margin: 0;
   color: var(--text-3);
   font-size: 13px;
 }
 
-.size-summary .size-count {
-  margin-top: 6px;
-  color: var(--text-2);
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-}
-
-.size-summary .size-count strong {
-  color: var(--text);
-}
-
-.size-level {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-2);
+.play-caption .btn-link {
+  margin-top: 4px;
   font-size: 13px;
-  font-weight: 600;
 }
+
+.play-form {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px;
+}
+
+.play-header {
+  padding-right: 40px; /* espaço do X, que fica no canto */
+}
+
+.play-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.play-header h2 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.play-header p {
+  margin: 6px 0 0;
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+.field-hint {
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.play-actions {
+  padding-top: 20px;
+  border-top: 1px solid var(--divider);
+}
+
+/* Celular: a foto vai para cima, menor. */
+@media (max-width: 720px) {
+  .dialog-split .dialog-body {
+    grid-template-columns: 1fr;
+  }
+
+  .play-media {
+    padding: 16px;
+  }
+
+  .play-photo {
+    max-height: 200px;
+  }
+
+  .play-form {
+    padding: 20px;
+  }
+}
+
+/* ── Criar sala: tamanho ────────────────────────────────────────────────── */
 
 .size-options {
   display: grid;
@@ -832,6 +1018,7 @@ select {
 }
 
 .size-option {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -850,9 +1037,28 @@ select {
 }
 
 .size-option:has(input:checked) {
-  border-color: var(--primary);
-  background: var(--primary);
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ✓ no canto da opção escolhida. */
+.size-option-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 20px;
+  height: 20px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
   color: #fff;
+}
+
+.size-option:has(input:checked) .size-option-check {
+  display: flex;
 }
 
 /* O rádio está escondido: o foco do teclado aparece no quadro inteiro. */
@@ -882,16 +1088,6 @@ select {
   color: var(--text-2);
   font-size: 12px;
   font-weight: 600;
-}
-
-.size-option:has(input:checked) .size-option-unit,
-.size-option:has(input:checked) .size-option-level {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-/* Barrinha apagada some no fundo escuro: um cinza mais claro na opção escolhida. */
-.size-option:has(input:checked) .pips span:not(.on) {
-  background: rgba(255, 255, 255, 0.3);
 }
 
 /* ── Ranking ────────────────────────────────────────────────────────────── */

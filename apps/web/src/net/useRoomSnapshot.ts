@@ -20,6 +20,8 @@ export interface RoomSnapshot {
   /** Foto do catálogo e tamanho escolhido (juntos com teamSize, a categoria do ranking). */
   imageId: string;
   pieceCount: number;
+  /** Vagas: 1 = solo, 2–4 = multiplayer. */
+  maxPlayers: number;
   /** Total real de peças (rows × cols; pode diferir um pouco do tamanho escolhido). */
   pieces: number;
   groups: number;
@@ -55,6 +57,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     phase: state.phase as GamePhase,
     imageId: state.config.imageId,
     pieceCount: state.config.pieceCount,
+    maxPlayers: state.config.maxPlayers,
     pieces: state.pieceGroup.length,
     groups: state.groups.size,
     placed: countPlaced(state.pieceGroup),

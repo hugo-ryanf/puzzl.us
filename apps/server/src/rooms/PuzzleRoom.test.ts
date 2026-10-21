@@ -130,6 +130,42 @@ describe('PuzzleRoom — sala e jogadores', () => {
   });
 });
 
+describe('PuzzleRoom — solo, vagas e foto aleatória', () => {
+  const create = (options: object) =>
+    colyseus.createRoom<PuzzleRoom>(ROOM_NAME, {
+      ...player('Ana'),
+      pieceCount: 24,
+      imageId: IMAGE.id,
+      ...options,
+    });
+
+  it('solo começa na hora, sem sala de espera, e não aceita um segundo jogador', async () => {
+    const room = await create({ maxPlayers: 1 });
+    await colyseus.connectTo(room, player('Ana'));
+    const state = room.state as RoomState;
+    expect(state.config.maxPlayers).toBe(1);
+    expect(state.phase).toBe('playing');
+    await expect(colyseus.connectTo(room, player('Bia'))).rejects.toThrow();
+  });
+
+  it('sala de 3 vagas não aceita o quarto jogador', async () => {
+    const room = await create({ maxPlayers: 3 });
+    for (const name of ['Ana', 'Bia', 'Caio']) await colyseus.connectTo(room, player(name));
+    await expect(colyseus.connectTo(room, player('Duda'))).rejects.toThrow();
+    expect((room.state as RoomState).phase).toBe('lobby'); // multiplayer espera o "Começar"
+  });
+
+  it('recusa mais de 4 vagas (o máximo é o quarteto)', async () => {
+    await expect(create({ maxPlayers: 5 })).rejects.toThrow();
+  });
+
+  it('foto aleatória: o servidor sorteia uma do catálogo', async () => {
+    const room = await create({ imageId: 'random' });
+    const { imageId } = (room.state as RoomState).config;
+    expect(CATALOG.some((image) => image.id === imageId)).toBe(true);
+  });
+});
+
 describe('PuzzleRoom — lobby', () => {
   it('começa no lobby, com o primeiro a entrar como anfitrião', async () => {
     const { ana, state } = await setup({ started: false });

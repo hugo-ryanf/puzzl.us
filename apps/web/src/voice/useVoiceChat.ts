@@ -112,7 +112,7 @@ function readPeers(call: Call): VoicePeers {
  * chamada; para não falar ou não ouvir, desliga o microfone e/ou o som. Entrar na sala foi um clique, então o navegador
  * costuma liberar o áudio; se não liberar (ex.: depois de um F5), `needsAudioUnlock` avisa.
  */
-export function useVoiceChat(room: PuzzleRoom): VoiceChat {
+export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
   const callRef = useRef<Call | null>(null);
   /** Evita duas chamadas se clicarem de novo enquanto o SDK ainda está baixando. */
   const joiningRef = useRef(false);
@@ -271,16 +271,16 @@ export function useVoiceChat(room: PuzzleRoom): VoiceChat {
     }
   }, [connect]);
 
-  // Abrir a sala já entra na chamada; sair da sala (desmontar a tela) encerra.
+  // Abrir a sala já entra na chamada (menos no solo); sair da sala (desmontar a tela) encerra.
   useEffect(() => {
     mountedRef.current = true;
-    void join();
+    if (enabled) void join();
     return () => {
       mountedRef.current = false;
       void callRef.current?.disconnect();
       callRef.current = null;
     };
-  }, [join]);
+  }, [join, enabled]);
 
   const toggleMute = useCallback(async () => {
     const call = callRef.current;
