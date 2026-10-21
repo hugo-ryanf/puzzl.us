@@ -371,6 +371,7 @@ describe('PuzzleRoom — fim e ranking', () => {
     const game = await setup();
     await solve(game);
     await waitForRankStatus(game.room, game.state);
+    expect(game.state.points).toBe(24); // sem partidas para comparar: vale as peças
 
     const { data } = await colyseus.http.get<GeneralRankingEntry[]>(
       '/api/ranking/general?players=2&period=week',
@@ -381,7 +382,6 @@ describe('PuzzleRoom — fim e ranking', () => {
         players: ['Ana', 'Bia'],
         points: 24,
         puzzles: 1,
-        totalMs: game.state.durationMs,
       },
     ]);
     // Período inválido é recusado.
