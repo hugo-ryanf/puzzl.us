@@ -276,7 +276,11 @@ export interface GeneralRankingEntry {
   puzzles: number;
 }
 
-/** GET /api/ranking/popular?players=2&period=week — fotos mais jogadas (para escolher no ranking). */
+/** GET /api/ranking/popular?period=week[&players=2] — sem `players`, todas as modalidades. */
+export const PopularQuery = z.object({ players: teamSize.optional(), period });
+export type PopularQuery = z.infer<typeof PopularQuery>;
+
+/** Uma foto mais jogada (para o destaque e para escolher no ranking por foto). */
 export interface PopularImage {
   imageId: string;
   plays: number;
