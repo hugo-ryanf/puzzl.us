@@ -269,27 +269,68 @@ export function gamePoints(pieceCount: number, durationMs: number, typicalMs?: n
  * Uma linha do ranking por pontos: soma, no período, da melhor partida da equipe em cada foto e
  * tamanho (repetir o mesmo quebra-cabeça não acumula). Empate: mais quebra-cabeças diferentes.
  */
-export interface GeneralRankingEntry {
-  position: number;
-  players: string[];
+export interface GeneralRankingEntry extends RankingRowBase {
   points: number;
   puzzles: number;
 }
 
 /** GET /api/ranking/popular?period=week[&players=2] — sem `players`, todas as modalidades. */
-export const PopularQuery = z.object({ players: teamSize.optional(), period });
+export const PopularQuery = z.object({
+  players: teamSize.optional(),
+  period,
+  /** Quantas fotos (o destaque mostra 8; "Ver todos", mais). */
+  limit: z.coerce.number().int().min(1).max(60).default(20),
+});
 export type PopularQuery = z.infer<typeof PopularQuery>;
 
 /** Uma foto mais jogada (para o destaque e para escolher no ranking por foto). */
 export interface PopularImage {
   imageId: string;
   plays: number;
+  /** Partidas no período anterior equivalente (ontem, semana/mês passado); 0 em "sempre". */
+  previousPlays: number;
 }
 
-/** Uma linha do ranking: o melhor tempo de cada equipe na categoria. */
-export interface RankingEntry {
+/** Variação das partidas da foto em relação ao período anterior, em % (null: sem base). */
+export function playsTrend({ plays, previousPlays }: PopularImage): number | null {
+  return previousPlays > 0 ? Math.round(((plays - previousPlays) / previousPlays) * 100) : null;
+}
+
+/** "Em alta": cresceu pelo menos 20% (ou estreou) com um mínimo de partidas. */
+export const TRENDING_MIN_PLAYS = 3;
+export function isTrending(image: PopularImage): boolean {
+  const trend = playsTrend(image);
+  return image.plays >= TRENDING_MIN_PLAYS && (trend === null || trend >= 20);
+}
+
+/** O que toda linha de ranking tem além do valor: posição, nomes, variação e sequência. */
+export interface RankingRowBase {
   position: number;
   players: string[];
+  /**
+   * Posições ganhas (+) ou perdidas (−) em relação ao período anterior equivalente; null: não
+   * estava no ranking de antes; ausente em "sempre".
+   */
+  change?: number | null;
+  /** Dias seguidos (até hoje ou ontem, no horário de Brasília) em que a equipe jogou. */
+  streak: number;
+}
+
+/**
+ * Resposta das rotas de ranking: o topo, quantas equipes há ao todo e, se quem pede aparece no
+ * ranking, a posição dele e a de quem está logo à frente ("Rumo ao Nº").
+ */
+export interface RankingPage<T extends RankingRowBase> {
+  entries: T[];
+  total: number;
+  me?: T & { ahead?: T };
+}
+
+/** Cabeçalho com o convidado deste navegador: o ranking acha "Sua posição" sem login. */
+export const GUEST_HEADER = 'x-guest-id';
+
+/** Uma linha do ranking: o melhor tempo de cada equipe na categoria. */
+export interface RankingEntry extends RankingRowBase {
   durationMs: number;
   /** ISO 8601. */
   finishedAt: string;
@@ -423,9 +464,7 @@ export const BulletRankingQuery = z.object({
 export type BulletRankingQuery = z.infer<typeof BulletRankingQuery>;
 
 /** Melhor corrida de cada equipe: mais montados; empate, mais peças no que ficou pela metade. */
-export interface BulletRankingEntry {
-  position: number;
-  players: string[];
+export interface BulletRankingEntry extends RankingRowBase {
   solved: number;
   partial: number;
   /** ISO 8601. */
