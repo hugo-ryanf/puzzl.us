@@ -1,4 +1,6 @@
 import type {
+  BulletRankingEntry,
+  BulletRankingQuery,
   GeneralRankingEntry,
   GeneralRankingQuery,
   RankingEntry,
@@ -23,4 +25,9 @@ export function fetchRanking(query: RankingQuery): Promise<RankingEntry[]> {
 /** Ranking geral da modalidade no período: peças somadas de todas as fotos. */
 export function fetchGeneralRanking(query: GeneralRankingQuery): Promise<GeneralRankingEntry[]> {
   return getRanking('/api/ranking/general', query);
+}
+
+/** Bullet: melhor corrida de cada equipe (minutos + peças + modalidade) no período. */
+export function fetchBulletRanking(query: BulletRankingQuery): Promise<BulletRankingEntry[]> {
+  return getRanking('/api/ranking/bullet', query);
 }
