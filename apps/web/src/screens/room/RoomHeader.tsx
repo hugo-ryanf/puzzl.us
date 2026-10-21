@@ -34,8 +34,9 @@ export function RoomHeader({
   friends,
 }: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
-  const { imageId, pieceCount, pieces, placed, phase, elapsedMs, durationMs, maxPlayers } =
+  const { imageId, pieceCount, pieces, placed, phase, elapsedMs, durationMs, maxPlayers, mode } =
     snapshot;
+  const bullet = mode === 'bullet';
   const solo = maxPlayers === 1;
   const title = puzzleImageInfo(imageId)?.title ?? 'Quebra-cabeça';
   const difficulty = DIFFICULTY_NAMES[difficultyOf(pieceCount) - 1];
@@ -61,15 +62,37 @@ export function RoomHeader({
                 Sala <span className="room-code">{roomId}</span>
               </>
             )}{' '}
-            · {pieces} peças · {difficulty}
+            {bullet ? (
+              <>
+                · Bullet · {snapshot.timeLimitMs / 60_000} min · {pieceCount} peças
+              </>
+            ) : mode === 'battle' ? (
+              <>
+                · Batalha {maxPlayers / 2}v{maxPlayers / 2} · {pieces} peças
+              </>
+            ) : (
+              <>
+                · {pieces} peças · {difficulty}
+              </>
+            )}
           </p>
         </div>
       </div>
 
       <div className="room-progress">
         <span className="clock-pill">
-          <GameClock phase={phase} elapsedMs={elapsedMs} durationMs={durationMs} />
+          <GameClock
+            phase={phase}
+            elapsedMs={elapsedMs}
+            durationMs={durationMs}
+            limitMs={bullet ? snapshot.timeLimitMs : undefined}
+          />
         </span>
+        {bullet && (
+          <span className="solved-pill" aria-label={`${snapshot.solved} montados`}>
+            <strong>{snapshot.solved}</strong> {snapshot.solved === 1 ? 'montado' : 'montados'}
+          </span>
+        )}
         <div
           className="progress-bar"
           role="progressbar"
