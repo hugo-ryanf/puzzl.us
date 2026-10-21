@@ -15,8 +15,11 @@ import {
   type SQL,
 } from 'drizzle-orm';
 import {
+  POINTS_MIN_SAMPLES,
   RANKING_TIME_ZONE,
+  gamePoints,
   type GeneralRankingEntry,
+  type PopularImage,
   type GeneralRankingQuery,
   type RankingEntry,
   type RankingPeriod,
@@ -123,14 +126,19 @@ type WithOptionalPeriod<T extends { period: RankingPeriod }> = Omit<T, 'period'>
 
 /** O que a sala precisa da persistência. Sem banco configurado, a sala recebe `undefined`. */
 export interface GameStore {
-  /** Grava a partida e devolve a posição da equipe na categoria: de sempre e só de hoje. */
-  saveGame(result: GameResult): Promise<{ rank: number; rankToday: number }>;
+  /**
+   * Grava a partida e devolve a posição da equipe na categoria (de sempre e só de hoje) e os
+   * pontos que ela valeu.
+   */
+  saveGame(result: GameResult): Promise<{ rank: number; rankToday: number; points: number }>;
   leaderboard(query: WithOptionalPeriod<RankingQuery>, limit?: number): Promise<RankingEntry[]>;
   /** Ranking geral da modalidade no período: soma de peças de todas as fotos. */
   generalLeaderboard(
     query: WithOptionalPeriod<GeneralRankingQuery>,
     limit?: number,
   ): Promise<GeneralRankingEntry[]>;
+  /** Fotos mais jogadas na modalidade e no período (para escolher no ranking por foto). */
+  popular(query: WithOptionalPeriod<GeneralRankingQuery>, limit?: number): Promise<PopularImage[]>;
 }
 
 const PERIOD_UNIT = { day: 'day', week: 'week', month: 'month' } as const;
@@ -170,6 +178,23 @@ export function createGameStore(db: AppDatabase): GameStore {
       return db.transaction(async (tx) => {
         const { playerIds, teamKey } = await resolveTeam(tx, team);
 
+        // Tempo típico das partidas iguais (peças + modalidade), em qualquer foto, antes desta.
+        const [typical] = await tx
+          .select({
+            samples: count(),
+            median: sql<
+              number | null
+            >`percentile_cont(0.5) within group (order by ${games.durationMs})`,
+          })
+          .from(games)
+          .where(and(eq(games.pieceCount, result.pieceCount), eq(games.teamSize, team.length)));
+        const enough = (typical?.samples ?? 0) >= POINTS_MIN_SAMPLES;
+        const points = gamePoints(
+          result.pieceCount,
+          result.durationMs,
+          enough ? Number(typical!.median) : undefined,
+        );
+
         const [game] = await tx
           .insert(games)
           .values({
@@ -182,6 +207,7 @@ export function createGameStore(db: AppDatabase): GameStore {
             teamSize: team.length,
             teamKey,
             durationMs: result.durationMs,
+            points,
             startedAt: result.startedAt,
             finishedAt: result.finishedAt,
           })
@@ -212,7 +238,7 @@ export function createGameStore(db: AppDatabase): GameStore {
           return (faster?.total ?? 0) + 1;
         };
 
-        return { rank: await rankIn('all'), rankToday: await rankIn('day') };
+        return { rank: await rankIn('all'), rankToday: await rankIn('day'), points };
       });
     },
 
@@ -255,15 +281,22 @@ export function createGameStore(db: AppDatabase): GameStore {
     },
 
     async generalLeaderboard({ players: teamSize, period = 'all' }, limit = 20) {
-      const points = sql<number>`sum(${games.pieceCount})::int`.as('points');
-      // bigint vem como texto do driver: a soma de tempos pode passar do limite de um int.
-      const totalMs = sql<string>`sum(${games.durationMs})::bigint`.as('total_ms');
-      const top = await db
-        .select({ teamKey: games.teamKey, points, puzzles: count(), totalMs })
+      // Melhor partida de cada equipe em cada foto e tamanho: repetir não acumula pontos.
+      const best = db
+        .select({
+          teamKey: games.teamKey,
+          best: sql<number>`max(${games.points})`.as('best'),
+        })
         .from(games)
         .where(and(eq(games.teamSize, teamSize), inPeriod(period)))
-        .groupBy(games.teamKey)
-        .orderBy(desc(points), asc(totalMs))
+        .groupBy(games.teamKey, games.imageId, games.pieceCount)
+        .as('best_by_puzzle');
+      const points = sql<number>`sum(${best.best})::int`.as('points');
+      const top = await db
+        .select({ teamKey: best.teamKey, points, puzzles: count() })
+        .from(best)
+        .groupBy(best.teamKey)
+        .orderBy(desc(points), desc(count()))
         .limit(limit);
       if (top.length === 0) return [];
 
@@ -272,14 +305,24 @@ export function createGameStore(db: AppDatabase): GameStore {
         db,
         top.map((row) => row.teamKey),
       );
-
       return top.map((row, index) => ({
         position: index + 1,
         players: names.get(row.teamKey)!,
         points: row.points,
         puzzles: row.puzzles,
-        totalMs: Number(row.totalMs),
       }));
+    },
+
+    async popular({ players: teamSize, period = 'all' }, limit = 20) {
+      const plays = count().as('plays');
+      const rows = await db
+        .select({ imageId: games.imageId, plays })
+        .from(games)
+        .where(and(eq(games.teamSize, teamSize), inPeriod(period)))
+        .groupBy(games.imageId)
+        .orderBy(desc(plays), asc(games.imageId))
+        .limit(limit);
+      return rows;
     },
   };
 }
