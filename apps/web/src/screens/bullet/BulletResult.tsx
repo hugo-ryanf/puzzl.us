@@ -30,7 +30,7 @@ export function BulletResult({ snapshot, onShowRanking, onLeave }: BulletResultP
     if (rankStatus !== 'saved') return;
     let cancelled = false;
     fetchBulletRanking({ minutes, pieces, players, period: 'all' })
-      .then((entries) => !cancelled && setRanking(entries))
+      .then((page) => !cancelled && setRanking(page.entries))
       .catch(() => !cancelled && setRanking([]));
     return () => {
       cancelled = true;
