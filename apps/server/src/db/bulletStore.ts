@@ -1,7 +1,13 @@
-import { and, asc, count, desc, eq, gt, ne, or, type SQL } from 'drizzle-orm';
-import type { BulletRankingEntry, BulletRankingQuery, RankingPeriod } from '@puzzle/shared';
+import { and, asc, count, desc, eq, gt, ne, or } from 'drizzle-orm';
+import type {
+  BulletRankingEntry,
+  BulletRankingQuery,
+  RankingPage,
+  RankingPeriod,
+} from '@puzzle/shared';
 import type { AppDatabase } from './database';
-import { finishedInPeriod, resolveTeam, teamNames, uniqueTeam, type TeamMember } from './gameStore';
+import { resolveTeam, uniqueTeam, type TeamMember } from './gameStore';
+import { finishedInPeriod, rankingPage } from './rankingPage';
 import { bulletRuns } from './schema';
 
 export interface BulletResult {
@@ -23,7 +29,12 @@ type Query = Omit<BulletRankingQuery, 'period'> & { period?: RankingPeriod };
 export interface BulletStore {
   /** Grava a corrida e devolve a posição da equipe na categoria: de sempre e só de hoje. */
   saveRun(result: BulletResult): Promise<{ rank: number; rankToday: number }>;
-  leaderboard(query: Query, limit?: number): Promise<BulletRankingEntry[]>;
+  /** Melhor corrida de cada equipe; `viewerPlayerId` acha "Sua posição". */
+  leaderboard(
+    query: Query,
+    viewerPlayerId?: string,
+    limit?: number,
+  ): Promise<RankingPage<BulletRankingEntry>>;
 }
 
 /** Só se comparam corridas iguais: mesmos minutos, mesmo tamanho, mesma equipe. */
@@ -37,7 +48,7 @@ function sameCategory({ minutes, pieceCount, teamSize }: Category) {
 
 export function createBulletStore(db: AppDatabase): BulletStore {
   /** Melhor corrida de cada equipe (DISTINCT ON): mais montados, depois mais peças, depois a mais antiga. */
-  const bestRuns = (category: Category, period: RankingPeriod, where?: SQL) =>
+  const bestRuns = (category: Category, period: RankingPeriod, previous = false) =>
     db
       .selectDistinctOn([bulletRuns.teamKey], {
         id: bulletRuns.id,
@@ -47,7 +58,7 @@ export function createBulletStore(db: AppDatabase): BulletStore {
         finishedAt: bulletRuns.finishedAt,
       })
       .from(bulletRuns)
-      .where(and(sameCategory(category), finishedInPeriod(bulletRuns.finishedAt, period), where))
+      .where(and(sameCategory(category), finishedInPeriod(bulletRuns.finishedAt, period, previous)))
       .orderBy(
         bulletRuns.teamKey,
         desc(bulletRuns.solved),
@@ -95,24 +106,31 @@ export function createBulletStore(db: AppDatabase): BulletStore {
       });
     },
 
-    async leaderboard({ minutes, pieces, players: teamSize, period = 'all' }, limit = 20) {
-      const best = bestRuns({ minutes, pieceCount: pieces, teamSize }, period);
-      const top = await db
-        .select()
-        .from(best)
-        .orderBy(desc(best.solved), desc(best.partial), asc(best.finishedAt))
-        .limit(limit);
-      const names = await teamNames(
-        db,
-        top.map((run) => run.teamKey),
-      );
-      return top.map((run, index) => ({
-        position: index + 1,
-        players: names.get(run.teamKey)!,
-        solved: run.solved,
-        partial: run.partial,
-        finishedAt: run.finishedAt.toISOString(),
-      }));
+    async leaderboard(
+      { minutes, pieces, players: teamSize, period = 'all' },
+      viewerPlayerId,
+      limit = 20,
+    ) {
+      const category = { minutes, pieceCount: pieces, teamSize };
+      const ordered = (previous: boolean) => {
+        const best = bestRuns(category, period, previous);
+        return db
+          .select()
+          .from(best)
+          .orderBy(desc(best.solved), desc(best.partial), asc(best.finishedAt));
+      };
+      return rankingPage(db, {
+        rows: await ordered(false),
+        previous: period === 'all' ? undefined : await ordered(true),
+        viewerPlayerId,
+        limit,
+        streakSource: 'bullet',
+        toEntry: (run) => ({
+          solved: run.solved,
+          partial: run.partial,
+          finishedAt: run.finishedAt.toISOString(),
+        }),
+      });
     },
   };
 }
