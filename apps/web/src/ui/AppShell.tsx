@@ -13,7 +13,7 @@ import {
   UsersIcon,
 } from './icons';
 
-export type Section = 'explore' | 'saved' | 'favorites' | 'records' | 'ranking';
+export type Section = 'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking';
 
 interface AppShellProps {
   active: Section;
@@ -21,6 +21,8 @@ interface AppShellProps {
   onCreateRoom: () => void;
   onJoinRoom: () => void;
   account: Account;
+  /** Pedidos de amizade esperando resposta (aparece como número no item "Amigos"). */
+  friendRequests?: number;
   children: ReactNode;
 }
 
@@ -44,6 +46,7 @@ export function AppShell({
   onCreateRoom,
   onJoinRoom,
   account,
+  friendRequests = 0,
   children,
 }: AppShellProps) {
   const current = (section: Section) => (section === active ? ('page' as const) : undefined);
@@ -79,7 +82,20 @@ export function AppShell({
             <CompassIcon />
             Explorar
           </button>
-          <SoonLink icon={<UsersIcon />} label="Amigos" />
+          <button
+            type="button"
+            className="nav-link"
+            aria-current={current('friends')}
+            onClick={() => onNavigate('friends')}
+          >
+            <UsersIcon />
+            Amigos
+            {friendRequests > 0 && (
+              <span className="nav-count" aria-label={`${friendRequests} pedidos`}>
+                {friendRequests}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             className="nav-link"
