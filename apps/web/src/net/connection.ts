@@ -4,11 +4,13 @@ import { ROOM_NAME, RoomState, type CreateRoomOptions, type JoinOptions } from '
 export type PuzzleRoom = Room<unknown, RoomState>;
 
 /**
- * Em dev o servidor roda na porta 2567 da mesma máquina que serviu a página. Usar o hostname
+ * Em produção o mesmo servidor entrega a página, a API e o WebSocket: é o próprio endereço.
+ * Em dev o servidor roda na porta 2567 da mesma máquina que serviu a página; usar o hostname
  * da página (em vez de "localhost") permite um amigo na mesma rede entrar pelo IP do PC.
  */
 export const SERVER_URL: string =
-  import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:2567`;
+  import.meta.env.VITE_SERVER_URL ??
+  (import.meta.env.DEV ? `${location.protocol}//${location.hostname}:2567` : location.origin);
 
 const client = new Client(SERVER_URL);
 
