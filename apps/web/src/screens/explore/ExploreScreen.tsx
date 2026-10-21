@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { CATALOG, type CatalogImage } from '@puzzle/shared';
+import { CATALOG, type CommunityPuzzle } from '@puzzle/shared';
 import { catalogThumbUrl } from '../../board/images';
+import type { Community } from '../../net/community';
 import type { PuzzleRoom } from '../../net/connection';
 import type { Library } from '../../net/library';
 import { ChevronDownIcon, FilterIcon, SearchIcon } from '../../ui/icons';
 import { CreateRoomDialog, type CreateRoomSource, type PuzzleChoice } from './CreateRoomDialog';
 import { JoinRoomDialog } from './JoinRoomDialog';
-import { PuzzleCard, orientationOf } from './PuzzleCard';
+import { PuzzleCard, orientationOf, type CommunityActions, type PuzzleImage } from './PuzzleCard';
 
 type Orientation = 'Todas' | 'Horizontal' | 'Vertical';
 const ORIENTATIONS: { value: Orientation; label: string }[] = [
@@ -23,12 +24,38 @@ const normalize = (text: string) =>
     .toLowerCase()
     .trim();
 
-function catalogChoice(image: CatalogImage): PuzzleChoice {
+/** Um card do Explorar: foto do catálogo ou publicada por alguém. */
+interface ExploreItem {
+  image: PuzzleImage;
+  thumbUrl: string;
+  puzzle?: CommunityPuzzle;
+}
+
+const catalogItems: ExploreItem[] = CATALOG.map((image) => ({
+  image,
+  thumbUrl: catalogThumbUrl(image.id),
+}));
+
+function communityItem(puzzle: CommunityPuzzle): ExploreItem {
+  return {
+    image: {
+      id: puzzle.imageId,
+      title: puzzle.title,
+      credit: `por ${puzzle.authorName}`,
+      width: puzzle.width,
+      height: puzzle.height,
+    },
+    thumbUrl: `/api/puzzles/${puzzle.id}/mini`,
+    puzzle,
+  };
+}
+
+function choiceOf({ image, thumbUrl }: ExploreItem): PuzzleChoice {
   return {
     imageId: image.id,
     title: image.title,
     subtitle: image.credit || 'Foto do catálogo',
-    thumbUrl: catalogThumbUrl(image.id),
+    thumbUrl,
   };
 }
 
@@ -50,6 +77,9 @@ export interface ExploreScreenProps {
   /** Logado: favorita. Convidado (com login no servidor): o marcador leva ao login. */
   signedIn: boolean;
   googleLogin: boolean;
+  /** Quebra-cabeças publicados pelos jogadores (aparecem depois do catálogo). */
+  community: Community;
+  isAdmin: boolean;
 }
 
 export function ExploreScreen({
@@ -67,6 +97,8 @@ export function ExploreScreen({
   library,
   signedIn,
   googleLogin,
+  community,
+  isAdmin,
 }: ExploreScreenProps) {
   const [query, setQuery] = useState('');
   const [orientation, setOrientation] = useState<Orientation>('Todas');
@@ -74,12 +106,20 @@ export function ExploreScreen({
 
   const favoritesOnly = view === 'favorites';
   const q = normalize(query);
-  const items = CATALOG.filter(
-    (image) =>
+  const items = [...catalogItems, ...community.puzzles.map(communityItem)].filter(
+    ({ image }) =>
       (!favoritesOnly || library.favorites.has(image.id)) &&
       (orientation === 'Todas' || orientationOf(image) === orientation) &&
-      (!q || normalize(image.title).includes(q)),
+      (!q || normalize(image.title).includes(q) || normalize(image.credit).includes(q)),
   );
+  /** Só as ações que esta pessoa pode fazer: denunciar (logada, não é dela), remover, restaurar. */
+  const actionsFor = (puzzle: CommunityPuzzle): CommunityActions => ({
+    puzzle,
+    onReport: signedIn && !puzzle.mine ? () => community.report(puzzle.id) : undefined,
+    onRemove: puzzle.mine || isAdmin ? () => community.remove(puzzle.id) : undefined,
+    onRestore:
+      isAdmin && puzzle.status === 'hidden' ? () => community.restore(puzzle.id) : undefined,
+  });
   // Convidado: o marcador aparece, mas leva ao login (favoritos ficam guardados na conta).
   const toggleFavorite = (imageId: string) =>
     signedIn
@@ -145,15 +185,17 @@ export function ExploreScreen({
       </div>
 
       <div className="grid">
-        {items.map((image) => (
+        {items.map((item) => (
           <PuzzleCard
-            key={image.id}
-            image={image}
-            onPlay={() => setChoice(catalogChoice(image))}
-            onShowRanking={() => onShowRanking(image.id)}
-            completedMs={library.completed.get(image.id)}
-            favorite={library.favorites.has(image.id)}
-            onToggleFavorite={toggleFavorite(image.id)}
+            key={item.image.id}
+            image={item.image}
+            thumbUrl={item.thumbUrl}
+            onPlay={() => setChoice(choiceOf(item))}
+            onShowRanking={() => onShowRanking(item.image.id)}
+            completedMs={library.completed.get(item.image.id)}
+            favorite={library.favorites.has(item.image.id)}
+            onToggleFavorite={toggleFavorite(item.image.id)}
+            community={item.puzzle && actionsFor(item.puzzle)}
           />
         ))}
       </div>
