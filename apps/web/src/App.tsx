@@ -1,23 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CATALOG, type RankingQuery } from '@puzzle/shared';
+import { CATALOG, type InviteMessage, type RankingQuery } from '@puzzle/shared';
 import { useAccount } from './net/account';
 import { useCommunity } from './net/community';
+import { useFriends } from './net/friends';
+import { usePresence } from './net/presence';
 import { useLibrary } from './net/library';
-import { hasSavedSession, resumeRoom, type PuzzleRoom } from './net/connection';
+import {
+  hasSavedSession,
+  joinRoom,
+  leaveRoom,
+  resumeRoom,
+  type PuzzleRoom,
+} from './net/connection';
 import { loadPlayerName } from './net/playerName';
 import { ExploreScreen } from './screens/explore/ExploreScreen';
 import { PrivacyScreen } from './screens/PrivacyScreen';
 import { RankingScreen } from './screens/RankingScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
+import { FriendsScreen } from './screens/FriendsScreen';
 import { RoomScreen } from './screens/RoomScreen';
 import { SavedScreen } from './screens/SavedScreen';
 import { AppShell, type Section } from './ui/AppShell';
 import { ArrowLeftIcon } from './ui/icons';
+import { InviteToasts } from './ui/InviteToasts';
 
 /** O link de convite é só o código no caminho: https://site/K7QF2 */
 function codeFromUrl(): string {
   const code = location.pathname.slice(1).toUpperCase();
   return /^[A-Z2-9]{5}$/.test(code) ? code : '';
+}
+
+/** Link de amigo: https://site/?amigo=K7QF-2M9D abre "Amigos" com o código preenchido. */
+function friendCodeFromUrl(): string | undefined {
+  return new URLSearchParams(location.search).get('amigo') ?? undefined;
 }
 
 const DEFAULT_RANKING: RankingQuery = {
@@ -32,7 +47,9 @@ export function App() {
   // Ranking aberto por cima (do menu ou do fim da partida); a sala continua conectada por trás.
   const [ranking, setRanking] = useState<RankingQuery | null>(null);
   /** Tela da barra lateral (o ranking, quando aberto, fica por cima dela). */
-  const [section, setSection] = useState<Exclude<Section, 'ranking'>>('explore');
+  const [section, setSection] = useState<Exclude<Section, 'ranking'>>(() =>
+    friendCodeFromUrl() ? 'friends' : 'explore',
+  );
   const [notice, setNotice] = useState<string>();
   const [name, setName] = useState(loadPlayerName);
   const account = useAccount();
@@ -41,6 +58,8 @@ export function App() {
   const playerName = name.trim() ? name : (accountName ?? name);
   const library = useLibrary(account.user);
   const signedIn = !!account.user;
+  const presence = usePresence(account.user?.id);
+  const friends = useFriends(account.user?.id, presence.version);
   const community = useCommunity(
     account.user === undefined ? undefined : (account.user?.id ?? null),
   );
@@ -79,6 +98,28 @@ export function App() {
     [refreshLibrary],
   );
 
+  const { dismissInvite } = presence;
+  /** "Entrar" num convite: sai da sala atual (se houver) e entra na do amigo. */
+  const acceptInvite = useCallback(
+    async (invite: InviteMessage) => {
+      dismissInvite(invite);
+      if (room) leaveRoom(room);
+      try {
+        enter(await joinRoom(invite.roomCode, { name: playerName.trim() || 'Jogador' }));
+      } catch {
+        leave('Não deu para entrar na sala do convite (ela pode ter acabado ou enchido).');
+      }
+    },
+    [dismissInvite, room, enter, leave, playerName],
+  );
+  const toasts = (
+    <InviteToasts
+      invites={presence.invites}
+      onAccept={acceptInvite}
+      onDismiss={presence.dismissInvite}
+    />
+  );
+
   // Página fixa (o Google exige o link da política de privacidade para liberar o login).
   if (location.pathname === '/privacidade') return <PrivacyScreen />;
   if (resuming) return <p className="loading">Voltando para a sala…</p>;
@@ -100,80 +141,97 @@ export function App() {
       );
     }
     return (
-      <RoomScreen
-        // Mesma sala por outra conexão (voltou depois de um reinício): remonta tudo do zero.
-        key={`${room.roomId}:${room.sessionId}`}
-        room={room}
-        onLeave={leave}
-        onRejoin={enter}
-        onShowRanking={setRanking}
-        account={account.user ? { name: account.user.name, publish: community.publish } : undefined}
-      />
+      <>
+        <RoomScreen
+          // Mesma sala por outra conexão (voltou depois de um reinício): remonta tudo do zero.
+          key={`${room.roomId}:${room.sessionId}`}
+          room={room}
+          onLeave={leave}
+          onRejoin={enter}
+          onShowRanking={setRanking}
+          account={
+            account.user ? { name: account.user.name, publish: community.publish } : undefined
+          }
+          friends={account.user ? friends : undefined}
+        />
+        {toasts}
+      </>
     );
   }
 
   const onExplore = section === 'explore' || section === 'favorites';
   return (
-    <AppShell
-      active={ranking ? 'ranking' : section}
-      onNavigate={(next) => {
-        if (next === 'ranking') return setRanking(DEFAULT_RANKING);
-        setRanking(null);
-        setSection(next);
-      }}
-      onCreateRoom={() => {
-        setRanking(null);
-        if (!onExplore) setSection('explore'); // os diálogos moram no Explorar
-        setCreateRequested(true);
-      }}
-      onJoinRoom={() => {
-        setRanking(null);
-        if (!onExplore) setSection('explore');
-        setJoinOpen(true);
-      }}
-      account={account}
-    >
-      {ranking ? (
-        // `key`: abrir o ranking de outra foto recomeça os filtros a partir dela.
-        <RankingScreen
-          key={JSON.stringify(ranking)}
-          initial={ranking}
-          community={community.puzzles}
-        />
-      ) : section === 'saved' ? (
-        <SavedScreen
-          signedIn={signedIn}
-          googleLogin={account.googleLogin}
-          name={playerName}
-          onEnter={enter}
-        />
-      ) : section === 'records' ? (
-        <RecordsScreen
-          library={library}
-          signedIn={signedIn}
-          googleLogin={account.googleLogin}
-          onShowRanking={setRanking}
-        />
-      ) : (
-        <ExploreScreen
-          view={section === 'favorites' ? 'favorites' : 'all'}
-          library={library}
-          signedIn={signedIn}
-          googleLogin={account.googleLogin}
-          community={community}
-          isAdmin={account.user?.isAdmin ?? false}
-          notice={notice ?? account.loginNotice}
-          name={playerName}
-          onNameChange={setName}
-          createRequested={createRequested}
-          joinOpen={joinOpen}
-          initialCode={codeFromUrl()}
-          onCloseCreate={() => setCreateRequested(false)}
-          onCloseJoin={() => setJoinOpen(false)}
-          onEnter={enter}
-          onShowRanking={(image) => setRanking({ ...DEFAULT_RANKING, image })}
-        />
-      )}
-    </AppShell>
+    <>
+      <AppShell
+        active={ranking ? 'ranking' : section}
+        onNavigate={(next) => {
+          if (next === 'ranking') return setRanking(DEFAULT_RANKING);
+          setRanking(null);
+          setSection(next);
+        }}
+        onCreateRoom={() => {
+          setRanking(null);
+          if (!onExplore) setSection('explore'); // os diálogos moram no Explorar
+          setCreateRequested(true);
+        }}
+        onJoinRoom={() => {
+          setRanking(null);
+          if (!onExplore) setSection('explore');
+          setJoinOpen(true);
+        }}
+        account={account}
+        friendRequests={friends.data?.incoming.length}
+      >
+        {ranking ? (
+          // `key`: abrir o ranking de outra foto recomeça os filtros a partir dela.
+          <RankingScreen
+            key={JSON.stringify(ranking)}
+            initial={ranking}
+            community={community.puzzles}
+          />
+        ) : section === 'friends' ? (
+          <FriendsScreen
+            friends={friends}
+            signedIn={signedIn}
+            googleLogin={account.googleLogin}
+            initialCode={friendCodeFromUrl()}
+          />
+        ) : section === 'saved' ? (
+          <SavedScreen
+            signedIn={signedIn}
+            googleLogin={account.googleLogin}
+            name={playerName}
+            onEnter={enter}
+          />
+        ) : section === 'records' ? (
+          <RecordsScreen
+            library={library}
+            signedIn={signedIn}
+            googleLogin={account.googleLogin}
+            onShowRanking={setRanking}
+          />
+        ) : (
+          <ExploreScreen
+            view={section === 'favorites' ? 'favorites' : 'all'}
+            library={library}
+            signedIn={signedIn}
+            googleLogin={account.googleLogin}
+            community={community}
+            isAdmin={account.user?.isAdmin ?? false}
+            notice={notice ?? account.loginNotice}
+            name={playerName}
+            onNameChange={setName}
+            createRequested={createRequested}
+            joinOpen={joinOpen}
+            initialCode={codeFromUrl()}
+            onCloseCreate={() => setCreateRequested(false)}
+            onCloseJoin={() => setJoinOpen(false)}
+            onEnter={enter}
+            onShowRanking={(image) => setRanking({ ...DEFAULT_RANKING, image })}
+          />
+        )}
+      </AppShell>
+      {toasts}
+    </>
   );
 }
