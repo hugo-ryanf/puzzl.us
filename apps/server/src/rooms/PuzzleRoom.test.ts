@@ -15,6 +15,7 @@ import {
 } from '@puzzle/shared';
 import { createGameServer } from '../app';
 import { createAccountStore, type AccountStore } from '../auth/accounts';
+import { createCommunityStore } from '../community/community';
 import type { AppDatabase } from '../db/database';
 import { createGameStore } from '../db/gameStore';
 import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
@@ -51,7 +52,11 @@ beforeAll(async () => {
     adminEmails: [],
     secureCookies: false,
   };
-  colyseus = await boot(createGameServer({ store, uploads, voice, snapshots, auth }), 2568);
+  const community = createCommunityStore(db);
+  colyseus = await boot(
+    createGameServer({ store, uploads, voice, snapshots, community, auth }),
+    2568,
+  );
 });
 afterAll(() => colyseus.shutdown());
 beforeEach(async () => {
@@ -401,15 +406,40 @@ describe('PuzzleRoom — fim e ranking', () => {
 describe('Fotos enviadas', () => {
   const API = 'http://localhost:2568/api';
 
-  async function uploadPhoto(width = 1600, height = 1200) {
+  async function uploadPhoto(width = 1600, height = 1200, cookie = '') {
     const body = await sharp({ create: { width, height, channels: 3, background: '#a64' } })
       .jpeg()
       .toBuffer();
     return fetch(`${API}/uploads`, {
       method: 'POST',
       body,
-      headers: { 'Content-Type': 'image/jpeg' },
+      headers: { 'Content-Type': 'image/jpeg', cookie },
     });
+  }
+
+  /** Monta tudo sozinha (Ana) e espera o servidor decidir sobre o ranking. */
+  async function playAlone(imageId: string) {
+    const room = await colyseus.createRoom<PuzzleRoom>(ROOM_NAME, {
+      ...player('Ana'),
+      pieceCount: 24,
+      imageId,
+    });
+    const ana = await colyseus.connectTo(room, player('Ana'));
+    const state = room.state as RoomState;
+    const send = async (type: 'start' | 'grab' | 'drop', payload?: unknown) => {
+      ana.send(type, payload as GrabMessage);
+      await room.waitForNextMessage();
+    };
+    await send('start');
+    for (let pieceId = 1; pieceId < state.pieceGroup.length; pieceId++) {
+      const groupId = state.pieceGroup[pieceId]!;
+      if (groupId === state.pieceGroup[0]) continue;
+      const anchor = state.groups.get(String(state.pieceGroup[0]))!;
+      await send('grab', { groupId });
+      await send('drop', { groupId, x: anchor.x, y: anchor.y });
+    }
+    await waitForRankStatus(room, state);
+    return { room, state };
   }
 
   it('envia a foto, devolve o id da sala e serve a versão processada', async () => {
@@ -451,20 +481,32 @@ describe('Fotos enviadas', () => {
     const state = room.state as RoomState;
     expect({ w: state.config.width, h: state.config.height }).toEqual({ w: 1200, h: 1600 });
 
-    const send = async (type: 'start' | 'grab' | 'drop', payload?: unknown) => {
-      ana.send(type, payload as GrabMessage);
-      await room.waitForNextMessage();
-    };
-    await send('start');
-    for (let pieceId = 1; pieceId < state.pieceGroup.length; pieceId++) {
-      const groupId = state.pieceGroup[pieceId]!;
-      if (groupId === state.pieceGroup[0]) continue;
-      const anchor = state.groups.get(String(state.pieceGroup[0]))!;
-      await send('grab', { groupId });
-      await send('drop', { groupId, x: anchor.x, y: anchor.y });
-    }
-    expect(state.phase).toBe('completed');
-    expect(state.rankStatus).toBe('unranked');
+    await ana.leave();
+
+    const played = await playAlone(imageId);
+    expect(played.state.phase).toBe('completed');
+    expect(played.state.rankStatus).toBe('unranked');
+  });
+
+  it('depois de publicada, a foto entra no ranking como as do catálogo', async () => {
+    const account = await accounts.signInWithGoogle({ sub: randomUUID(), name: 'Hugo' }, false);
+    const { token } = await accounts.createSession(account.id);
+    const cookie = `sid=${token}`;
+    const { imageId } = (await (await uploadPhoto(1600, 1200, cookie)).json()) as UploadResponse;
+    const publish = await fetch(`${API}/puzzles`, {
+      method: 'POST',
+      headers: { cookie, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageId, title: 'Meu quintal', authorName: 'Hugo', rights: true }),
+    });
+    expect(publish.status).toBe(201);
+
+    const { state } = await playAlone(imageId);
+    expect(state.rankStatus).toBe('saved');
+    expect(state.rank).toBe(1);
+    const ranking = await fetch(`${API}/ranking?image=${imageId}&pieces=24&players=1`);
+    expect(((await ranking.json()) as RankingEntry[]).map((entry) => entry.players)).toEqual([
+      ['Ana'],
+    ]);
   });
 
   it('recusa criar sala com foto que não existe (ou expirou)', async () => {
