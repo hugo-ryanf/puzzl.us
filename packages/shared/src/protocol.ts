@@ -42,7 +42,7 @@ export type GamePhase = 'lobby' | 'playing' | 'completed';
 
 /**
  * Situação do registro no ranking depois que o puzzle termina.
- * 'unranked': foto enviada pelos jogadores — única, então não há com quem comparar.
+ * 'unranked': foto enviada e não publicada — única, então não há com quem comparar.
  */
 export type RankStatus = '' | 'saving' | 'saved' | 'unavailable' | 'unranked';
 
@@ -53,8 +53,9 @@ export const UPLOAD_PREFIX = 'upload:';
 export const UPLOAD_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
 const UPLOAD_IMAGE_PATTERN = new RegExp(`^${UPLOAD_PREFIX}[A-Za-z0-9_-]{22}$`);
 
+const uploadImageId = z.string().regex(UPLOAD_IMAGE_PATTERN, 'Foto inválida');
 /** Catálogo ou foto enviada ("upload:<id>"); a existência do upload é checada no servidor. */
-const imageId = z.union([catalogImageId, z.string().regex(UPLOAD_IMAGE_PATTERN)]);
+const imageId = z.union([catalogImageId, uploadImageId]);
 
 /** O id do upload, se o imageId da sala for de uma foto enviada. */
 export function uploadIdOf(imageId: string): string | undefined {
@@ -223,7 +224,8 @@ const period = z.enum(RANKING_PERIODS).default('all');
  * Categoria = imagem + tamanho escolhido + tamanho da equipe (só compara partidas iguais).
  */
 export const RankingQuery = z.object({
-  image: catalogImageId, // fotos enviadas não têm ranking
+  // Foto enviada só tem partidas no ranking depois de publicada (o servidor só grava aí).
+  image: imageId,
   pieces: z.coerce.number().pipe(pieceCount),
   players: teamSize,
   period,
@@ -256,4 +258,43 @@ export interface RankingEntry {
   durationMs: number;
   /** ISO 8601. */
   finishedAt: string;
+}
+
+// ── Quebra-cabeças da comunidade ────────────────────────────────────────────
+
+/** Denúncias (de contas diferentes) que tiram a foto do ar até o admin decidir. */
+export const COMMUNITY_HIDE_REPORTS = 3;
+
+/** POST /api/puzzles — publica uma foto enviada pela própria conta. */
+export const PublishPuzzleRequest = z.object({
+  imageId: uploadImageId,
+  title: z.string().trim().min(2, 'Dê um título').max(60),
+  authorName: z.string().trim().min(1, 'Diga quem é o autor').max(40),
+  /** "A foto é minha / tenho direito de compartilhar": sem isso, não publica. */
+  rights: z.literal(true, 'Confirme que pode compartilhar a foto'),
+});
+export type PublishPuzzleRequest = z.infer<typeof PublishPuzzleRequest>;
+
+/** Id de um quebra-cabeça publicado (rotas /api/puzzles/:id). */
+export const CommunityPuzzleId = z.uuid();
+
+/** Um quebra-cabeça publicado, como o Explorar mostra (GET /api/puzzles). */
+export interface CommunityPuzzle {
+  id: string;
+  /** "upload:<id>": é com ele que a sala é criada (e o ranking agrupado). */
+  imageId: string;
+  title: string;
+  authorName: string;
+  width: number;
+  height: number;
+  /** ISO 8601 da publicação. */
+  createdAt: string;
+  /** "hidden" só aparece para o admin (denunciado demais, esperando a decisão). */
+  status: 'published' | 'hidden';
+  /** Quantas denúncias (só o admin vê o número; para os outros, 0). */
+  reports: number;
+  /** Publicado pela conta que pediu a lista (pode remover). */
+  mine: boolean;
+  /** A conta que pediu a lista já denunciou. */
+  reported: boolean;
 }
