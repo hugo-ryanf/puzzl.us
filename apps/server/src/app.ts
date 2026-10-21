@@ -7,6 +7,7 @@ import {
   BULLET_ROOM,
   BulletRankingQuery,
   GeneralRankingQuery,
+  PopularQuery,
   PIECE_COUNT_PRESETS,
   PRESENCE_ROOM,
   ROOM_NAME,
@@ -154,7 +155,7 @@ export function createGameServer({
 
       // Fotos mais jogadas na modalidade e no período: a escolha da foto no ranking.
       app.get('/api/ranking/popular', async (req, res) => {
-        const query = GeneralRankingQuery.safeParse(req.query);
+        const query = PopularQuery.safeParse(req.query);
         if (!query.success) {
           res.status(400).json({ error: 'parâmetros inválidos', issues: query.error.issues });
           return;
