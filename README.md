@@ -42,7 +42,9 @@ As salas usam fotos de um catálogo fixo.
    e escreve `packages/shared/src/catalog.ts`.
 3. Ajuste título e crédito em `catalogo/catalogo.json` (o nome do arquivo vira o título; fotos
    baixadas do Unsplash/Pexels já ganham o crédito do autor) e rode `pnpm catalog` de novo.
-   Para tirar uma foto do jogo, apague a entrada dela desse arquivo.
+   Para tirar uma foto do jogo, tire o original de `catalogo/originais/` (subpastas são
+   ignoradas, ex.: `originais/duplicadas/`), apague a entrada dela desse arquivo e rode
+   `pnpm catalog` — com o original ainda na pasta, ela voltaria como foto nova.
 
 > **Não renomeie fotos que já estão no jogo:** o id da imagem vem do nome do arquivo e o
 > ranking é guardado por id — renomear "zera" o ranking daquela foto. Trocar o **título** no
@@ -69,16 +71,39 @@ normalmente, só o ranking fica indisponível.
 
 O `.env` é ignorado pelo git. Os testes não usam o Neon: rodam num Postgres em memória (PGlite).
 
-## Chamada de áudio
+## Chamada de voz e câmera
 
-A chamada usa o [LiveKit Cloud](https://cloud.livekit.io) (plano gratuito). Sem ele o jogo
-funciona normalmente e aparece "Chamada indisponível".
+A chamada usa o [LiveKit Cloud](https://cloud.livekit.io) (plano gratuito). Quem entra na sala
+já entra na chamada (microfone, som e câmera se controlam na barra do topo; a câmera começa
+desligada). Sem LiveKit o jogo funciona normalmente e o ícone do microfone aparece cortado.
 
 1. Crie um projeto no LiveKit Cloud e vá em **Settings → API Keys → Create key**.
 2. **Na janela que abre logo após criar a chave**, copie o bloco _Environment variables_ e cole
    no `apps/server/.env`. O secret só aparece nesse momento; depois o painel mostra `••••` (se
    copiar a máscara, o LiveKit recusa com "invalid token" — revogue e crie outra chave).
 3. Reinicie o `pnpm dev`: deve aparecer `[server] chamada de áudio via wss://…`.
+
+## Deploy (Render)
+
+Em produção um único serviço Node entrega o site (`apps/web/dist`), a API e o WebSocket, então
+o jogo tem uma URL só. A configuração está em [`render.yaml`](render.yaml) (plano gratuito,
+região Ohio, a mesma do banco no Neon).
+
+1. No [Render](https://render.com), entre com o GitHub e vá em **New → Blueprint**.
+2. Escolha este repositório. O Render lê o `render.yaml` e pede os segredos: `DATABASE_URL` e
+   as três `LIVEKIT_*` (os mesmos valores do seu `apps/server/.env`).
+3. Ao terminar o build, o jogo fica em `https://<nome-do-serviço>.onrender.com`. Cada push na
+   `main` faz um deploy novo.
+
+No plano gratuito o serviço dorme depois de ~15 min sem visitas; a primeira visita depois disso
+leva cerca de 1 min para acordar. Salas abertas se perdem quando ele dorme ou reinicia.
+
+Para testar a versão de produção no seu PC:
+
+```sh
+pnpm build:deploy
+node apps/server/dist/index.js   # abre em http://localhost:2567
+```
 
 ## Jogando com amigos na mesma rede
 
