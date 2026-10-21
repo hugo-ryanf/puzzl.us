@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { CloseCode } from '@colyseus/sdk';
-import type { RankingQuery } from '@puzzle/shared';
+import { uploadIdOf, type RankingQuery } from '@puzzle/shared';
 import { Board } from '../board/Board';
 import { puzzleImageInfo } from '../board/images';
 import { usePuzzleImage } from '../board/usePuzzleImage';
 import { formatDuration } from '../format';
+import type { Community } from '../net/community';
 import { leaveRoom, rejoinRoom, type PuzzleRoom } from '../net/connection';
 import { loadPlayerName } from '../net/playerName';
 import { useRoomSnapshot, type RoomSnapshot } from '../net/useRoomSnapshot';
@@ -19,9 +20,11 @@ interface RoomScreenProps {
   /** Voltou para a mesma sala por uma conexão nova (o servidor reiniciou no meio do jogo). */
   onRejoin: (room: PuzzleRoom) => void;
   onShowRanking: (query: RankingQuery) => void;
+  /** Logado: nome da conta e como publicar (a foto própria, no fim da partida). */
+  account?: { name: string; publish: Community['publish'] };
 }
 
-export function RoomScreen({ room, onLeave, onRejoin, onShowRanking }: RoomScreenProps) {
+export function RoomScreen({ room, onLeave, onRejoin, onShowRanking, account }: RoomScreenProps) {
   const snapshot = useRoomSnapshot(room);
   const solo = snapshot.maxPlayers === 1;
   // Solo não entra na chamada: não há com quem falar (e poupa a cota do LiveKit).
@@ -126,7 +129,28 @@ export function RoomScreen({ room, onLeave, onRejoin, onShowRanking }: RoomScree
           />
         )}
         {snapshot.phase === 'completed' && (
-          <CompletedModal snapshot={snapshot} onShowRanking={onShowRanking} onLeave={leave} />
+          <CompletedModal
+            snapshot={snapshot}
+            onShowRanking={onShowRanking}
+            onLeave={leave}
+            publisher={
+              // Quem criou a sala (logado) é quem enviou a foto; o servidor confere de novo.
+              // Já publicada, a partida entra no ranking e esta seção nem aparece.
+              account && isOwner && uploadIdOf(snapshot.imageId)
+                ? {
+                    defaultAuthor: account.name,
+                    publish: async (title, authorName) => {
+                      await account.publish({
+                        imageId: snapshot.imageId,
+                        title,
+                        authorName,
+                        rights: true,
+                      });
+                    },
+                  }
+                : undefined
+            }
+          />
         )}
       </div>
     </div>
