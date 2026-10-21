@@ -8,6 +8,8 @@ import type { AppDatabase } from '../db/database';
 import { createGameStore } from '../db/gameStore';
 import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
 import { players } from '../db/schema';
+import { CATALOG, type LibraryResponse } from '@puzzle/shared';
+import { createLibraryStore } from '../library/library';
 import { createAccountStore, type GoogleProfile } from './accounts';
 import type { GoogleAuth } from './google';
 
@@ -41,6 +43,7 @@ beforeAll(async () => {
       publicUrl: PUBLIC_URL,
       adminEmails: ['hugo@exemplo.com'],
       secureCookies: false,
+      library: createLibraryStore(db),
     },
   });
   await server.listen(PORT);
@@ -138,5 +141,24 @@ describe('login com Google', () => {
     expect((await link(session)).status).toBe(204);
     const [player] = await db.select().from(players).where(eq(players.guestId, guestId));
     expect(player!.userId).toBe((await me(session)).user!.id);
+  });
+
+  it('favoritos: só logado; favorita, aparece na biblioteca e desfavorita', async () => {
+    const imageId = CATALOG[0]!.id;
+    const call = (method: string, cookie: string, id = imageId) =>
+      fetch(`${base}/api/me/favorites/${id}`, { method, headers: { cookie } });
+    const library = async (cookie: string) =>
+      (await (
+        await fetch(`${base}/api/me/library`, { headers: { cookie } })
+      ).json()) as LibraryResponse;
+
+    expect((await call('PUT', '')).status).toBe(401);
+    const { session } = await login();
+    expect((await call('PUT', session)).status).toBe(204);
+    expect((await call('PUT', session, 'nao-existe')).status).toBe(400);
+    expect(await library(session)).toEqual({ records: [], favorites: [imageId] });
+
+    expect((await call('DELETE', session)).status).toBe(204);
+    expect((await library(session)).favorites).toEqual([]);
   });
 });
