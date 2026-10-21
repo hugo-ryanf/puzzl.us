@@ -16,6 +16,8 @@ export interface PlayerView {
 export interface RoomSnapshot {
   players: PlayerView[];
   hostId: string;
+  /** sessionId de quem criou a sala logado (pode salvar a partida); vazio se não estiver. */
+  ownerId: string;
   phase: GamePhase;
   /** Foto do catálogo e tamanho escolhido (juntos com teamSize, a categoria do ranking). */
   imageId: string;
@@ -56,6 +58,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
       snaps: p.snaps,
     })),
     hostId: state.hostId,
+    ownerId: state.ownerId,
     phase: state.phase as GamePhase,
     imageId: state.config.imageId,
     pieceCount: state.config.pieceCount,
@@ -95,6 +98,7 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
         [
           'phase',
           'hostId',
+          'ownerId',
           'elapsedMs',
           'durationMs',
           'rankStatus',
