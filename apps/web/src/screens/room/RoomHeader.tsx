@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { puzzleImageInfo } from '../../board/images';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
+import type { FriendView } from '@puzzle/shared';
 import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
 import logoUrl from '../../assets/logo.webp';
 import { CheckIcon, HourglassIcon, LinkIcon, LogOutIcon } from '../../ui/icons';
 import type { VoiceChat } from '../../voice/useVoiceChat';
 import { VoiceMenu } from '../../voice/VoiceMenu';
 import { GameClock } from '../GameClock';
+import { InviteMenu } from './InviteMenu';
 
 interface RoomHeaderProps {
   roomId: string;
@@ -17,6 +19,8 @@ interface RoomHeaderProps {
   onSaveAndLeave?: () => void;
   /** Esperando o servidor gravar. */
   saving?: boolean;
+  /** Logado: o "Convidar" também chama amigos online. */
+  friends?: { list: FriendView[]; invite: (friendId: string) => Promise<void> };
 }
 
 /** Barra da sala: foto e sala à esquerda, tempo e progresso no meio, convite/som/sair à direita. */
@@ -27,6 +31,7 @@ export function RoomHeader({
   onLeave,
   onSaveAndLeave,
   saving = false,
+  friends,
 }: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
   const { imageId, pieceCount, pieces, placed, phase, elapsedMs, durationMs, maxPlayers } =
@@ -86,14 +91,18 @@ export function RoomHeader({
         {!solo && (
           <>
             {/* Só o ícone; o nome aparece (o botão cresce) ao passar o mouse ou ao copiar. */}
-            <button
-              type="button"
-              className={copied ? 'btn reveal-btn revealed' : 'btn reveal-btn'}
-              onClick={() => void copyInvite()}
-            >
-              {copied ? <CheckIcon size={18} /> : <LinkIcon size={18} />}
-              <span className="reveal-label">{copied ? 'Link copiado!' : 'Convidar'}</span>
-            </button>
+            {friends ? (
+              <InviteMenu roomId={roomId} friends={friends.list} onInvite={friends.invite} />
+            ) : (
+              <button
+                type="button"
+                className={copied ? 'btn reveal-btn revealed' : 'btn reveal-btn'}
+                onClick={() => void copyInvite()}
+              >
+                {copied ? <CheckIcon size={18} /> : <LinkIcon size={18} />}
+                <span className="reveal-label">{copied ? 'Link copiado!' : 'Convidar'}</span>
+              </button>
+            )}
             <VoiceMenu voice={voice} />
             <span className="bar-divider" aria-hidden="true" />
           </>
