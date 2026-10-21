@@ -69,6 +69,15 @@ export const BookmarkIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const HourglassIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 22h14" />
+    <path d="M5 2h14" />
+    <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+    <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+  </Icon>
+);
+
 export const TrophyIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
