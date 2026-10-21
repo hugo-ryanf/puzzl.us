@@ -8,6 +8,8 @@ export interface PlayerView {
   name: string;
   color: string;
   connected: boolean;
+  /** Encaixes feitos por este jogador (contribuição no resultado). */
+  snaps: number;
 }
 
 /** Fotografia do estado da sala em objetos simples, para o React renderizar a interface. */
@@ -18,13 +20,25 @@ export interface RoomSnapshot {
   /** Foto do catálogo e tamanho escolhido (juntos com teamSize, a categoria do ranking). */
   imageId: string;
   pieceCount: number;
+  /** Total real de peças (rows × cols; pode diferir um pouco do tamanho escolhido). */
   pieces: number;
   groups: number;
+  /** Peças já encaixadas em alguma outra (em grupos de 2 ou mais). */
+  placed: number;
   elapsedMs: number;
   durationMs: number;
   rankStatus: RankStatus;
   rank: number;
   teamSize: number;
+}
+
+/** Soma as peças de todo grupo com 2+ peças (peça sozinha ainda não foi encaixada). */
+function countPlaced(pieceGroup: Iterable<number>): number {
+  const sizes = new Map<number, number>();
+  for (const groupId of pieceGroup) sizes.set(groupId, (sizes.get(groupId) ?? 0) + 1);
+  let placed = 0;
+  for (const size of sizes.values()) if (size > 1) placed += size;
+  return placed;
 }
 
 function readSnapshot(room: PuzzleRoom): RoomSnapshot {
@@ -35,6 +49,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
       name: p.name,
       color: p.color,
       connected: p.connected,
+      snaps: p.snaps,
     })),
     hostId: state.hostId,
     phase: state.phase as GamePhase,
@@ -42,6 +57,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     pieceCount: state.config.pieceCount,
     pieces: state.pieceGroup.length,
     groups: state.groups.size,
+    placed: countPlaced(state.pieceGroup),
     elapsedMs: state.elapsedMs,
     durationMs: state.durationMs,
     rankStatus: state.rankStatus as RankStatus,
