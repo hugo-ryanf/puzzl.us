@@ -5,6 +5,8 @@ import {
   UPLOAD_PREFIX,
   type UploadResponse,
 } from '@puzzle/shared';
+import type { AccountStore } from '../auth/accounts';
+import { accountFromCookieHeader } from '../auth/routes';
 import { processUpload, UploadError } from './processUpload';
 import { createRateLimiter } from './rateLimit';
 import type { UploadStore } from './uploadStore';
@@ -19,7 +21,11 @@ const CACHE_SECONDS = 7 * 24 * 60 * 60;
  * GET  /api/uploads/:id — a foto processada (WebP)
  * Sem `uploads` (servidor sem banco), respondem 503.
  */
-export function registerUploadRoutes(app: Application, uploads: UploadStore | undefined) {
+export function registerUploadRoutes(
+  app: Application,
+  uploads: UploadStore | undefined,
+  accounts?: AccountStore,
+) {
   const limiter = createRateLimiter({ max: UPLOADS_PER_HOUR, windowMs: 60 * 60 * 1000 });
 
   app.post(
@@ -38,7 +44,9 @@ export function registerUploadRoutes(app: Application, uploads: UploadStore | un
         const processed = await processUpload(
           Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0),
         );
-        const id = await uploads.save(processed);
+        // Logado: a foto fica marcada como dele (só ele pode publicá-la depois).
+        const account = await accountFromCookieHeader(accounts, req.headers.cookie);
+        const id = await uploads.save(processed, account?.id);
         const body: UploadResponse = {
           imageId: `${UPLOAD_PREFIX}${id}`,
           width: processed.width,
