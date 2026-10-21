@@ -1,8 +1,12 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  BATTLE_ROOM,
+  BULLET_ROOM,
   PRESENCE_ROOM,
   ROOM_NAME,
   RoomState,
+  type CreateBattleOptions,
+  type CreateBulletOptions,
   type CreateRoomOptions,
   type JoinOptions,
   type RestoreRoomOptions,
@@ -45,6 +49,20 @@ type WithoutGuest<T> = Omit<T, 'guestId'>;
 export async function createRoom(options: WithoutGuest<CreateRoomOptions>): Promise<PuzzleRoom> {
   const room = await client.create(ROOM_NAME, { ...options, guestId: guestId() }, RoomState);
   return track(room);
+}
+
+/** Bullet: contra o relógio, quebra-cabeças pequenos um atrás do outro. */
+export async function createBulletRoom(
+  options: WithoutGuest<CreateBulletOptions>,
+): Promise<PuzzleRoom> {
+  return track(await client.create(BULLET_ROOM, { ...options, guestId: guestId() }, RoomState));
+}
+
+/** Batalha: dois lados montando o mesmo quebra-cabeça. */
+export async function createBattleRoom(
+  options: WithoutGuest<CreateBattleOptions>,
+): Promise<PuzzleRoom> {
+  return track(await client.create(BATTLE_ROOM, { ...options, guestId: guestId() }, RoomState));
 }
 
 /**
@@ -157,7 +175,8 @@ export function leaveRoom(room: PuzzleRoom): void {
  * a cada reconexão automática (o token muda quando reconecta).
  */
 async function track(room: PuzzleRoom): Promise<PuzzleRoom> {
-  // `?.`: antes do primeiro estado a referência `config` ainda não foi decodificada.
+  // `?.`: antes do primeiro estado a referência `config` ainda não foi decodificada. Todo modo
+  // preenche o `config` da raiz (no Bullet e na Batalha, com o quebra-cabeça da vez).
   if (!room.state.config?.seed) {
     await new Promise<void>((resolve) => room.onStateChange.once(() => resolve()));
   }
