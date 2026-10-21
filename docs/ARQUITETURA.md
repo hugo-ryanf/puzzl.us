@@ -199,9 +199,15 @@ Implementado depois do deploy (`apps/server/src/db/gameStore.ts`):
 - **Período** (`period=day|week|month|all`): filtra `finished_at` a partir do começo do dia, da
   semana (segunda) ou do mês **no horário de Brasília** (`date_trunc` com `America/Sao_Paulo`;
   o servidor roda em UTC). O resultado da partida mostra a posição de sempre e a de hoje.
-- **Ranking geral** (`GET /api/ranking/general?players=&period=`): por modalidade (solo, dupla,
-  trio, quarteto), soma as peças (`piece_count`) de todos os quebra-cabeças completados no
-  período, por equipe (`team_key`); empate, ganha quem gastou menos tempo no total.
+- **Ranking por pontos** (`GET /api/ranking/general?players=&period=`): cada partida vale
+  peças × fator de velocidade, gravado em `games.points` quando ela termina. O fator é o tempo
+  típico (mediana) das partidas com o mesmo número de peças e a mesma modalidade, em qualquer
+  foto, dividido pelo tempo da partida, entre 0,5× e 2× (com menos de 5 partidas para comparar,
+  1×). O ranking soma, no período, a melhor partida de cada equipe em cada foto e tamanho
+  (repetir não acumula); empate, mais quebra-cabeças diferentes. Partidas de antes dos pontos
+  ficaram com as peças (fator 1×).
+- **Escolher a foto do ranking por foto:** busca pelo título e as mais jogadas
+  (`GET /api/ranking/popular?players=&period=`), em vez de listar todas as fotos.
 - Índice `games(team_size, finished_at)` para as duas consultas.
 
 ## Contas (login com Google)
