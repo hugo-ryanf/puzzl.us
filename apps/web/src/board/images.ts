@@ -1,4 +1,5 @@
 import { findCatalogImage, uploadIdOf } from '@puzzle/shared';
+import { communityPuzzleOf } from '../net/community';
 
 /** Imagens do catálogo ficam em public/catalog (geradas por `pnpm catalog`). */
 export const catalogThumbUrl = (id: string) => `/catalog/${id}-mini.webp`;
@@ -9,10 +10,19 @@ export function puzzleImageUrl(imageId: string): string {
   return uploadId ? `/api/uploads/${uploadId}` : `/catalog/${imageId}.webp`;
 }
 
-/** Título para mostrar na sala; fotos enviadas não têm título nem crédito. */
+/** Título e crédito: do catálogo, da comunidade (título e autor) ou "Foto enviada". */
 export function puzzleImageInfo(imageId: string): { title: string; credit: string } | undefined {
+  const published = communityPuzzleOf(imageId);
+  if (published) return { title: published.title, credit: `por ${published.authorName}` };
   if (uploadIdOf(imageId)) return { title: 'Foto enviada', credit: '' };
   return findCatalogImage(imageId);
+}
+
+/** Miniatura para listas: do catálogo, a da comunidade, ou a própria foto enviada. */
+export function puzzleThumbUrl(imageId: string): string {
+  const published = communityPuzzleOf(imageId);
+  if (published) return `/api/puzzles/${published.id}/mini`;
+  return uploadIdOf(imageId) ? puzzleImageUrl(imageId) : catalogThumbUrl(imageId);
 }
 
 /** Baixa e decodifica a foto antes de montar o tabuleiro (a textura precisa dos pixels prontos). */
