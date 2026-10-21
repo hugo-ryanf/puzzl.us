@@ -1,6 +1,18 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
-import { MAX_PLAYERS, PIECE_COUNT_PRESETS, RANDOM_IMAGE, gridForPieceCount } from '@puzzle/shared';
-import { createBattleRoom, createRoom, type PuzzleRoom } from '../../net/connection';
+import {
+  BULLET_MINUTES,
+  BULLET_PIECES,
+  MAX_PLAYERS,
+  PIECE_COUNT_PRESETS,
+  RANDOM_IMAGE,
+  gridForPieceCount,
+} from '@puzzle/shared';
+import {
+  createBattleRoom,
+  createBulletRoom,
+  createRoom,
+  type PuzzleRoom,
+} from '../../net/connection';
 import { friendlyError, savePlayerName } from '../../net/playerName';
 import { uploadImage, type UploadedImage } from '../../net/uploads';
 import { DIFFICULTY_NAMES, Pips, difficultyOf } from '../../ui/difficulty';
@@ -12,6 +24,7 @@ import {
   CloseIcon,
   ShuffleIcon,
   SwordsIcon,
+  TimerIcon,
   UserIcon,
   UsersIcon,
 } from '../../ui/icons';
@@ -36,13 +49,13 @@ interface CreateRoomDialogProps {
   onNameChange: (name: string) => void;
   onClose: () => void;
   onCreated: (room: PuzzleRoom) => void;
-  /** Abrir já num modo (o card "Batalha" da faixa de modos abre em 'battle'). */
-  initialMode?: Mode;
 }
 
-type Mode = 'solo' | 'multi' | 'battle';
+type Mode = 'solo' | 'multi' | 'battle' | 'bullet';
 type BattleFormat = '1v1' | '2v2';
 const PLAYER_OPTIONS = Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2); // 2, 3, 4
+/** No Bullet dá para jogar sozinho também. */
+const BULLET_PLAYER_OPTIONS = Array.from({ length: MAX_PLAYERS }, (_, i) => i + 1); // 1–4
 /** 1000 → "1.000", como no resto do site. */
 const formatCount = (count: number) => count.toLocaleString('pt-BR');
 
@@ -56,10 +69,12 @@ export function CreateRoomDialog({
   onNameChange,
   onClose,
   onCreated,
-  initialMode = 'solo',
 }: CreateRoomDialogProps) {
   const custom = source === 'custom';
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [mode, setMode] = useState<Mode>('solo');
+  const [minutes, setMinutes] = useState<(typeof BULLET_MINUTES)[number]>(5);
+  const [bulletPieces, setBulletPieces] = useState<(typeof BULLET_PIECES)[number]>(12);
+  const [bulletPlayers, setBulletPlayers] = useState(1);
   const [format, setFormat] = useState<BattleFormat>('1v1');
   const [players, setPlayers] = useState(2);
   const [randomImage, setRandomImage] = useState(false);
@@ -77,11 +92,10 @@ export function CreateRoomDialog({
     };
   }, [uploaded]);
 
-  /** Foto sorteada no servidor: escolhida assim no diálogo ou vinda do card "Batalha". */
-  const randomSource = typeof source === 'object' && source?.imageId === RANDOM_IMAGE;
-  const random = randomSource || (!custom && mode !== 'solo' && randomImage);
+  const bullet = mode === 'bullet';
+  const random = !custom && (mode === 'multi' || mode === 'battle') && randomImage;
   /** Sala personalizada sem foto (ou com a foto ainda subindo): não dá para começar. */
-  const missingPhoto = custom && !uploaded;
+  const missingPhoto = custom && !uploaded && !bullet;
   const preview: PuzzleChoice | undefined = custom
     ? uploaded && {
         imageId: uploaded.imageId,
@@ -96,6 +110,26 @@ export function CreateRoomDialog({
     if (!source) return;
     const trimmed = name.trim();
     if (!trimmed) return setError('Digite seu nome.');
+    if (bullet) {
+      // Bullet não usa a foto escolhida: cada quebra-cabeça é sorteado do catálogo.
+      savePlayerName(trimmed);
+      setBusy(true);
+      setError(undefined);
+      try {
+        onCreated(
+          await createBulletRoom({
+            name: trimmed,
+            minutes,
+            pieces: bulletPieces,
+            maxPlayers: bulletPlayers,
+          }),
+        );
+      } catch (e) {
+        setError(friendlyError(e));
+        setBusy(false);
+      }
+      return;
+    }
     const imageId = random ? RANDOM_IMAGE : preview?.imageId;
     if (!imageId) return setError('Escolha a foto do quebra-cabeça.');
     savePlayerName(trimmed);
@@ -114,13 +148,15 @@ export function CreateRoomDialog({
     }
   }
 
-  const subtitle = custom
-    ? 'Envie uma foto sua e escolha como jogar.'
-    : mode === 'solo'
-      ? 'Escolha o tamanho e comece quando quiser.'
-      : mode === 'battle'
-        ? 'Dois lados montam o mesmo quebra-cabeça: quem terminar primeiro ganha.'
-        : 'Escolha o tamanho e chame seus amigos pelo link da sala.';
+  const subtitle = bullet
+    ? 'Monte o máximo de quebra-cabeças pequenos até o tempo acabar. As fotos são sorteadas.'
+    : custom
+      ? 'Envie uma foto sua e escolha como jogar.'
+      : mode === 'solo'
+        ? 'Escolha o tamanho e comece quando quiser.'
+        : mode === 'battle'
+          ? 'Dois lados montam o mesmo quebra-cabeça: quem terminar primeiro ganha.'
+          : 'Escolha o tamanho e chame seus amigos pelo link da sala.';
 
   return (
     <Dialog
@@ -132,7 +168,9 @@ export function CreateRoomDialog({
       {source && (
         <>
           <aside className="play-media">
-            {custom && !preview ? (
+            {bullet ? (
+              <BulletPreview pieces={bulletPieces} />
+            ) : custom && !preview ? (
               <PhotoUpload onUploaded={setUploaded} />
             ) : (
               <MediaPreview
@@ -152,7 +190,7 @@ export function CreateRoomDialog({
             </header>
 
             {/* Rádios nativos escondidos: as setas do teclado trocam a opção, como em qualquer grupo. */}
-            <fieldset className="mode-options three">
+            <fieldset className="mode-options">
               <legend>Como jogar</legend>
               <label className="mode-option">
                 <input
@@ -190,7 +228,69 @@ export function CreateRoomDialog({
                 <strong>Batalha</strong>
                 <small>Lado contra lado: quem montar primeiro ganha.</small>
               </label>
+              <label className="mode-option">
+                <input
+                  type="radio"
+                  name="mode"
+                  className="sr-only"
+                  checked={mode === 'bullet'}
+                  onChange={() => setMode('bullet')}
+                />
+                <TimerIcon size={20} />
+                <strong>Bullet</strong>
+                <small>Contra o relógio: quantos você monta em 3, 5 ou 10 min?</small>
+              </label>
             </fieldset>
+
+            {bullet && (
+              <div className="choice-rows">
+                <fieldset className="choice-row">
+                  <legend>Jogadores</legend>
+                  {BULLET_PLAYER_OPTIONS.map((count) => (
+                    <label key={count} className="radio-chip">
+                      <input
+                        type="radio"
+                        name="bullet-players"
+                        className="sr-only"
+                        checked={bulletPlayers === count}
+                        onChange={() => setBulletPlayers(count)}
+                      />
+                      {count === 1 ? 'Solo' : count}
+                    </label>
+                  ))}
+                </fieldset>
+                <fieldset className="choice-row">
+                  <legend>Tempo</legend>
+                  {BULLET_MINUTES.map((value) => (
+                    <label key={value} className="radio-chip">
+                      <input
+                        type="radio"
+                        name="bullet-minutes"
+                        className="sr-only"
+                        checked={minutes === value}
+                        onChange={() => setMinutes(value)}
+                      />
+                      {value} min
+                    </label>
+                  ))}
+                </fieldset>
+                <fieldset className="choice-row">
+                  <legend>Peças</legend>
+                  {BULLET_PIECES.map((value) => (
+                    <label key={value} className="radio-chip">
+                      <input
+                        type="radio"
+                        name="bullet-pieces"
+                        className="sr-only"
+                        checked={bulletPieces === value}
+                        onChange={() => setBulletPieces(value)}
+                      />
+                      {value}
+                    </label>
+                  ))}
+                </fieldset>
+              </div>
+            )}
 
             {mode === 'battle' && (
               <div className="choice-rows">
@@ -209,7 +309,7 @@ export function CreateRoomDialog({
                     </label>
                   ))}
                 </fieldset>
-                {!custom && !randomSource && (
+                {!custom && (
                   <fieldset className="choice-row">
                     <legend>Foto</legend>
                     <label className="radio-chip">
@@ -255,7 +355,7 @@ export function CreateRoomDialog({
                     </label>
                   ))}
                 </fieldset>
-                {!custom && !randomSource && (
+                {!custom && (
                   <fieldset className="choice-row">
                     <legend>Foto</legend>
                     <label className="radio-chip">
@@ -284,7 +384,7 @@ export function CreateRoomDialog({
               </div>
             )}
 
-            <SizeOptions pieceCount={pieceCount} onPieceCount={setPieceCount} />
+            {!bullet && <SizeOptions pieceCount={pieceCount} onPieceCount={setPieceCount} />}
 
             <label className="field">
               Seu nome
@@ -296,7 +396,7 @@ export function CreateRoomDialog({
                 onChange={(e) => onNameChange(e.target.value)}
               />
               <small className="field-hint">
-                {mode === 'solo'
+                {mode === 'solo' || bullet
                   ? 'É o nome que aparece no ranking.'
                   : 'É assim que seus amigos vão te ver na sala.'}
               </small>
@@ -309,7 +409,11 @@ export function CreateRoomDialog({
                 Cancelar
               </button>
               <button className="btn btn-primary" disabled={busy || missingPhoto}>
-                {busy ? 'Criando…' : mode === 'solo' ? 'Começar' : 'Criar sala'}
+                {busy
+                  ? 'Criando…'
+                  : mode === 'solo' || (bullet && bulletPlayers === 1)
+                    ? 'Começar'
+                    : 'Criar sala'}
                 {!busy && <ArrowRightIcon size={18} />}
               </button>
             </div>
@@ -327,6 +431,22 @@ export function CreateRoomDialog({
         </>
       )}
     </Dialog>
+  );
+}
+
+/** Bullet não usa a foto escolhida: mostra como a partida funciona no lugar dela. */
+function BulletPreview({ pieces }: { pieces: number }) {
+  return (
+    <>
+      <div className="play-photo bullet-preview">
+        <TimerIcon size={40} />
+        <span className="play-count">{pieces} peças cada</span>
+      </div>
+      <div className="play-caption">
+        <strong>Fotos sorteadas</strong>
+        <p>Terminou um quebra-cabeça, entra outro do catálogo na hora, até o tempo acabar.</p>
+      </div>
+    </>
   );
 }
 

@@ -1,18 +1,10 @@
 import { useState } from 'react';
-import { CATALOG, RANDOM_IMAGE, type CommunityPuzzle } from '@puzzle/shared';
+import { CATALOG, type CommunityPuzzle } from '@puzzle/shared';
 import { catalogThumbUrl } from '../../board/images';
 import type { Community } from '../../net/community';
 import type { PuzzleRoom } from '../../net/connection';
 import type { Library } from '../../net/library';
-import {
-  ArrowRightIcon,
-  ChevronDownIcon,
-  FilterIcon,
-  SearchIcon,
-  SwordsIcon,
-  TimerIcon,
-} from '../../ui/icons';
-import { BulletDialog } from '../bullet/BulletDialog';
+import { ChevronDownIcon, FilterIcon, SearchIcon } from '../../ui/icons';
 import { CreateRoomDialog, type CreateRoomSource, type PuzzleChoice } from './CreateRoomDialog';
 import { JoinRoomDialog } from './JoinRoomDialog';
 import { PuzzleCard, orientationOf, type CommunityActions, type PuzzleImage } from './PuzzleCard';
@@ -31,14 +23,6 @@ const normalize = (text: string) =>
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
     .trim();
-
-/** Card "Batalha" da faixa de modos: a foto é sorteada no servidor. */
-const RANDOM_BATTLE: PuzzleChoice = {
-  imageId: RANDOM_IMAGE,
-  title: 'Foto aleatória',
-  subtitle: 'Sorteada do catálogo na hora',
-  thumbUrl: '',
-};
 
 /** Um card do Explorar: foto do catálogo ou publicada por alguém. */
 interface ExploreItem {
@@ -119,10 +103,6 @@ export function ExploreScreen({
   const [query, setQuery] = useState('');
   const [orientation, setOrientation] = useState<Orientation>('Todas');
   const [choice, setChoice] = useState<PuzzleChoice | null>(null);
-  /** Diálogo de um modo de jogo aberto pela faixa "Modos". */
-  const [modeDialog, setModeDialog] = useState<'bullet' | null>(null);
-  /** O diálogo de criar foi aberto pelo card "Batalha" (já no modo Batalha). */
-  const [battleFromModes, setBattleFromModes] = useState(false);
 
   const favoritesOnly = view === 'favorites';
   const q = normalize(query);
@@ -180,40 +160,6 @@ export function ExploreScreen({
       </div>
 
       {notice && <p className="notice">{notice}</p>}
-
-      {!favoritesOnly && (
-        <section className="modes" aria-label="Modos de jogo">
-          <button type="button" className="mode-card" onClick={() => setModeDialog('bullet')}>
-            <span className="mode-card-icon">
-              <TimerIcon size={22} />
-            </span>
-            <span className="mode-card-text">
-              <strong>Bullet</strong>
-              <small>
-                Contra o relógio: quantos quebra-cabeças vocês montam em 3, 5 ou 10 min?
-              </small>
-            </span>
-            <ArrowRightIcon size={18} />
-          </button>
-          <button
-            type="button"
-            className="mode-card"
-            onClick={() => {
-              setBattleFromModes(true);
-              setChoice(RANDOM_BATTLE);
-            }}
-          >
-            <span className="mode-card-icon">
-              <SwordsIcon size={22} />
-            </span>
-            <span className="mode-card-text">
-              <strong>Batalha</strong>
-              <small>1v1 ou 2v2, o mesmo quebra-cabeça: quem montar primeiro ganha.</small>
-            </span>
-            <ArrowRightIcon size={18} />
-          </button>
-        </section>
-      )}
 
       <div className="page-header">
         <div>
@@ -293,20 +239,10 @@ export function ExploreScreen({
         source={dialogSource}
         name={name}
         onNameChange={onNameChange}
-        initialMode={battleFromModes ? 'battle' : 'solo'}
         onClose={() => {
           setChoice(null);
-          setBattleFromModes(false);
           onCloseCreate();
         }}
-        onCreated={onEnter}
-      />
-      <BulletDialog
-        key={modeDialog === 'bullet' ? 'bullet:aberto' : 'bullet:fechado'}
-        open={modeDialog === 'bullet'}
-        name={name}
-        onNameChange={onNameChange}
-        onClose={() => setModeDialog(null)}
         onCreated={onEnter}
       />
       <JoinRoomDialog
