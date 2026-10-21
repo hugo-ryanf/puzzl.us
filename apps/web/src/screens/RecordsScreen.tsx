@@ -1,5 +1,6 @@
 import { findCatalogImage, type RankingQuery } from '@puzzle/shared';
-import { catalogThumbUrl } from '../board/images';
+import { communityPuzzleOf } from '../net/community';
+import { puzzleImageInfo, puzzleThumbUrl } from '../board/images';
 import { formatDuration } from '../format';
 import type { Library } from '../net/library';
 import { TrophyIcon } from '../ui/icons';
@@ -54,15 +55,14 @@ export function RecordsScreen({
       {records.length > 0 && (
         <ol className="records-list">
           {records.map((record) => {
-            const image = findCatalogImage(record.imageId);
+            // Ranking existe para o catálogo e para fotos publicadas (que ainda estão no ar).
+            const ranked =
+              !!findCatalogImage(record.imageId) || !!communityPuzzleOf(record.imageId);
+            const image = puzzleImageInfo(record.imageId);
             const key = `${record.imageId}:${record.pieceCount}:${record.teamSize}`;
             return (
               <li key={key}>
-                {image ? (
-                  <img src={catalogThumbUrl(record.imageId)} alt="" loading="lazy" />
-                ) : (
-                  <span className="records-thumb" />
-                )}
+                <img src={puzzleThumbUrl(record.imageId)} alt="" loading="lazy" />
                 <span className="records-title">
                   <strong>{image?.title ?? 'Foto enviada'}</strong>
                   <small>
@@ -76,7 +76,7 @@ export function RecordsScreen({
                     {dateFormat.format(new Date(record.lastPlayedAt))}
                   </small>
                 </span>
-                {image && (
+                {image && ranked && (
                   <button
                     type="button"
                     className="btn"
