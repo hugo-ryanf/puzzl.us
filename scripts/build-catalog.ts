@@ -2,7 +2,8 @@
  * pnpm catalog — monta o catálogo de imagens a partir de catalogo/originais/.
  *
  * - catalogo/catalogo.json é a lista oficial (título e crédito editáveis à mão). Fotos novas na
- *   pasta entram sozinhas; para tirar uma foto do jogo, apague a entrada dela desse arquivo.
+ *   pasta entram sozinhas; para tirar uma foto do jogo, tire o original da pasta (subpastas
+ *   são ignoradas) e apague a entrada dela desse arquivo.
  * - Cada foto vira apps/web/public/catalog/<id>.webp (lado maior ≤ 2048 px) e <id>-mini.webp.
  *   A rotação do celular é aplicada e os metadados EXIF (inclusive GPS) são descartados.
  * - packages/shared/src/catalog.ts é gerado com id, título, crédito e tamanho de cada imagem.
@@ -46,20 +47,32 @@ function titleFromFile(fileName: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** ["adrien", "olichon"] → "Adrien Olichon" */
+function personName(words: string[]): string {
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
 /**
- * Fotos baixadas do Unsplash/Pexels já vêm com o autor no nome do arquivo:
- * "adrian-botica-bx5kehBQTMA-unsplash.jpg" → "Foto de Adrian Botica no Unsplash".
- * Assim o crédito (atribuição) já nasce preenchido; dá para ajustar no catalogo.json.
+ * Fotos baixadas do Unsplash/Pexels já vêm com o autor no nome do arquivo, e assim o crédito
+ * (atribuição) já nasce preenchido; dá para ajustar no catalogo.json.
+ * - Unsplash: "adrian-botica-bx5kehBQTMA-unsplash.jpg" → "Foto de Adrian Botica no Unsplash"
+ * - Pexels: "pexels-adrien-olichon-1257089-4237154.jpg" → "Foto de Adrien Olichon no Pexels"
+ *   (os números são ids; às vezes o autor vem seguido de "pexels" de novo, que descartamos).
  */
 function creditFromFile(fileName: string): string {
-  const match = /^(.+)-[^-]+-(unsplash|pexels)$/i.exec(basename(fileName, extname(fileName)));
-  if (!match) return '';
-  const [, author = '', site = ''] = match;
-  const name = author
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-  return `Foto de ${name} no ${site.charAt(0).toUpperCase()}${site.slice(1).toLowerCase()}`;
+  const name = basename(fileName, extname(fileName)).replace(/\s*\(\d+\)$/, ''); // "foto (1)"
+  const unsplash = /^(.+)-[^-]+-unsplash$/i.exec(name);
+  if (unsplash) return `Foto de ${personName(unsplash[1]!.split('-'))} no Unsplash`;
+  const pexels = /^pexels-(.+)$/i.exec(name);
+  if (pexels) {
+    const words = pexels[1]!.split('-');
+    const firstId = words.findIndex((word) => /^\d+$/.test(word));
+    const author = (firstId === -1 ? words : words.slice(0, firstId)).filter(
+      (word) => word.toLowerCase() !== 'pexels',
+    );
+    if (author.length > 0) return `Foto de ${personName(author)} no Pexels`;
+  }
+  return '';
 }
 
 function readManifest(): ManifestEntry[] {
