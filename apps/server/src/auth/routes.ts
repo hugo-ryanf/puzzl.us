@@ -3,6 +3,7 @@ import { LinkGuestRequest, type MeResponse } from '@puzzle/shared';
 import type { AccountStore } from './accounts';
 import type { GoogleAuth } from './google';
 import { registerLibraryRoutes, type LibraryStore } from '../library/library';
+import type { FriendStore } from '../friends/friends';
 import type { SavedGameStore } from '../rooms/savedGames';
 
 export const SESSION_COOKIE = 'sid';
@@ -25,6 +26,8 @@ export interface AuthOptions {
   library?: LibraryStore;
   /** Partidas salvas da conta (rotas /api/me/saved); a sala também grava nele. */
   savedGames?: SavedGameStore;
+  /** Amizades (rotas /api/me/friends e /api/me/invites, mais a sala de presença). */
+  friends?: FriendStore;
 }
 
 /** "a=1; sid=abc" → { a: '1', sid: 'abc' }. Express não lê cookie sem o cookie-parser. */
