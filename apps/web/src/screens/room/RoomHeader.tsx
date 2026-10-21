@@ -3,7 +3,7 @@ import { puzzleImageInfo } from '../../board/images';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
 import logoUrl from '../../assets/logo.webp';
-import { CheckIcon, LinkIcon, LogOutIcon } from '../../ui/icons';
+import { CheckIcon, HourglassIcon, LinkIcon, LogOutIcon } from '../../ui/icons';
 import type { VoiceChat } from '../../voice/useVoiceChat';
 import { VoiceMenu } from '../../voice/VoiceMenu';
 import { GameClock } from '../GameClock';
@@ -13,10 +13,21 @@ interface RoomHeaderProps {
   snapshot: RoomSnapshot;
   voice: VoiceChat;
   onLeave: () => void;
+  /** Só para o dono da sala, durante a partida: grava no "Em andamento" e fecha a sala. */
+  onSaveAndLeave?: () => void;
+  /** Esperando o servidor gravar. */
+  saving?: boolean;
 }
 
 /** Barra da sala: foto e sala à esquerda, tempo e progresso no meio, convite/som/sair à direita. */
-export function RoomHeader({ roomId, snapshot, voice, onLeave }: RoomHeaderProps) {
+export function RoomHeader({
+  roomId,
+  snapshot,
+  voice,
+  onLeave,
+  onSaveAndLeave,
+  saving = false,
+}: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
   const { imageId, pieceCount, pieces, placed, phase, elapsedMs, durationMs, maxPlayers } =
     snapshot;
@@ -86,6 +97,18 @@ export function RoomHeader({ roomId, snapshot, voice, onLeave }: RoomHeaderProps
             <VoiceMenu voice={voice} />
             <span className="bar-divider" aria-hidden="true" />
           </>
+        )}
+        {onSaveAndLeave && (
+          <button
+            type="button"
+            className="btn"
+            onClick={onSaveAndLeave}
+            disabled={saving}
+            title="Guarda a partida em Em andamento e encerra a sala para todos"
+          >
+            <HourglassIcon size={18} />
+            {saving ? 'Salvando…' : 'Salvar e sair'}
+          </button>
         )}
         <button type="button" className="btn btn-ghost" onClick={onLeave}>
           <LogOutIcon size={18} />
