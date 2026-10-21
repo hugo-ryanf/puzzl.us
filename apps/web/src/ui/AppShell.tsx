@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
+import logoUrl from '../assets/logo.webp';
 import {
   BookmarkIcon,
   CompassIcon,
   LogInIcon,
   PlusIcon,
-  PuzzleIcon,
   SettingsIcon,
   TimerIcon,
   TrophyIcon,
@@ -48,10 +48,10 @@ export function AppShell({
     <div className="shell">
       <aside className="sidebar">
         <button type="button" className="brand" onClick={() => onNavigate('explore')}>
-          <span className="brand-mark">
-            <PuzzleIcon />
+          <img className="brand-logo" src={logoUrl} alt="" />
+          <span className="brand-name">
+            puzzl<span>.us</span>
           </span>
-          puzzl.us
         </button>
 
         <div className="sidebar-actions">
