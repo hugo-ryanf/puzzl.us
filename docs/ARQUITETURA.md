@@ -192,6 +192,39 @@ tempo menor.
 
 ---
 
+### Ranking por período e ranking geral
+
+Implementado depois do deploy (`apps/server/src/db/gameStore.ts`):
+
+- **Período** (`period=day|week|month|all`): filtra `finished_at` a partir do começo do dia, da
+  semana (segunda) ou do mês **no horário de Brasília** (`date_trunc` com `America/Sao_Paulo`;
+  o servidor roda em UTC). O resultado da partida mostra a posição de sempre e a de hoje.
+- **Ranking geral** (`GET /api/ranking/general?players=&period=`): por modalidade (solo, dupla,
+  trio, quarteto), soma as peças (`piece_count`) de todos os quebra-cabeças completados no
+  período, por equipe (`team_key`); empate, ganha quem gastou menos tempo no total.
+- Índice `games(team_size, finished_at)` para as duas consultas.
+
+## Contas (login com Google)
+
+Implementado na fase C (`apps/server/src/auth/`). Quem não entra continua jogando como
+convidado; a conta é o que permite amigos, salvos, favoritos e publicar fotos.
+
+1. **Fluxo:** `/auth/google` gera `state` e o verificador PKCE (cookies httpOnly de 10 min) e vai
+   para o Google (lib `arctic`, escopos `openid profile email`). O Google devolve em
+   `/auth/google/callback`; conferido o `state`, o código vira o perfil (id_token), a conta é
+   criada/atualizada e nasce uma **sessão**: token aleatório no cookie `sid` (httpOnly,
+   SameSite=Lax, Secure em produção, 30 dias) e só o **hash SHA-256** dele na tabela `sessions`.
+2. **Dados:** `users` guarda o `sub` do Google, nome, foto, código de amigo e `is_admin`. O
+   e-mail **não** é guardado: só é comparado com `ADMIN_EMAILS` no login.
+3. **Jogador × conta:** `players.user_id` liga o jogador do ranking à conta. Na primeira partida
+   logado (ou pelo `POST /api/me/link-guest` que o site chama uma vez), o convidado deste
+   navegador vira o jogador da conta; se a conta já tinha outro, as partidas dele passam para
+   ela e o `team_key` é recalculado. A mesma conta em dois aparelhos conta como uma pessoa só.
+4. **Na sala:** o `onAuth` da `PuzzleRoom` lê o cookie da conexão do WebSocket (cookie não
+   depende de porta, então em dev também chega na 2567). Sem sessão, entra como convidado.
+5. **Dev:** o Vite repassa `/api` e `/auth` ao servidor, então o site e a API são a mesma origem
+   e o cookie vai junto sem CORS. Testes trocam o Google por um falso (`GoogleAuth`).
+
 ## Áudio
 
 Implementado na fase 4 (`apps/server/src/voice.ts`, `apps/web/src/voice/`):
@@ -234,6 +267,42 @@ A interface `UploadStore` isola isso: trocar por R2 depois não muda rotas nem s
 4. Criar sala com a foto renova `last_used_at`; uma limpeza a cada 6 h apaga fotos sem uso há 7
    dias. Partidas com foto própria terminam com `rankStatus = 'unranked'` (fora do ranking).
 
+## Snapshot da sala
+
+Implementado na fase 8 (`apps/server/src/rooms/snapshots.ts`). O estado da sala vive na memória
+do processo, e o Render reinicia o processo a cada deploy, quando dorme e quando cai. Sem
+snapshot, a partida em andamento sumia. Agora:
+
+1. **Gravação:** a sala grava um `RoomSnapshot` (JSON em `room_snapshots`, uma linha por código)
+   assim que é criada, a cada 10 s se algo mudou e, no desligamento gracioso (SIGTERM do deploy),
+   em `onBeforeShutdown`, **antes** de derrubar os jogadores. Numa queda sem aviso perde-se no
+   máximo ~10 s. As gravações passam por uma fila, então nunca chegam fora de ordem ao banco.
+2. **Conteúdo:** config do puzzle, fase, tempo de jogo, grupos (id, deslocamento, peças) e
+   jogadores **por `guestId`** (nome, cor, encaixes), porque o `sessionId` muda ao voltar.
+   Quem segura o quê e quem está conectado não entram.
+3. **Restauração:** `joinById(code)` dá "not found" → o cliente pede
+   `joinOrCreate('puzzle', { restore: code })`. A sala é registrada com `filterBy(['restore'])`,
+   então pedidos simultâneos de vários amigos caem na **mesma** sala. O `onCreate` carrega o
+   snapshot, recria o engine com `PuzzleEngine.fromGroups` e usa o próprio código como `roomId`.
+   Sem snapshot, devolve o mesmo "not found" do `joinById`.
+4. **Relógio:** o tempo com o servidor fora do ar **não conta**: a sala restaurada retoma de
+   `elapsedMs`. O `startedAt` gravado no ranking continua sendo o início real.
+5. **Quem volta** recupera a cor (se ainda livre) e os encaixes. O primeiro a voltar vira o
+   anfitrião, como numa sala nova.
+6. **Cliente:** se a conexão cai de vez (`SERVER_SHUTDOWN`, ou a reconexão automática desiste),
+   a sala tenta entrar de novo pelo código por ~1 min (cobre um deploy e o Render acordando) e
+   troca para a nova conexão sem sair da tela. Depois de um F5 com o servidor reiniciado, o token
+   de reconexão não vale mais: o cliente entra de novo pelo código com o nome lembrado.
+7. **Fim da vida:** partida terminada apaga o snapshot (o resultado já está no ranking); sala que
+   esvazia também (não há a quem devolver). Snapshots esquecidos (servidor caiu e ninguém
+   voltou) somem após 24 h. Um código guardado por snapshot não é sorteado para sala nova.
+
+Limite conhecido: durante um deploy o Render mantém a instância velha e a nova no ar por alguns
+segundos. Se alguém entrar pelo código na nova **antes** de a velha desligar, a sala é
+restaurada de um snapshot de até 10 s atrás, e quem ainda estava na velha perde esse trecho.
+
+Sem `DATABASE_URL` não há snapshots: o jogo funciona como antes.
+
 ## Fluxo de sala
 
 Home → “Criar sala” (escolhe tamanho) → `client.create('puzzle')` pelo matchmaker do Colyseus
@@ -263,7 +332,8 @@ e posição no ranking, câmera enquadrando a imagem montada. _Fase 4:_ áudio n
 4. **Áudio** — LiveKit token + UI.
 5. **Catálogo e tamanhos** — algumas imagens fixas no R2, presets de peças.
 6. **Upload de foto** — fluxo R2 + sharp.
-7. **Polimento e deploy** — feito: redesign da sala, câmera, ferramentas da mesa (zoom, centralizar, ver imagem, espalhar), tela de resultado com encaixes por jogador, deploy no Render. Ideias para depois: snapshot do estado da sala (sobreviver a restart), contas OAuth, sons, rotação de peças opcional.
+7. **Polimento e deploy** — feito: redesign da sala, câmera, ferramentas da mesa (zoom, centralizar, ver imagem, espalhar), tela de resultado com encaixes por jogador, deploy no Render.
+8. **Snapshot da sala** — salas em andamento sobrevivem a deploy/restart do servidor (ver "Snapshot da sala"). Ideias para depois: contas OAuth, sons, rotação de peças opcional.
 
 ---
 
