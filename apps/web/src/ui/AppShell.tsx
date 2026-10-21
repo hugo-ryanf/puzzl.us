@@ -13,7 +13,7 @@ import {
   UsersIcon,
 } from './icons';
 
-export type Section = 'explore' | 'favorites' | 'records' | 'ranking';
+export type Section = 'explore' | 'saved' | 'favorites' | 'records' | 'ranking';
 
 interface AppShellProps {
   active: Section;
@@ -80,7 +80,15 @@ export function AppShell({
             Explorar
           </button>
           <SoonLink icon={<UsersIcon />} label="Amigos" />
-          <SoonLink icon={<HourglassIcon />} label="Em andamento" />
+          <button
+            type="button"
+            className="nav-link"
+            aria-current={current('saved')}
+            onClick={() => onNavigate('saved')}
+          >
+            <HourglassIcon />
+            Em andamento
+          </button>
           <button
             type="button"
             className="nav-link"
