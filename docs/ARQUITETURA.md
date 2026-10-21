@@ -1,4 +1,4 @@
-# Arquitetura — Quebra-cabeça colaborativo online
+# Arquitetura — puzzl.us (quebra-cabeça colaborativo online)
 
 ## Contexto
 
