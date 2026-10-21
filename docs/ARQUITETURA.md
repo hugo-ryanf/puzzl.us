@@ -262,6 +262,25 @@ snapshot da sala (`RoomSnapshot`):
    não é apagada pela limpeza de 7 dias.
 6. Rotas: `GET /api/me/saved` e `DELETE /api/me/saved/:id` (só apaga se for da conta).
 
+## Amigos, presença e convites
+
+Implementado na fase G (`apps/server/src/friends/`):
+
+1. **Amizade:** `friendships (user_low, user_high, status, requested_by)`, uma linha por par (o
+   menor id primeiro). Pede-se pelo código de amigo (`POST /api/me/friends`, aceita sem hífen e em
+   minúsculas); se a outra pessoa já tinha pedido, vira amizade na hora. Aceitar, recusar, cancelar
+   e desfazer: `POST /api/me/friends/:id/accept` e `DELETE /api/me/friends/:id`.
+2. **Presença:** todo cliente logado mantém aberta a sala Colyseus **`presence`** (auth pelo
+   cookie; convidado é recusado). O `PresenceHub` (em memória, uma instância só no Render) conta
+   as abas abertas (online) e as salas do jogo em que a conta está (`PuzzleRoom` avisa no
+   `onJoin`/`onLeave`: jogando). Quando o status de alguém muda, os amigos dele recebem
+   `friendsChanged` e buscam a lista de novo; pedidos e aceites também avisam a outra pessoa.
+3. **Convite:** `POST /api/me/invites { friendId, roomCode }` só passa se forem amigos, se quem
+   chama estiver mesmo naquela sala e se o amigo estiver online; o mesmo amigo só pode ser chamado
+   de novo depois de 15 s. O amigo recebe `invite` (nome, foto da sala, código) e vê um aviso com
+   **Entrar** (sai da sala atual, se estiver numa) e **Agora não**.
+4. O status de jogo não revela o código da sala: só o convite leva até ela.
+
 ## Áudio
 
 Implementado na fase 4 (`apps/server/src/voice.ts`, `apps/web/src/voice/`):
