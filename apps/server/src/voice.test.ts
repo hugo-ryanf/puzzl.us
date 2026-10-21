@@ -25,6 +25,7 @@ describe('createVoiceTokenIssuer', () => {
       roomJoin: true,
       room: voiceRoomName('K7QF2'),
       canPublish: true,
+      canPublishSources: ['microphone', 'camera'],
       canSubscribe: true,
       canPublishData: false,
     });
