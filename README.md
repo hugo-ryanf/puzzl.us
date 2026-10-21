@@ -95,7 +95,7 @@ desligada). Sem LiveKit o jogo funciona normalmente e o ícone do microfone apar
 
 ## Login com Google
 
-Opcional: sem ele todo mundo joga como convidado. Com ele, a conta guarda amigos, salvos e
+Opcional: sem ele todo mundo joga como convidado. Com ele, a conta guarda amigos, partidas salvas e
 favoritos em qualquer aparelho.
 
 1. No [Google Cloud Console](https://console.cloud.google.com), crie um projeto e vá em
