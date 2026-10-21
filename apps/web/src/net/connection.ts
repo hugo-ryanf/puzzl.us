@@ -5,6 +5,7 @@ import {
   type CreateRoomOptions,
   type JoinOptions,
   type RestoreRoomOptions,
+  type ResumeRoomOptions,
 } from '@puzzle/shared';
 import { loadPlayerName } from './playerName';
 
@@ -43,6 +44,18 @@ type WithoutGuest<T> = Omit<T, 'guestId'>;
 export async function createRoom(options: WithoutGuest<CreateRoomOptions>): Promise<PuzzleRoom> {
   const room = await client.create(ROOM_NAME, { ...options, guestId: guestId() }, RoomState);
   return track(room);
+}
+
+/**
+ * Continua uma partida salva ("Em andamento") numa sala nova. O servidor só deixa a conta que
+ * salvou (o cookie da sessão vai junto no WebSocket).
+ */
+export async function resumeSavedGame(
+  savedId: string,
+  options: WithoutGuest<JoinOptions>,
+): Promise<PuzzleRoom> {
+  const resume: ResumeRoomOptions = { ...options, guestId: guestId(), resume: savedId };
+  return track(await client.create(ROOM_NAME, resume, RoomState));
 }
 
 /**
