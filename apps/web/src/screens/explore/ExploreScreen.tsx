@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CATALOG, type CatalogImage } from '@puzzle/shared';
 import { catalogThumbUrl } from '../../board/images';
 import type { PuzzleRoom } from '../../net/connection';
+import type { Library } from '../../net/library';
 import { ChevronDownIcon, FilterIcon, SearchIcon } from '../../ui/icons';
 import { CreateRoomDialog, type CreateRoomSource, type PuzzleChoice } from './CreateRoomDialog';
 import { JoinRoomDialog } from './JoinRoomDialog';
@@ -43,6 +44,12 @@ export interface ExploreScreenProps {
   onCloseJoin: () => void;
   onEnter: (room: PuzzleRoom) => void;
   onShowRanking: (imageId: string) => void;
+  /** "favorites": só os favoritos da conta (aba Favoritos da barra lateral). */
+  view?: 'all' | 'favorites';
+  library: Library;
+  /** Logado: favorita. Convidado (com login no servidor): o marcador leva ao login. */
+  signedIn: boolean;
+  googleLogin: boolean;
 }
 
 export function ExploreScreen({
@@ -56,17 +63,30 @@ export function ExploreScreen({
   onCloseJoin,
   onEnter,
   onShowRanking,
+  view = 'all',
+  library,
+  signedIn,
+  googleLogin,
 }: ExploreScreenProps) {
   const [query, setQuery] = useState('');
   const [orientation, setOrientation] = useState<Orientation>('Todas');
   const [choice, setChoice] = useState<PuzzleChoice | null>(null);
 
+  const favoritesOnly = view === 'favorites';
   const q = normalize(query);
   const items = CATALOG.filter(
     (image) =>
+      (!favoritesOnly || library.favorites.has(image.id)) &&
       (orientation === 'Todas' || orientationOf(image) === orientation) &&
       (!q || normalize(image.title).includes(q)),
   );
+  // Convidado: o marcador aparece, mas leva ao login (favoritos ficam guardados na conta).
+  const toggleFavorite = (imageId: string) =>
+    signedIn
+      ? () => library.toggleFavorite(imageId)
+      : googleLogin
+        ? () => location.assign('/auth/google')
+        : undefined;
   const filtering = q !== '' || orientation !== 'Todas';
 
   // Clique num card = jogar aquela foto; "Criar sala" da barra lateral = sala personalizada
@@ -103,9 +123,10 @@ export function ExploreScreen({
 
       <div className="page-header">
         <div>
-          <h1>Explorar</h1>
+          <h1>{favoritesOnly ? 'Favoritos' : 'Explorar'}</h1>
           <p>
-            {items.length === 1 ? '1 imagem' : `${items.length} imagens`} · escolha uma para jogar
+            {items.length === 1 ? '1 imagem' : `${items.length} imagens`} ·{' '}
+            {favoritesOnly ? 'separadas para montar depois' : 'escolha uma para jogar'}
           </p>
         </div>
         <div className="chips" role="group" aria-label="Orientação">
@@ -130,9 +151,28 @@ export function ExploreScreen({
             image={image}
             onPlay={() => setChoice(catalogChoice(image))}
             onShowRanking={() => onShowRanking(image.id)}
+            completedMs={library.completed.get(image.id)}
+            favorite={library.favorites.has(image.id)}
+            onToggleFavorite={toggleFavorite(image.id)}
           />
         ))}
       </div>
+
+      {favoritesOnly && !filtering && items.length === 0 && (
+        <div className="empty">
+          <strong>{signedIn ? 'Nenhum favorito ainda' : 'Entre para ter favoritos'}</strong>
+          <p>
+            {signedIn
+              ? 'Toque no marcador de um quebra-cabeça para guardar aqui e montar depois.'
+              : 'Os favoritos ficam na sua conta, em qualquer aparelho.'}
+          </p>
+          {!signedIn && googleLogin && (
+            <a className="btn" href="/auth/google">
+              Entrar com Google
+            </a>
+          )}
+        </div>
+      )}
 
       {filtering && items.length === 0 && (
         <div className="empty">
