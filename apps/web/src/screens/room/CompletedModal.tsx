@@ -73,7 +73,7 @@ export function CompletedModal({
     if (rankStatus !== 'saved') return;
     let cancelled = false;
     fetchRanking({ image: imageId, pieces: pieceCount, players: teamSize, period: 'all' })
-      .then((entries) => !cancelled && setRanking(entries))
+      .then((page) => !cancelled && setRanking(page.entries))
       .catch(() => !cancelled && setRanking([]));
     return () => {
       cancelled = true;
