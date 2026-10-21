@@ -1,5 +1,5 @@
-import { neighborsOf, type Point, type Puzzle } from './puzzle';
-import { createRandom, uniform } from './random';
+import { neighborsOf, type PieceDef, type Point, type Puzzle } from './puzzle';
+import { createRandom, uniform, type Random } from './random';
 
 /**
  * Peças encaixadas andam juntas. Como dentro de um grupo todas estão na posição relativa
@@ -20,6 +20,28 @@ export interface DropResult {
 
 /** Distância máxima (relativa ao lado menor da peça) para o encaixe "puxar" a peça. */
 const SNAP_RATIO = 0.25;
+/** Tentativas de achar um lugar livre ao reespalhar antes de aceitar cair sobre um bloco. */
+const SCATTER_TRIES = 20;
+
+interface Rect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** Deslocamento aleatório que põe a peça numa área 2× maior que a imagem, centrada nela. */
+function scatterOffset(puzzle: Puzzle, random: Random, piece: PieceDef): Point {
+  const { width, height, pieceWidth, pieceHeight } = puzzle;
+  return {
+    x: uniform(random, -width / 2, width * 1.5 - pieceWidth) - piece.x,
+    y: uniform(random, -height / 2, height * 1.5 - pieceHeight) - piece.y,
+  };
+}
+
+function overlaps(a: Rect, b: Rect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+}
 
 export class PuzzleEngine {
   readonly snapDistance: number;
@@ -47,12 +69,36 @@ export class PuzzleEngine {
   /** Espalha as peças numa área 2× maior que a imagem, de forma reproduzível pelo seed. */
   static scattered(puzzle: Puzzle): PuzzleEngine {
     const random = createRandom(`${puzzle.seed}:scatter`);
-    const { width, height, pieceWidth, pieceHeight } = puzzle;
-    const offsets = puzzle.pieces.map((piece) => ({
-      x: uniform(random, -width / 2, width * 1.5 - pieceWidth) - piece.x,
-      y: uniform(random, -height / 2, height * 1.5 - pieceHeight) - piece.y,
-    }));
+    const offsets = puzzle.pieces.map((piece) => scatterOffset(puzzle, random, piece));
     return new PuzzleEngine(puzzle, offsets);
+  }
+
+  /**
+   * Reespalha as peças soltas (grupos de uma peça só) pela mesma área do começo, evitando cair
+   * em cima dos blocos já montados, que ficam onde estão. Devolve os grupos que mudaram de lugar.
+   *
+   * `canMove` permite poupar peças — no multiplayer, as que algum jogador está segurando.
+   */
+  scatterLoose(random: Random, canMove: (group: GroupState) => boolean = () => true): number[] {
+    const groups = [...this.groups.values()];
+    const blocks = groups.filter((g) => g.pieceIds.length > 1).map((g) => this.bounds(g));
+    const moved: number[] = [];
+    for (const group of groups) {
+      if (group.pieceIds.length > 1 || !canMove(group)) continue;
+      const piece = this.puzzle.pieces[group.pieceIds[0]!]!;
+      let offset = scatterOffset(this.puzzle, random, piece);
+      for (
+        let tries = 1;
+        tries < SCATTER_TRIES && blocks.some((b) => overlaps(b, this.pieceRect(piece, offset)));
+        tries++
+      ) {
+        offset = scatterOffset(this.puzzle, random, piece);
+      }
+      group.x = offset.x;
+      group.y = offset.y;
+      moved.push(group.id);
+    }
+    return moved;
   }
 
   get groupCount(): number {
@@ -125,6 +171,29 @@ export class PuzzleEngine {
       }
     }
     return undefined;
+  }
+
+  /** Retângulo da peça (sem as abas) se o grupo dela estivesse no deslocamento dado. */
+  private pieceRect(piece: PieceDef, offset: Point): Rect {
+    const left = piece.x + offset.x;
+    const top = piece.y + offset.y;
+    return {
+      left,
+      top,
+      right: left + this.puzzle.pieceWidth,
+      bottom: top + this.puzzle.pieceHeight,
+    };
+  }
+
+  /** Retângulo que envolve todas as peças do grupo. */
+  private bounds(group: GroupState): Rect {
+    const rects = group.pieceIds.map((id) => this.pieceRect(this.puzzle.pieces[id]!, group));
+    return {
+      left: Math.min(...rects.map((r) => r.left)),
+      top: Math.min(...rects.map((r) => r.top)),
+      right: Math.max(...rects.map((r) => r.right)),
+      bottom: Math.max(...rects.map((r) => r.bottom)),
+    };
   }
 
   private absorb(group: GroupState, other: GroupState): void {
