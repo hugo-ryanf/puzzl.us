@@ -57,6 +57,13 @@
       "when": 1792604871883,
       "tag": "0007_partidas-salvas",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792606400032,
+      "tag": "0008_comunidade",
+      "breakpoints": true
     }
   ]
 }
