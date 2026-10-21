@@ -6,6 +6,7 @@ import { puzzleImageInfo } from '../board/images';
 import { usePuzzleImage } from '../board/usePuzzleImage';
 import { formatDuration } from '../format';
 import type { Community } from '../net/community';
+import type { Friends } from '../net/friends';
 import { leaveRoom, rejoinRoom, type PuzzleRoom } from '../net/connection';
 import { loadPlayerName } from '../net/playerName';
 import { useRoomSnapshot, type RoomSnapshot } from '../net/useRoomSnapshot';
@@ -22,9 +23,18 @@ interface RoomScreenProps {
   onShowRanking: (query: RankingQuery) => void;
   /** Logado: nome da conta e como publicar (a foto própria, no fim da partida). */
   account?: { name: string; publish: Community['publish'] };
+  /** Logado: amigos para chamar pelo "Convidar". */
+  friends?: Friends;
 }
 
-export function RoomScreen({ room, onLeave, onRejoin, onShowRanking, account }: RoomScreenProps) {
+export function RoomScreen({
+  room,
+  onLeave,
+  onRejoin,
+  onShowRanking,
+  account,
+  friends,
+}: RoomScreenProps) {
   const snapshot = useRoomSnapshot(room);
   const solo = snapshot.maxPlayers === 1;
   // Solo não entra na chamada: não há com quem falar (e poupa a cota do LiveKit).
@@ -104,6 +114,12 @@ export function RoomScreen({ room, onLeave, onRejoin, onShowRanking, account }: 
         onLeave={leave}
         onSaveAndLeave={isOwner && snapshot.phase === 'playing' ? saveAndLeave : undefined}
         saving={saving}
+        friends={
+          friends?.data && {
+            list: friends.data.friends,
+            invite: (friendId) => friends.invite({ friendId, roomCode: room.roomId }),
+          }
+        }
       />
       {reconnecting && <div className="banner">Conexão caiu — reconectando…</div>}
       {saveError && <div className="banner">Não deu para salvar agora. Tente de novo.</div>}
