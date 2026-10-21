@@ -5,8 +5,11 @@ import { PIECE_COUNT_PRESETS } from './grid';
 /** Nome do tipo de sala registrado no servidor Colyseus. */
 export const ROOM_NAME = 'puzzle';
 
-/** A ideia é jogar em 2–4; acima de 8 a mesa fica caótica e o tráfego cresce à toa. */
-export const MAX_PLAYERS = 8;
+/** Solo, dupla, trio ou quarteto: as quatro modalidades do ranking. */
+export const MAX_PLAYERS = 4;
+
+/** imageId especial ao criar a sala: o servidor sorteia uma foto do catálogo. */
+export const RANDOM_IMAGE = 'random';
 
 /** Uma cor por jogador, na ordem em que entram (borda da peça segurada e cursor). */
 export const PLAYER_COLORS = [
@@ -28,6 +31,8 @@ const pieceCount = z
 const catalogImageId = z
   .string()
   .refine((id) => findCatalogImage(id) !== undefined, 'Imagem inválida');
+/** 1 = solo (começa na hora, sem sala de espera); 2–4 = multiplayer, trava quando enche. */
+const maxPlayers = z.number().int().min(1).max(MAX_PLAYERS);
 const groupId = z.number().int().nonnegative();
 /** Limite generoso: a mesa ocupa ~2× a imagem; só barramos valores absurdos. */
 const coordinate = z.number().min(-100_000).max(100_000);
@@ -82,7 +87,11 @@ export const JoinOptions = z.object({
 });
 export type JoinOptions = z.infer<typeof JoinOptions>;
 
-export const CreateRoomOptions = JoinOptions.extend({ pieceCount, imageId });
+export const CreateRoomOptions = JoinOptions.extend({
+  pieceCount,
+  imageId: z.union([imageId, z.literal(RANDOM_IMAGE)]),
+  maxPlayers: maxPlayers.default(MAX_PLAYERS),
+});
 export type CreateRoomOptions = z.infer<typeof CreateRoomOptions>;
 
 // ── Cliente → servidor durante o jogo ───────────────────────────────────────

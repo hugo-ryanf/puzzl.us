@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Room, validate, type Client, type Delayed } from '@colyseus/core';
 import {
+  CATALOG,
   CreateRoomOptions,
   CursorMessage,
   GrabMessage,
@@ -12,6 +13,7 @@ import {
   PlayerSchema,
   PuzzleConfigSchema,
   PuzzleEngine,
+  RANDOM_IMAGE,
   RoomState,
   findCatalogImage,
   generatePuzzle,
@@ -40,8 +42,10 @@ const SCATTER_COOLDOWN_MS = 2000;
  * que o Colyseus sincroniza com todos.
  *
  * Ciclo: lobby (esperando o anfitrião) → playing (relógio correndo) → completed (grava no ranking).
+ * Sala solo (maxPlayers = 1) pula o lobby: começa assim que o jogador entra.
  */
 export class PuzzleRoom extends Room<{ state: RoomState }> {
+  /** Ajustado no onCreate para as vagas escolhidas; cheia, o Colyseus trava a sala sozinho. */
   maxClients = MAX_PLAYERS;
   /** Movimentos (~20/s) + cursor (~20/s) com folga; acima disso o cliente é desconectado. */
   maxMessagesPerSecond = 100;
@@ -75,7 +79,14 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   };
 
   async onCreate(rawOptions: unknown) {
-    const { pieceCount, imageId } = CreateRoomOptions.parse(rawOptions);
+    const options = CreateRoomOptions.parse(rawOptions);
+    const { pieceCount, maxPlayers } = options;
+    // "Aleatória": o servidor sorteia, assim ninguém escolhe a foto pelo console do navegador.
+    const imageId =
+      options.imageId === RANDOM_IMAGE
+        ? CATALOG[Math.floor(Math.random() * CATALOG.length)]!.id
+        : options.imageId;
+    this.maxClients = maxPlayers;
     // O puzzle usa o tamanho real da imagem (em pixels).
     const { width, height } = await this.imageSize(imageId);
     this.roomId = await uniqueRoomCode();
@@ -84,7 +95,16 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     this.engine = PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height }));
 
     this.state = new RoomState({
-      config: new PuzzleConfigSchema({ imageId, seed, rows, cols, width, height, pieceCount }),
+      config: new PuzzleConfigSchema({
+        imageId,
+        seed,
+        rows,
+        cols,
+        width,
+        height,
+        pieceCount,
+        maxPlayers,
+      }),
     });
     for (const group of this.engine.allGroups()) {
       this.state.groups.set(String(group.id), new GroupSchema({ x: group.x, y: group.y }));
@@ -112,6 +132,8 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     this.state.players.set(client.sessionId, new PlayerSchema({ name, color }));
     this.guests.set(client.sessionId, guestId);
     if (!this.state.hostId) this.state.hostId = client.sessionId;
+    // Solo não tem ninguém para esperar: o relógio começa já.
+    if (this.state.config.maxPlayers === 1) this.startPlaying();
   }
 
   /** Queda sem "tchau": solta o que ele segurava e guarda a vaga por um tempo. */
@@ -145,8 +167,14 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     return this.state.phase as GamePhase;
   }
 
+  /** "Começar" do anfitrião no lobby. */
   private start(client: Client) {
-    if (this.phase !== 'lobby' || client.sessionId !== this.state.hostId) return;
+    if (client.sessionId !== this.state.hostId) return;
+    this.startPlaying();
+  }
+
+  private startPlaying() {
+    if (this.phase !== 'lobby') return;
     this.state.phase = 'playing' satisfies GamePhase;
     this.startedAt = Date.now();
     this.clockTimer = this.clock.setInterval(() => {

@@ -17,6 +17,8 @@ export const PuzzleConfigSchema = schema(
     height: t.uint16(),
     /** Tamanho escolhido na criação (categoria do ranking); rows × cols chega perto dele. */
     pieceCount: t.uint16(),
+    /** Vagas da sala: 1 = solo (sem sala de espera nem chamada); 2–4 = multiplayer. */
+    maxPlayers: t.uint8().default(4),
   },
   'PuzzleConfigSchema',
 );
