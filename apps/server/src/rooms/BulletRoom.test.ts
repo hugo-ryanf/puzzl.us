@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { matchMaker, type Server } from '@colyseus/core';
 import { ColyseusSDK } from '@colyseus/sdk';
-import { BULLET_ROOM, RoomState, type BoardSchema, type BulletRankingEntry } from '@puzzle/shared';
+import {
+  BULLET_ROOM,
+  RoomState,
+  type BoardSchema,
+  type BulletRankingEntry,
+  type RankingPage,
+} from '@puzzle/shared';
 import { createGameServer } from '../app';
 import { createBulletStore, type BulletStore } from '../db/bulletStore';
 import type { AppDatabase } from '../db/database';
@@ -110,8 +116,8 @@ describe('BulletRoom', () => {
     const response = await fetch(
       `http://127.0.0.1:${PORT}/api/ranking/bullet?minutes=3&pieces=12&players=1`,
     );
-    const ranking = (await response.json()) as BulletRankingEntry[];
-    expect(ranking).toEqual([
+    const ranking = (await response.json()) as RankingPage<BulletRankingEntry>;
+    expect(ranking.entries).toEqual([
       expect.objectContaining({
         position: 1,
         players: ['Ana'],
@@ -173,13 +179,13 @@ describe('BulletStore', () => {
     const saved = await bullet.saveRun(run(['Bia', 'Caio'], 2, 0));
     expect(saved).toEqual({ rank: 3, rankToday: 3 });
 
-    const top = await bullet.leaderboard({ minutes: 5, pieces: 12, players: 2 });
+    const top = (await bullet.leaderboard({ minutes: 5, pieces: 12, players: 2 })).entries;
     expect(top.map((entry) => [entry.players, entry.solved, entry.partial])).toEqual([
       [['Ana', 'Caio'], 6, 5],
       [['Ana', 'Bia'], 6, 0],
       [['Bia', 'Caio'], 2, 0],
     ]);
     // Outra categoria não se mistura.
-    expect(await bullet.leaderboard({ minutes: 3, pieces: 12, players: 2 })).toEqual([]);
+    expect((await bullet.leaderboard({ minutes: 3, pieces: 12, players: 2 })).entries).toEqual([]);
   });
 });
