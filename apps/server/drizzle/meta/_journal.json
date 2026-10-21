@@ -71,6 +71,13 @@
       "when": 1792607531018,
       "tag": "0009_amigos",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792610017760,
+      "tag": "0010_bullet",
+      "breakpoints": true
     }
   ]
 }
