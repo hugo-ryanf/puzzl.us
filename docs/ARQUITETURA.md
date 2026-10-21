@@ -225,6 +225,21 @@ convidado; a conta é o que permite amigos, salvos, favoritos e publicar fotos.
 5. **Dev:** o Vite repassa `/api` e `/auth` ao servidor, então o site e a API são a mesma origem
    e o cookie vai junto sem CORS. Testes trocam o Google por um falso (`GoogleAuth`).
 
+## Concluídos, favoritos e "Meus records"
+
+Implementado na fase D (`apps/server/src/library/library.ts`), só para quem tem conta:
+
+- **Concluídos/records** não têm tabela própria: saem das partidas já gravadas (`games` +
+  `game_players` do jogador ligado à conta), agrupadas por foto + peças + modalidade, com o
+  melhor tempo, quantas vezes e a última data. O card do catálogo mostra **✓ Montado** se há
+  algum record daquela foto.
+- **Favoritos:** tabela `favorites (user_id, image_id)`; o marcador do card favorita (otimista
+  no cliente). A aba **Favoritos** é o Explorar filtrado; convidado que toca o marcador vai
+  para o login.
+- Rotas: `GET /api/me/library` (`{ records, favorites }`) e `PUT`/`DELETE
+/api/me/favorites/:imageId`, todas exigindo sessão (401 sem login).
+- Partidas com foto própria ficam fora do ranking e, por isso, fora dos records.
+
 ## Áudio
 
 Implementado na fase 4 (`apps/server/src/voice.ts`, `apps/web/src/voice/`):
