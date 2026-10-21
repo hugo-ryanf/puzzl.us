@@ -6,6 +6,7 @@ import {
   BATTLE_ROOM,
   BULLET_ROOM,
   BulletRankingQuery,
+  GUEST_HEADER,
   GeneralRankingQuery,
   PopularQuery,
   PIECE_COUNT_PRESETS,
@@ -14,7 +15,7 @@ import {
   RankingQuery,
 } from '@puzzle/shared';
 import type { AccountStore } from './auth/accounts';
-import { registerAuthRoutes, type AuthOptions } from './auth/routes';
+import { accountFromCookieHeader, registerAuthRoutes, type AuthOptions } from './auth/routes';
 import type { CommunityStore } from './community/community';
 import { registerCommunityRoutes } from './community/routes';
 import { PresenceRoom } from './friends/PresenceRoom';
@@ -126,6 +127,16 @@ export function createGameServer({
         app.get('/api/me', (_req, res) => res.json({ user: null, googleLogin: false }));
       }
 
+      /** O jogador de quem pede o ranking (para "Sua posição"): conta, ou convidado do navegador. */
+      const viewerOf = async (req: express.Request): Promise<string | undefined> => {
+        if (!store) return undefined;
+        const account = await accountFromCookieHeader(accounts, req.headers.cookie);
+        const header = req.get(GUEST_HEADER);
+        const guestId = header && /^[0-9a-f-]{36}$/i.test(header) ? header : undefined;
+        return store.playerIdFor({ userId: account?.id, guestId });
+      };
+      const noStore = (res: express.Response) => res.setHeader('Cache-Control', 'no-store');
+
       app.get('/api/ranking', async (req, res) => {
         const query = RankingQuery.safeParse(req.query);
         if (!query.success) {
@@ -136,7 +147,8 @@ export function createGameServer({
           res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
           return;
         }
-        res.json(await store.leaderboard(query.data));
+        noStore(res);
+        res.json(await store.leaderboard(query.data, await viewerOf(req)));
       });
 
       // Ranking geral da modalidade (soma de todas as fotos) no período.
@@ -150,7 +162,8 @@ export function createGameServer({
           res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
           return;
         }
-        res.json(await store.generalLeaderboard(query.data));
+        noStore(res);
+        res.json(await store.generalLeaderboard(query.data, await viewerOf(req)));
       });
 
       // Fotos mais jogadas na modalidade e no período: a escolha da foto no ranking.
@@ -178,7 +191,8 @@ export function createGameServer({
           res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
           return;
         }
-        res.json(await bullet.leaderboard(query.data));
+        noStore(res);
+        res.json(await bullet.leaderboard(query.data, await viewerOf(req)));
       });
 
       if (webDist) serveWebApp(app, webDist);
