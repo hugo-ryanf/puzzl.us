@@ -47,6 +47,8 @@ export interface RoomSnapshot {
   rank: number;
   /** Posição só entre as partidas de hoje, na mesma categoria. */
   rankToday: number;
+  /** Pontos que a partida valeu no ranking por pontos. */
+  points: number;
   teamSize: number;
   boards: Partial<Record<string, BoardView>>;
   /** Bullet: duração, tempo que falta, quebra-cabeça da vez, montados e o que ficou pela metade. */
@@ -109,6 +111,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     rankStatus: state.rankStatus as RankStatus,
     rank: state.rank,
     rankToday: state.rankToday,
+    points: state.points,
     teamSize: state.teamSize,
     boards,
     timeLimitMs: state.timeLimitMs,
@@ -159,6 +162,7 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
           'rankStatus',
           'rank',
           'rankToday',
+          'points',
           'teamSize',
           'remainingMs',
           'round',
