@@ -132,39 +132,72 @@ describe('GameStore — períodos', () => {
 
   it('a posição de hoje ignora partidas de outros dias', async () => {
     await store.saveGame(game([ana], 10_000, { finishedAt: daysAgo(3) }));
-    expect(await store.saveGame(game([bia], 20_000, { finishedAt: new Date() }))).toEqual({
+    expect(await store.saveGame(game([bia], 20_000, { finishedAt: new Date() }))).toMatchObject({
       rank: 2,
       rankToday: 1,
     });
   });
 });
 
-describe('GameStore — ranking geral', () => {
-  it('soma as peças de todas as fotos por equipe; quem montou mais peças fica na frente', async () => {
+describe('GameStore — pontos', () => {
+  it('sem partidas para comparar, a partida vale as peças (fator 1×)', async () => {
+    const saved = await store.saveGame(game([ana], 60_000, { pieceCount: 48 }));
+    expect(saved.points).toBe(48);
+  });
+
+  it('com o tempo típico da categoria: mais rápido vale mais, limitado a 2× e 0,5×', async () => {
+    // Cinco partidas de 100 s (em fotos diferentes) fazem o tempo típico de 100 peças solo.
+    for (const imageId of ['a', 'b', 'c', 'd', 'e']) {
+      await store.saveGame(game([caio], 100_000, { imageId }));
+    }
+    expect((await store.saveGame(game([ana], 50_000, { imageId: 'f' }))).points).toBe(200); // 2×
+    expect((await store.saveGame(game([ana], 20_000, { imageId: 'g' }))).points).toBe(200); // teto
+    expect((await store.saveGame(game([bia], 400_000, { imageId: 'h' }))).points).toBe(50); // piso
+  });
+
+  it('ranking soma a melhor partida de cada foto e tamanho; repetir não acumula', async () => {
     const now = new Date();
     await store.saveGame(game([ana, bia], 60_000, { pieceCount: 24, finishedAt: now }));
+    await store.saveGame(game([bia, ana], 30_000, { pieceCount: 24, finishedAt: now })); // repetiu
     await store.saveGame(
       game([bia, ana], 90_000, { pieceCount: 48, imageId: 'lago', finishedAt: now }),
     );
     await store.saveGame(game([caio, duda], 300_000, { pieceCount: 100, finishedAt: now }));
-    await store.saveGame(game([ana], 5_000, { pieceCount: 500, finishedAt: now })); // solo: outra modalidade
+    await store.saveGame(game([ana], 5_000, { pieceCount: 500, finishedAt: now })); // solo: outra
 
     expect(await store.generalLeaderboard({ players: 2, period: 'week' })).toEqual([
-      { position: 1, players: ['Caio', 'Duda'], points: 100, puzzles: 1, totalMs: 300_000 },
-      { position: 2, players: ['Ana', 'Bia'], points: 72, puzzles: 2, totalMs: 150_000 },
+      { position: 1, players: ['Caio', 'Duda'], points: 100, puzzles: 1 },
+      { position: 2, players: ['Ana', 'Bia'], points: 72, puzzles: 2 },
     ]);
   });
 
-  it('empate em pontos: ganha quem gastou menos tempo no total', async () => {
-    await store.saveGame(game([ana], 80_000, { pieceCount: 24, finishedAt: new Date() }));
+  it('empate em pontos: ganha quem montou mais quebra-cabeças diferentes', async () => {
+    await store.saveGame(game([ana], 80_000, { pieceCount: 48, finishedAt: new Date() }));
     await store.saveGame(game([bia], 40_000, { pieceCount: 24, finishedAt: new Date() }));
+    await store.saveGame(
+      game([bia], 40_000, { pieceCount: 24, imageId: 'lago', finishedAt: new Date() }),
+    );
     const top = await store.generalLeaderboard({ players: 1, period: 'day' });
-    expect(top.map((e) => e.players[0])).toEqual(['Bia', 'Ana']);
+    expect(top.map((e) => [e.players[0], e.points, e.puzzles])).toEqual([
+      ['Bia', 48, 2],
+      ['Ana', 48, 1],
+    ]);
   });
 
   it('respeita o período: partida antiga não soma na semana', async () => {
     await store.saveGame(game([ana], 10_000, { pieceCount: 1000, finishedAt: daysAgo(10) }));
     expect(await store.generalLeaderboard({ players: 1, period: 'week' })).toEqual([]);
     expect(await store.generalLeaderboard({ players: 1 })).toHaveLength(1);
+  });
+
+  it('fotos mais jogadas na modalidade e no período', async () => {
+    await store.saveGame(game([ana], 10_000, { imageId: 'lago' }));
+    await store.saveGame(game([bia], 10_000, { imageId: 'lago' }));
+    await store.saveGame(game([ana], 10_000, { imageId: 'praia' }));
+    await store.saveGame(game([ana, bia], 10_000, { imageId: 'deserto' })); // dupla: outra
+    expect(await store.popular({ players: 1 })).toEqual([
+      { imageId: 'lago', plays: 2 },
+      { imageId: 'praia', plays: 1 },
+    ]);
   });
 });
