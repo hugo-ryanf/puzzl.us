@@ -2767,6 +2767,22 @@ a.btn {
   }
 }
 
+/* Ranking: busca da foto e pontos da partida no resultado. */
+.ranking-search {
+  max-width: 420px;
+  margin-bottom: 8px;
+}
+
+.result-points {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* ── Bullet ────────────────────────────────────────────────────────────── */
 
 .solved-pill {
