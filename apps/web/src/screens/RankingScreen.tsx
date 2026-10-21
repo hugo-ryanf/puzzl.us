@@ -4,6 +4,10 @@ import {
   MAX_PLAYERS,
   PIECE_COUNT_PRESETS,
   RANKING_PERIODS,
+  BULLET_MINUTES,
+  BULLET_PIECES,
+  type BulletRankingEntry,
+  type BulletRankingQuery,
   type CommunityPuzzle,
   type GeneralRankingEntry,
   type RankingEntry,
@@ -12,23 +16,30 @@ import {
 } from '@puzzle/shared';
 import { catalogThumbUrl, puzzleImageInfo } from '../board/images';
 import { formatDuration } from '../format';
-import { fetchGeneralRanking, fetchRanking } from '../net/ranking';
+import { fetchBulletRanking, fetchGeneralRanking, fetchRanking } from '../net/ranking';
 import { Pips, difficultyOf } from '../ui/difficulty';
 
+/** O que abre o ranking: a categoria de uma foto e, vindo de um Bullet, a categoria dele. */
+export type RankingOpen = Partial<RankingQuery> & { bullet?: BulletRankingQuery };
+
 interface RankingScreenProps {
-  initial: RankingQuery;
+  initial: RankingQuery & { bullet?: BulletRankingQuery };
   /** Fotos publicadas também têm ranking (depois do catálogo nos filtros). */
   community: CommunityPuzzle[];
 }
 
-/** Por quebra-cabeça (melhor tempo numa foto) ou geral (peças somadas de todas as fotos). */
-type Tab = 'puzzle' | 'general';
+/**
+ * Por quebra-cabeça (melhor tempo numa foto), geral (peças somadas de todas as fotos) ou Bullet
+ * (quantos quebra-cabeças em X minutos).
+ */
+type Tab = 'puzzle' | 'general' | 'bullet';
 
 interface Loaded {
   /** De qual consulta é este resultado: se não bate com a atual, ainda está carregando. */
   key: string;
   entries?: RankingEntry[];
   general?: GeneralRankingEntry[];
+  bullet?: BulletRankingEntry[];
   error?: string;
 }
 
@@ -64,24 +75,36 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
         thumb: `/api/puzzles/${puzzle.id}/mini`,
       })),
   ];
-  const [tab, setTab] = useState<Tab>('puzzle');
-  const [query, setQuery] = useState(initial);
+  const [tab, setTab] = useState<Tab>(initial.bullet ? 'bullet' : 'puzzle');
+  const [query, setQuery] = useState<RankingQuery>(() => ({
+    ...initial,
+    players: initial.bullet?.players ?? initial.players,
+    period: initial.bullet?.period ?? initial.period,
+  }));
+  const [bulletCategory, setBulletCategory] = useState(() => ({
+    minutes: initial.bullet?.minutes ?? BULLET_MINUTES[1],
+    pieces: initial.bullet?.pieces ?? BULLET_PIECES[0],
+  }));
   const [loaded, setLoaded] = useState<Loaded>();
   const { players, period } = query;
   const key =
     tab === 'puzzle'
       ? `foto:${query.image}:${query.pieces}:${players}:${period}`
-      : `geral:${players}:${period}`;
+      : tab === 'bullet'
+        ? `bullet:${bulletCategory.minutes}:${bulletCategory.pieces}:${players}:${period}`
+        : `geral:${players}:${period}`;
 
   useEffect(() => {
     let current = true; // ignora respostas de consultas antigas (troca rápida de filtro)
     const request: Promise<Loaded> =
       tab === 'puzzle'
         ? fetchRanking(query).then((entries) => ({ key, entries }))
-        : fetchGeneralRanking({ players: query.players, period: query.period }).then((general) => ({
-            key,
-            general,
-          }));
+        : tab === 'bullet'
+          ? fetchBulletRanking({ ...bulletCategory, players, period }).then((bullet) => ({
+              key,
+              bullet,
+            }))
+          : fetchGeneralRanking({ players, period }).then((general) => ({ key, general }));
     request
       .then((result) => current && setLoaded(result))
       .catch(
@@ -91,7 +114,7 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
     return () => {
       current = false;
     };
-  }, [tab, query, key]);
+  }, [tab, query, key, bulletCategory, players, period]);
 
   const result = loaded?.key === key ? loaded : undefined;
   const imageTitle = puzzleImageInfo(query.image)?.title;
@@ -104,7 +127,9 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
           <p>
             {tab === 'puzzle'
               ? 'Melhor tempo de cada equipe em cada foto, medido pelo servidor.'
-              : 'Peças montadas somando todas as fotos. Empate: menos tempo no total.'}
+              : tab === 'bullet'
+                ? 'Quantos quebra-cabeças cada equipe montou no tempo. Empate: peças do último.'
+                : 'Peças montadas somando todas as fotos. Empate: menos tempo no total.'}
           </p>
         </div>
         <div className="chips" role="group" aria-label="Tipo de ranking">
@@ -123,6 +148,14 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
             onClick={() => setTab('general')}
           >
             Geral
+          </button>
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={tab === 'bullet'}
+            onClick={() => setTab('bullet')}
+          >
+            Bullet
           </button>
         </div>
       </div>
@@ -205,15 +238,58 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
         </>
       )}
 
+      {tab === 'bullet' && (
+        <>
+          <div className="filter-group" role="radiogroup" aria-labelledby="filter-minutes">
+            <span id="filter-minutes">Tempo</span>
+            <div className="chips">
+              {BULLET_MINUTES.map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  role="radio"
+                  aria-checked={minutes === bulletCategory.minutes}
+                  className="chip"
+                  onClick={() => setBulletCategory({ ...bulletCategory, minutes })}
+                >
+                  {minutes} min
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="filter-group" role="radiogroup" aria-labelledby="filter-bullet-pieces">
+            <span id="filter-bullet-pieces">Peças</span>
+            <div className="chips">
+              {BULLET_PIECES.map((pieces) => (
+                <button
+                  key={pieces}
+                  type="button"
+                  role="radio"
+                  aria-checked={pieces === bulletCategory.pieces}
+                  className="chip"
+                  onClick={() => setBulletCategory({ ...bulletCategory, pieces })}
+                >
+                  {pieces}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {!result && <p className="loading">Carregando…</p>}
       {result?.error && <p className="error">{result.error}</p>}
-      {(result?.entries?.length === 0 || result?.general?.length === 0) && (
+      {(result?.entries?.length === 0 ||
+        result?.general?.length === 0 ||
+        result?.bullet?.length === 0) && (
         <div className="empty">
           <strong>Ninguém no pódio {PERIOD_PHRASES[period]}</strong>
           <p>
             {tab === 'puzzle'
               ? `Ninguém montou “${imageTitle}” com ${query.pieces} peças em ${teamLabel(players)} ${PERIOD_PHRASES[period]}. `
-              : `Nenhum quebra-cabeça completado em ${teamLabel(players)} ${PERIOD_PHRASES[period]}. `}
+              : tab === 'bullet'
+                ? `Nenhum Bullet de ${bulletCategory.minutes} min com ${bulletCategory.pieces} peças em ${teamLabel(players)} ${PERIOD_PHRASES[period]}. `
+                : `Nenhum quebra-cabeça completado em ${teamLabel(players)} ${PERIOD_PHRASES[period]}. `}
             Seja o primeiro!
           </p>
         </div>
@@ -228,6 +304,25 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
               <span>{entry.players.join(' & ')}</span>
               <span className="time">{formatDuration(entry.durationMs)}</span>
               <span className="date">{dateFormat.format(new Date(entry.finishedAt))}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {!!result?.bullet?.length && (
+        <ol className="ranking-list" aria-label={`Ranking do Bullet: ${teamLabel(players)}`}>
+          {result.bullet.map((entry) => (
+            <li key={entry.position}>
+              <span className={entry.position <= 3 ? 'position podium' : 'position'}>
+                {entry.position}º
+              </span>
+              <span>{entry.players.join(' & ')}</span>
+              <span className="time">
+                {entry.solved === 1 ? '1 montado' : `${entry.solved} montados`}
+              </span>
+              <span className="date">
+                {entry.partial > 0 && `+${entry.partial} peças · `}
+                {dateFormat.format(new Date(entry.finishedAt))}
+              </span>
             </li>
           ))}
         </ol>
