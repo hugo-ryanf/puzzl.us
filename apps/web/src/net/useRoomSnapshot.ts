@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Callbacks } from '@colyseus/sdk';
-import type { GamePhase, RankStatus } from '@puzzle/shared';
+import type { BattleTeam, GameMode, GamePhase, RankStatus } from '@puzzle/shared';
 import type { PuzzleRoom } from './connection';
 
 export interface PlayerView {
@@ -10,10 +10,22 @@ export interface PlayerView {
   connected: boolean;
   /** Encaixes feitos por este jogador (contribuição no resultado). */
   snaps: number;
+  /** Lado na Batalha ('' nos outros modos). */
+  team: BattleTeam | '';
+}
+
+/** Progresso de um tabuleiro dos modos novos ('main' no Bullet; 'a' e 'b' na Batalha). */
+export interface BoardView {
+  imageId: string;
+  pieces: number;
+  placed: number;
+  done: boolean;
+  durationMs: number;
 }
 
 /** Fotografia do estado da sala em objetos simples, para o React renderizar a interface. */
 export interface RoomSnapshot {
+  mode: GameMode;
   players: PlayerView[];
   hostId: string;
   /** sessionId de quem criou a sala logado (pode salvar a partida); vazio se não estiver. */
@@ -36,6 +48,16 @@ export interface RoomSnapshot {
   /** Posição só entre as partidas de hoje, na mesma categoria. */
   rankToday: number;
   teamSize: number;
+  boards: Partial<Record<string, BoardView>>;
+  /** Bullet: duração, tempo que falta, quebra-cabeça da vez, montados e o que ficou pela metade. */
+  timeLimitMs: number;
+  remainingMs: number;
+  round: number;
+  solved: number;
+  partial: number;
+  /** Batalha: lado vencedor ('' até alguém terminar) e se foi por W.O. */
+  winner: BattleTeam | '';
+  walkover: boolean;
 }
 
 /** Soma as peças de todo grupo com 2+ peças (peça sozinha ainda não foi encaixada). */
@@ -49,13 +71,29 @@ function countPlaced(pieceGroup: Iterable<number>): number {
 
 function readSnapshot(room: PuzzleRoom): RoomSnapshot {
   const { state } = room;
+  const boards: RoomSnapshot['boards'] = {};
+  for (const [key, board] of state.boards ?? []) {
+    boards[key] = {
+      imageId: board.config.imageId,
+      pieces: board.pieceGroup.length,
+      placed: countPlaced(board.pieceGroup),
+      done: board.done,
+      durationMs: board.durationMs,
+    };
+  }
+  // Bullet: o progresso mostrado é o do quebra-cabeça da vez; Batalha: o do meu lado.
+  const myTeam = state.players.get(room.sessionId)?.team;
+  const main = state.boards?.get('main') ?? (myTeam ? state.boards?.get(myTeam) : undefined);
+  const pieceGroup = main?.pieceGroup ?? state.pieceGroup;
   return {
+    mode: (state.mode || 'classic') as GameMode,
     players: [...state.players.entries()].map(([sessionId, p]) => ({
       sessionId,
       name: p.name,
       color: p.color,
       connected: p.connected,
       snaps: p.snaps,
+      team: p.team as BattleTeam | '',
     })),
     hostId: state.hostId,
     ownerId: state.ownerId,
@@ -63,15 +101,23 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     imageId: state.config.imageId,
     pieceCount: state.config.pieceCount,
     maxPlayers: state.config.maxPlayers,
-    pieces: state.pieceGroup.length,
-    groups: state.groups.size,
-    placed: countPlaced(state.pieceGroup),
+    pieces: pieceGroup.length,
+    groups: (main?.groups ?? state.groups).size,
+    placed: countPlaced(pieceGroup),
     elapsedMs: state.elapsedMs,
     durationMs: state.durationMs,
     rankStatus: state.rankStatus as RankStatus,
     rank: state.rank,
     rankToday: state.rankToday,
     teamSize: state.teamSize,
+    boards,
+    timeLimitMs: state.timeLimitMs,
+    remainingMs: state.remainingMs,
+    round: state.round,
+    solved: state.solved,
+    partial: state.partial,
+    winner: state.winner as BattleTeam | '',
+    walkover: state.walkover,
   };
 }
 
@@ -94,6 +140,15 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
       // `false`: não dispara para os grupos que já existem (seriam centenas de refresh à toa).
       callbacks.onAdd('groups', refresh, false),
       callbacks.onRemove('groups', refresh),
+      // Modos novos: o progresso de cada tabuleiro (e o tabuleiro trocado no Bullet).
+      callbacks.onAdd('boards', (board) => {
+        unsubscribers.push(
+          callbacks.onRemove(board, 'groups', refresh),
+          callbacks.listen(board, 'done', refresh),
+        );
+        refresh();
+      }),
+      callbacks.onRemove('boards', refresh),
       ...(
         [
           'phase',
@@ -105,6 +160,12 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
           'rank',
           'rankToday',
           'teamSize',
+          'remainingMs',
+          'round',
+          'solved',
+          'partial',
+          'winner',
+          'walkover',
         ] as const
       ).map((field) => callbacks.listen(field, refresh)),
     );
