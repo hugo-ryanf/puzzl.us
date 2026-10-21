@@ -38,10 +38,11 @@ import {
 } from '@puzzle/shared';
 import type { AccountStore } from '../auth/accounts';
 import { accountFromCookieHeader } from '../auth/routes';
-import type { GameStore } from '../db/gameStore';
+import type { GameResult, GameStore } from '../db/gameStore';
 import type { UploadStore } from '../uploads/uploadStore';
 import type { VoiceTokenIssuer } from '../voice';
 import { uniqueRoomCode } from './roomCode';
+import type { CommunityStore } from '../community/community';
 import type { SavedGameStore } from './savedGames';
 import { SNAPSHOT_VERSION, type RoomSnapshot, type SnapshotStore } from './snapshots';
 
@@ -85,6 +86,8 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   protected accounts?: AccountStore;
   /** Partidas salvas ("Em andamento"); injetado por createGameServer. Sem banco, undefined. */
   protected savedGames?: SavedGameStore;
+  /** Fotos publicadas (entram no ranking); injetado por createGameServer. Sem banco, undefined. */
+  protected community?: CommunityStore;
 
   private engine!: PuzzleEngine;
   /**
@@ -511,30 +514,37 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     this.state.teamSize = new Set(team.map(identityKey)).size;
     void this.lock();
 
-    // Foto enviada é única: não há com quem comparar, então não entra no ranking.
-    if (uploadIdOf(this.state.config.imageId)) {
-      this.state.rankStatus = 'unranked' satisfies RankStatus;
-      return;
-    }
     if (!this.store) {
       this.state.rankStatus = 'unavailable' satisfies RankStatus;
       return;
     }
     this.state.rankStatus = 'saving' satisfies RankStatus;
+    void this.saveResult(team, finishedAt);
+  }
+
+  /**
+   * Grava no ranking. Foto enviada só entra se estiver publicada: antes disso ela é única e não
+   * há com quem comparar.
+   */
+  private async saveResult(team: GameResult['players'], finishedAt: number) {
     const { config } = this.state;
-    this.store
-      .saveGame({
-        roomCode: this.roomId,
-        imageId: config.imageId,
-        pieceCount: config.pieceCount,
-        rows: config.rows,
-        cols: config.cols,
-        seed: config.seed,
-        startedAt: new Date(this.startedAt),
-        finishedAt: new Date(finishedAt),
-        durationMs: this.state.durationMs,
-        players: team,
-      })
+    const uploadId = uploadIdOf(config.imageId);
+    if (uploadId && !(await this.community?.isPublished(uploadId).catch(() => false))) {
+      this.state.rankStatus = 'unranked' satisfies RankStatus;
+      return;
+    }
+    await this.store!.saveGame({
+      roomCode: this.roomId,
+      imageId: config.imageId,
+      pieceCount: config.pieceCount,
+      rows: config.rows,
+      cols: config.cols,
+      seed: config.seed,
+      startedAt: new Date(this.startedAt),
+      finishedAt: new Date(finishedAt),
+      durationMs: this.state.durationMs,
+      players: team,
+    })
       .then(({ rank, rankToday }) => {
         this.state.rank = rank;
         this.state.rankToday = rankToday;
