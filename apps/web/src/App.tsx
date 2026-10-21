@@ -50,9 +50,9 @@ const DEFAULT_RANKING: RankingQuery = {
 export function App() {
   const [room, setRoom] = useState<PuzzleRoom | null>(null);
   // Ranking aberto por cima (do menu ou do fim da partida); a sala continua conectada por trás.
-  const [ranking, setRanking] = useState<(RankingQuery & { bullet?: BulletRankingQuery }) | null>(
-    null,
-  );
+  const [ranking, setRanking] = useState<
+    (RankingQuery & { bullet?: BulletRankingQuery; tab?: 'general' }) | null
+  >(null);
   /** Tela da barra lateral (o ranking, quando aberto, fica por cima dela). */
   const [section, setSection] = useState<Exclude<Section, 'ranking'>>(() =>
     friendCodeFromUrl() ? 'friends' : 'explore',
@@ -174,7 +174,7 @@ export function App() {
       <AppShell
         active={ranking ? 'ranking' : section}
         onNavigate={(next) => {
-          if (next === 'ranking') return setRanking(DEFAULT_RANKING);
+          if (next === 'ranking') return setRanking({ ...DEFAULT_RANKING, tab: 'general' });
           setRanking(null);
           setSection(next);
         }}
@@ -199,6 +199,11 @@ export function App() {
             key={JSON.stringify(ranking)}
             initial={ranking}
             community={community.puzzles}
+            onCreateRoom={() => {
+              setRanking(null);
+              setSection('explore');
+              setCreateRequested(true);
+            }}
           />
         ) : section === 'friends' ? (
           <FriendsScreen
