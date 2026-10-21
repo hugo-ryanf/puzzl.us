@@ -1,16 +1,19 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, lt, notExists, sql } from 'drizzle-orm';
+import { and, eq, lt, ne, notExists, sql } from 'drizzle-orm';
 import { UPLOAD_PREFIX } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
-import { savedGames, uploads } from '../db/schema';
+import { communityPuzzles, savedGames, uploads } from '../db/schema';
 import type { ProcessedUpload } from './processUpload';
 
 /** Fotos sem uso por mais que isso são apagadas. */
 export const UPLOAD_TTL_DAYS = 7;
 
 export interface UploadStore {
-  /** Guarda a foto já processada e devolve o id (aleatório, 22 caracteres). */
-  save(upload: ProcessedUpload): Promise<string>;
+  /**
+   * Guarda a foto já processada e devolve o id (aleatório, 22 caracteres). Com a conta de quem
+   * enviou, ela pode publicar a foto depois.
+   */
+  save(upload: ProcessedUpload, ownerUserId?: string): Promise<string>;
   /** Só largura/altura (sem carregar os bytes): é o que a sala precisa para montar a grade. */
   size(id: string): Promise<{ width: number; height: number } | undefined>;
   data(id: string): Promise<Buffer | undefined>;
@@ -22,10 +25,10 @@ export interface UploadStore {
 
 export function createUploadStore(db: AppDatabase): UploadStore {
   return {
-    async save({ data, width, height }) {
+    async save({ data, width, height }, ownerUserId) {
       // 16 bytes aleatórios = 128 bits: impossível de adivinhar ou enumerar.
       const id = randomBytes(16).toString('base64url');
-      await db.insert(uploads).values({ id, data, width, height });
+      await db.insert(uploads).values({ id, data, width, height, ownerUserId });
       return id;
     },
 
@@ -58,6 +61,18 @@ export function createUploadStore(db: AppDatabase): UploadStore {
                 .select({ id: savedGames.id })
                 .from(savedGames)
                 .where(eq(savedGames.imageId, sql`${UPLOAD_PREFIX} || ${uploads.id}`)),
+            ),
+            // Publicada fica no ar enquanto não for removida.
+            notExists(
+              db
+                .select({ id: communityPuzzles.id })
+                .from(communityPuzzles)
+                .where(
+                  and(
+                    eq(communityPuzzles.uploadId, uploads.id),
+                    ne(communityPuzzles.status, 'removed'),
+                  ),
+                ),
             ),
           ),
         )
