@@ -31,6 +31,8 @@ import { uniqueRoomCode } from './roomCode';
 const RECONNECT_SECONDS = 30;
 /** O cliente interpola entre atualizações; 1/s basta para o relógio não derivar. */
 const CLOCK_UPDATE_MS = 1000;
+/** "Espalhar" mexe na mesa de todos: no máximo uma vez a cada 2 s, para não virar bagunça. */
+const SCATTER_COOLDOWN_MS = 2000;
 
 /**
  * Uma sala = um quebra-cabeça. O PuzzleEngine (o mesmo do modo local) é a autoridade:
@@ -55,6 +57,7 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   /** guestId de cada sessão: identifica o jogador no ranking sem ir para o estado público. */
   private readonly guests = new Map<string, string>();
   private startedAt = 0;
+  private lastScatterAt = 0;
   private clockTimer?: Delayed;
 
   messages = {
@@ -62,6 +65,7 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
     grab: validate(GrabMessage, (client, { groupId }) => this.grab(client, groupId)),
     move: validate(MoveMessage, (client, message) => this.move(client, message)),
     drop: validate(MoveMessage, (client, message) => this.drop(client, message)),
+    scatter: () => this.scatter(),
     cursor: validate(CursorMessage, (client, { x, y }) => {
       const message: CursorBroadcast = { sessionId: client.sessionId, x, y };
       this.broadcast('cursor', message, { except: client });
@@ -192,6 +196,9 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
       (other) => this.state.groups.get(String(other.id))?.heldBy === '',
     );
 
+    const player = this.state.players.get(client.sessionId);
+    if (player) player.snaps += absorbedGroupIds.length;
+
     const merged = this.engine.getGroup(groupId);
     group.x = merged.x;
     group.y = merged.y;
@@ -201,6 +208,23 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
       if (this.state.pieceGroup[pieceId] !== groupId) this.state.pieceGroup[pieceId] = groupId;
     }
     if (completed) this.finish();
+  }
+
+  /** Reespalha as peças soltas pela mesa (para todos); blocos montados e peças na mão ficam. */
+  private scatter() {
+    const now = Date.now();
+    if (this.phase !== 'playing' || now - this.lastScatterAt < SCATTER_COOLDOWN_MS) return;
+    this.lastScatterAt = now;
+    const moved = this.engine.scatterLoose(
+      Math.random,
+      (group) => this.state.groups.get(String(group.id))?.heldBy === '',
+    );
+    for (const groupId of moved) {
+      const { x, y } = this.engine.getGroup(groupId);
+      const group = this.state.groups.get(String(groupId))!;
+      group.x = x;
+      group.y = y;
+    }
   }
 
   /** Para o relógio, fecha a sala e registra o tempo (sem travar o jogo esperando o banco). */
