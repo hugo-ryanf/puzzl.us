@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PuzzleEngine } from './engine';
 import { generatePuzzle } from './puzzle';
+import { createRandom } from './random';
 
 // Grade 1×3 com peças de 100×100: peças 0-1-2 em linha; 0 e 2 não são vizinhas.
 const puzzle = generatePuzzle({ seed: 'motor', rows: 1, cols: 3, width: 300, height: 100 });
@@ -65,5 +66,51 @@ describe('PuzzleEngine', () => {
     expect([0, 1, 2].map((id) => a.piecePosition(id))).toEqual(
       [0, 1, 2].map((id) => b.piecePosition(id)),
     );
+  });
+
+  describe('scatterLoose', () => {
+    // Grade 4×4: dá espaço para ter um bloco montado e várias peças soltas.
+    const big = generatePuzzle({ seed: 'espalhar', rows: 4, cols: 4, width: 400, height: 400 });
+    /** Peças 0 e 1 encaixadas num bloco; o resto solto. */
+    const withBlock = () => {
+      const engine = PuzzleEngine.scattered(big);
+      engine.moveGroup(1, engine.getGroup(0).x, engine.getGroup(0).y);
+      engine.dropGroup(1);
+      return engine;
+    };
+
+    it('move só as peças soltas e deixa o bloco montado onde está', () => {
+      const engine = withBlock();
+      const block = { ...engine.groupOf(0) };
+      const moved = engine.scatterLoose(createRandom('teste'));
+
+      expect(moved).toHaveLength(14);
+      expect(moved).not.toContain(block.id);
+      expect(engine.groupOf(0)).toMatchObject({ x: block.x, y: block.y });
+    });
+
+    it('não cai em cima de um bloco montado', () => {
+      const engine = withBlock();
+      engine.scatterLoose(createRandom('teste'));
+      // Bloco = peças 0 e 1 lado a lado: duas peças de largura, uma de altura.
+      const block = engine.piecePosition(0);
+      for (let id = 2; id < big.pieces.length; id++) {
+        const { x, y } = engine.piecePosition(id);
+        const apart =
+          x >= block.x + big.pieceWidth * 2 ||
+          block.x >= x + big.pieceWidth ||
+          y >= block.y + big.pieceHeight ||
+          block.y >= y + big.pieceHeight;
+        expect(apart).toBe(true);
+      }
+    });
+
+    it('poupa as peças vetadas por canMove', () => {
+      const engine = withBlock();
+      const before = { ...engine.getGroup(5) };
+      const moved = engine.scatterLoose(createRandom('teste'), (group) => group.id !== 5);
+      expect(moved).not.toContain(5);
+      expect(engine.getGroup(5)).toMatchObject({ x: before.x, y: before.y });
+    });
   });
 });
