@@ -7,6 +7,9 @@ coverage/
 .env.*
 !.env.example
 
+# Fotos originais do catálogo (grandes, com EXIF): só a versão processada vai para o git.
+catalogo/originais/
+
 .DS_Store
 Thumbs.db
 *.log
