@@ -31,7 +31,7 @@ export function GameClock({ phase, elapsedMs, durationMs }: GameClockProps) {
       ? durationMs
       : phase === 'playing'
         ? Math.max(elapsedMs, interpolated) // nunca volta para trás quando chega o valor novo
-        : 0;
+        : elapsedMs; // lobby: 0 numa sala nova, o tempo acumulado numa partida retomada
 
   return (
     <span className="clock" title="Tempo de montagem (medido no servidor)">
