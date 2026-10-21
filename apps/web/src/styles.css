@@ -2549,6 +2549,51 @@ a.btn {
   }
 }
 
+/* ── Em andamento (partidas salvas) ────────────────────────────────────── */
+
+.saved-list li {
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+}
+
+.saved-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.saved-progress .progress-bar {
+  width: 120px;
+  height: 6px;
+}
+
+.saved-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Celular: tempo ao lado do título, botões numa linha só embaixo. */
+@media (max-width: 640px) {
+  .saved-list li {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+  }
+
+  .saved-actions {
+    grid-column: 1 / -1;
+  }
+
+  .saved-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
 /* ── Página de texto (política de privacidade) ──────────────────────────── */
 
 .main.standalone > a.btn {
