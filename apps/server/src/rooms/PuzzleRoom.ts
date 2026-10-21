@@ -368,9 +368,10 @@ export class PuzzleRoom extends BaseGameRoom {
       durationMs: this.state.durationMs,
       players: team,
     })
-      .then(({ rank, rankToday }) => {
+      .then(({ rank, rankToday, points }) => {
         this.state.rank = rank;
         this.state.rankToday = rankToday;
+        this.state.points = points;
         this.state.rankStatus = 'saved' satisfies RankStatus;
       })
       .catch((error: unknown) => {
