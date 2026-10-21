@@ -6,13 +6,18 @@ import {
   MAX_PLAYERS,
   PIECE_COUNT_PRESETS,
   RANKING_PERIODS,
+  isTrending,
+  playsTrend,
   type BulletRankingEntry,
   type BulletRankingQuery,
   type CommunityPuzzle,
   type GeneralRankingEntry,
+  type PopularImage,
   type RankingEntry,
+  type RankingPage,
   type RankingPeriod,
   type RankingQuery,
+  type RankingRowBase,
 } from '@puzzle/shared';
 import { catalogThumbUrl, puzzleImageInfo } from '../board/images';
 import { formatDuration } from '../format';
@@ -23,7 +28,14 @@ import {
   fetchRanking,
 } from '../net/ranking';
 import { avatarColor, initials } from '../ui/avatar';
-import { ChevronDownIcon, CrownIcon, PlusIcon, SearchIcon, TrophyIcon } from '../ui/icons';
+import {
+  ChevronDownIcon,
+  CrownIcon,
+  FlameIcon,
+  PlusIcon,
+  SearchIcon,
+  TrophyIcon,
+} from '../ui/icons';
 
 /** O que abre o ranking: a categoria de uma foto e, vindo de um Bullet, a categoria dele. */
 export type RankingOpen = Partial<RankingQuery> & { bullet?: BulletRankingQuery };
@@ -43,22 +55,68 @@ interface RankingScreenProps {
  */
 type Tab = 'general' | 'puzzle' | 'bullet';
 
-interface Loaded {
-  /** De qual consulta é este resultado: se não bate com a atual, ainda está carregando. */
-  key: string;
-  entries?: RankingEntry[];
-  general?: GeneralRankingEntry[];
-  bullet?: BulletRankingEntry[];
-  error?: string;
-}
-
 /** Uma linha do placar, seja qual for o tipo de ranking. */
 interface Row {
   position: number;
   players: string[];
   value: string;
   sub: string;
+  change?: number | null;
+  streak: number;
+  /** O valor em número (tempo, pontos, montados): calcula o "Rumo ao Nº". */
+  score: number;
 }
+
+interface Loaded {
+  /** De qual consulta é este resultado: se não bate com a atual, ainda está carregando. */
+  key: string;
+  rows?: Row[];
+  /** Quantas equipes há no ranking (a tabela mostra só o topo). */
+  total?: number;
+  /** A melhor posição de quem está vendo, e quem está logo à frente. */
+  me?: Row & { ahead?: Row };
+  error?: string;
+}
+
+/** Converte a resposta da API em linhas do placar (topo, total e "Sua posição"). */
+function toRows<T extends RankingRowBase>(
+  key: string,
+  page: RankingPage<T>,
+  format: (entry: T) => Pick<Row, 'value' | 'sub' | 'score'>,
+): Loaded {
+  const row = (entry: T): Row => ({
+    position: entry.position,
+    players: entry.players,
+    change: entry.change,
+    streak: entry.streak,
+    ...format(entry),
+  });
+  return {
+    key,
+    rows: page.entries.map(row),
+    total: page.total,
+    me: page.me && { ...row(page.me), ahead: page.me.ahead && row(page.me.ahead) },
+  };
+}
+
+const formatPuzzle = (entry: RankingEntry) => ({
+  value: formatDuration(entry.durationMs),
+  sub: dateFormat.format(new Date(entry.finishedAt)),
+  score: entry.durationMs,
+});
+const formatGeneral = (entry: GeneralRankingEntry) => ({
+  value: `${entry.points.toLocaleString('pt-BR')} pts`,
+  sub: entry.puzzles === 1 ? '1 quebra-cabeça' : `${entry.puzzles} quebra-cabeças`,
+  score: entry.points,
+});
+const formatBullet = (entry: BulletRankingEntry) => ({
+  value: entry.solved === 1 ? '1 montado' : `${entry.solved} montados`,
+  sub: `${entry.partial > 0 ? `+${entry.partial} peças · ` : ''}${dateFormat.format(
+    new Date(entry.finishedAt),
+  )}`,
+  // Montados valem mais que qualquer número de peças do que ficou pela metade.
+  score: entry.solved * 10_000 + entry.partial,
+});
 
 interface ImageOption {
   id: string;
@@ -92,6 +150,8 @@ const VALUE_HEADERS: Record<Tab, string> = {
 const TEAM_LABELS: Record<number, string> = { 1: 'Solo', 2: 'Duplas', 3: 'Trios', 4: 'Quartetos' };
 const teamLabel = (n: number) => TEAM_LABELS[n] ?? `${n} jogadores`;
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+/** "Ver todos" os mais jogados: até quantas fotos. */
+const TRENDING_ALL = 48;
 /** Quantas fotos o seletor mostra (busca ou mais jogadas). */
 const IMAGE_CHOICES = 12;
 /** Quantas fotos o destaque "Mais jogados da semana" mostra. */
@@ -152,13 +212,14 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
     let current = true; // ignora respostas de consultas antigas (troca rápida de filtro)
     const request: Promise<Loaded> =
       tab === 'puzzle'
-        ? fetchRanking(query).then((entries) => ({ key, entries }))
+        ? fetchRanking(query).then((page) => toRows(key, page, formatPuzzle))
         : tab === 'bullet'
-          ? fetchBulletRanking({ ...bulletCategory, players, period }).then((bullet) => ({
-              key,
-              bullet,
-            }))
-          : fetchGeneralRanking({ players, period }).then((general) => ({ key, general }));
+          ? fetchBulletRanking({ ...bulletCategory, players, period }).then((page) =>
+              toRows(key, page, formatBullet),
+            )
+          : fetchGeneralRanking({ players, period }).then((page) =>
+              toRows(key, page, formatGeneral),
+            );
     request
       .then((result) => current && setLoaded(result))
       .catch(
@@ -171,19 +232,18 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
   }, [tab, query, key, bulletCategory, players, period]);
 
   // Destaque do topo: as fotos mais jogadas da semana, em qualquer modalidade.
-  const [trending, setTrending] = useState<Array<{ image: ImageOption; plays: number }>>();
+  const [trending, setTrending] = useState<TrendingItem[]>();
+  const [showAllTrending, setShowAllTrending] = useState(false);
   useEffect(() => {
     let current = true;
-    fetchPopularImages({ period: 'week' })
+    fetchPopularImages({ period: 'week', limit: showAllTrending ? TRENDING_ALL : TRENDING })
       .then((list) => {
         if (!current) return;
         setTrending(
-          list
-            .flatMap(({ imageId, plays }) => {
-              const image = byId.get(imageId);
-              return image ? [{ image, plays }] : [];
-            })
-            .slice(0, TRENDING),
+          list.flatMap((popular) => {
+            const image = byId.get(popular.imageId);
+            return image ? [{ image, popular }] : [];
+          }),
         );
       })
       .catch(() => current && setTrending([]));
@@ -192,7 +252,7 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
     };
     // `byId` muda a cada render; a lista da comunidade é o que importa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [community]);
+  }, [community, showAllTrending]);
 
   // Fotos para o seletor do ranking por foto: as mais jogadas da modalidade no período.
   const [popular, setPopular] = useState<string[]>();
@@ -209,28 +269,7 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
 
   const result = loaded?.key === key ? loaded : undefined;
   const imageTitle = puzzleImageInfo(query.image)?.title;
-  const rows: Row[] | undefined = result?.entries
-    ? result.entries.map((entry) => ({
-        position: entry.position,
-        players: entry.players,
-        value: formatDuration(entry.durationMs),
-        sub: dateFormat.format(new Date(entry.finishedAt)),
-      }))
-    : result?.general
-      ? result.general.map((entry) => ({
-          position: entry.position,
-          players: entry.players,
-          value: `${entry.points.toLocaleString('pt-BR')} pts`,
-          sub: entry.puzzles === 1 ? '1 quebra-cabeça' : `${entry.puzzles} quebra-cabeças`,
-        }))
-      : result?.bullet?.map((entry) => ({
-          position: entry.position,
-          players: entry.players,
-          value: entry.solved === 1 ? '1 montado' : `${entry.solved} montados`,
-          sub: `${entry.partial > 0 ? `+${entry.partial} peças · ` : ''}${dateFormat.format(
-            new Date(entry.finishedAt),
-          )}`,
-        }));
+  const rows = result?.rows;
 
   const hint =
     tab === 'puzzle'
@@ -259,6 +298,8 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
           items={trending}
           selected={tab === 'puzzle' ? query.image : undefined}
           onPick={pickImage}
+          showAll={showAllTrending}
+          onShowAll={setShowAllTrending}
         />
       )}
 
@@ -374,7 +415,29 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
             )}
           </div>
         )}
-        {!!rows?.length && <Board rows={rows} valueHeader={VALUE_HEADERS[tab]} />}
+        {!!rows?.length && (
+          <Board
+            rows={rows}
+            valueHeader={VALUE_HEADERS[tab]}
+            more={(result?.total ?? rows.length) - rows.length}
+            noun={players === 1 ? 'jogadores' : 'equipes'}
+          />
+        )}
+        {result?.me && (
+          <MyPosition
+            me={result.me}
+            higherIsBetter={tab !== 'puzzle'}
+            gapLabel={(ahead, me) =>
+              tab === 'puzzle'
+                ? `Falta ${formatDuration(me.score - ahead.score)}`
+                : tab === 'bullet'
+                  ? Math.floor(ahead.score / 10_000) > Math.floor(me.score / 10_000)
+                    ? `Falta${ahead.score - me.score >= 20_000 ? 'm' : ''} ${Math.floor(ahead.score / 10_000) - Math.floor(me.score / 10_000)} montado${Math.floor(ahead.score / 10_000) - Math.floor(me.score / 10_000) === 1 ? '' : 's'}`
+                    : `Faltam ${ahead.score - me.score} peças`
+                  : `Faltam ${(ahead.score - me.score).toLocaleString('pt-BR')} pts`
+            }
+          />
+        )}
       </section>
     </div>
   );
@@ -401,8 +464,43 @@ function Avatars({ players, size }: { players: string[]; size: number }) {
   );
 }
 
+/** "▲ 2", "▼ 1", "=" ou "NOVO": quanto a equipe subiu ou caiu desde o período anterior. */
+function Change({ change }: { change?: number | null }) {
+  if (change === undefined) return <span className="rk-change">—</span>;
+  if (change === null) return <span className="rk-change new">NOVO</span>;
+  if (change === 0) return <span className="rk-change">=</span>;
+  return (
+    <span className={change > 0 ? 'rk-change up' : 'rk-change down'}>
+      <span className="sr-only">{change > 0 ? 'Subiu ' : 'Caiu '}</span>
+      <span aria-hidden="true">{change > 0 ? '▲' : '▼'}</span> {Math.abs(change)}
+    </span>
+  );
+}
+
+/** Chama acesa a partir de 3 dias seguidos jogando. */
+function Streak({ days }: { days: number }) {
+  return (
+    <span className={days >= 3 ? 'rk-streak hot' : 'rk-streak'}>
+      <FlameIcon size={15} />
+      <span className="sr-only">Sequência de </span>
+      {days}
+      <span className="sr-only"> {days === 1 ? 'dia' : 'dias'}</span>
+    </span>
+  );
+}
+
 /** Pódio dos três primeiros (2º, 1º, 3º) e a tabela do 4º em diante. */
-function Board({ rows, valueHeader }: { rows: Row[]; valueHeader: string }) {
+function Board({
+  rows,
+  valueHeader,
+  more,
+  noun,
+}: {
+  rows: Row[];
+  valueHeader: string;
+  more: number;
+  noun: string;
+}) {
   const podium = PODIUM_ORDER.flatMap((index) => (rows[index] ? [rows[index]] : []));
   const rest = rows.slice(3);
   return (
@@ -417,7 +515,10 @@ function Board({ rows, valueHeader }: { rows: Row[]; valueHeader: string }) {
             )}
             <Avatars players={row.players} size={row.position === 1 ? 60 : 52} />
             <span className="rk-podium-name">{teamName(row.players)}</span>
-            <span className="rk-mono rk-podium-value">{row.value}</span>
+            <span className="rk-podium-meta">
+              <Streak days={row.streak} />
+              <span className="rk-mono rk-podium-value">{row.value}</span>
+            </span>
             <span className="rk-podium-block">
               <span className="sr-only">Posição </span>
               {row.position}
@@ -430,7 +531,9 @@ function Board({ rows, valueHeader }: { rows: Row[]; valueHeader: string }) {
         <>
           <div className="rk-row rk-row-header" aria-hidden="true">
             <span>POS</span>
+            <span>±</span>
             <span>JOGADOR</span>
+            <span className="rk-col-streak">SEQUÊNCIA</span>
             <span className="rk-value">{valueHeader}</span>
           </div>
           <ol className="rk-rows" start={4}>
@@ -440,6 +543,7 @@ function Board({ rows, valueHeader }: { rows: Row[]; valueHeader: string }) {
                   <span className="sr-only">Posição </span>
                   {row.position}
                 </span>
+                <Change change={row.change} />
                 <span className="rk-player">
                   <Avatars players={row.players} size={38} />
                   <span className="rk-player-text">
@@ -447,25 +551,122 @@ function Board({ rows, valueHeader }: { rows: Row[]; valueHeader: string }) {
                     <small>{row.sub}</small>
                   </span>
                 </span>
+                <span className="rk-col-streak">
+                  <Streak days={row.streak} />
+                </span>
                 <span className="rk-mono rk-value">{row.value}</span>
               </li>
             ))}
           </ol>
         </>
       )}
+      {more > 0 && (
+        <div className="rk-more" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          mais {more} {noun}
+        </div>
+      )}
     </div>
   );
 }
 
-/** "Em alta · Mais jogados da semana": carrossel com as fotos; clicar abre o ranking dela. */
+/** "Sua posição": fixa no pé, com quanto falta para passar quem está logo à frente. */
+function MyPosition({
+  me,
+  higherIsBetter,
+  gapLabel,
+}: {
+  me: Row & { ahead?: Row };
+  higherIsBetter: boolean;
+  gapLabel: (ahead: Row, me: Row) => string;
+}) {
+  const { ahead } = me;
+  const pct = !ahead
+    ? 100
+    : Math.max(
+        0,
+        Math.min(
+          99,
+          Math.round((higherIsBetter ? me.score / ahead.score : ahead.score / me.score) * 100),
+        ),
+      );
+  return (
+    <div className="rk-me">
+      <span className="rk-mono rk-me-pos">
+        <span className="sr-only">Sua posição: </span>
+        {me.position}º
+      </span>
+      <span className="rk-me-who">
+        <Avatars players={me.players} size={40} />
+        <span className="rk-player-text">
+          <span className="rk-me-name">
+            <strong>{teamName(me.players)}</strong>
+            <span className="rk-me-you">Você</span>
+          </span>
+          <small>
+            {ahead ? `${gapLabel(ahead, me)} para o ${ahead.position}º lugar` : 'Você lidera!'}
+          </small>
+        </span>
+      </span>
+      {ahead && (
+        <span className="rk-me-progress">
+          <span className="rk-me-progress-label">
+            <span>Rumo ao {ahead.position}º</span>
+            <span className="rk-mono">{pct}%</span>
+          </span>
+          <span
+            className="rk-me-bar"
+            role="progressbar"
+            aria-label="Progresso até a próxima posição"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+          >
+            <span style={{ width: `${pct}%` }} />
+          </span>
+        </span>
+      )}
+      <span className="rk-mono rk-me-value">{me.value}</span>
+    </div>
+  );
+}
+
+interface TrendingItem {
+  image: ImageOption;
+  popular: PopularImage;
+}
+
+/** "▲ 32%" verde / "▼ 4%" laranja, comparando com a semana passada. */
+function Trend({ popular }: { popular: PopularImage }) {
+  const trend = playsTrend(popular);
+  if (trend === null) return null;
+  return (
+    <span className={trend >= 0 ? 'rk-mono rk-trend up' : 'rk-mono rk-trend down'}>
+      <span className="sr-only">{trend >= 0 ? 'Subiu ' : 'Caiu '}</span>
+      <span aria-hidden="true">{trend >= 0 ? '▲' : '▼'}</span>
+      {Math.abs(trend)}%
+    </span>
+  );
+}
+
+/**
+ * "Em alta · Mais jogados da semana": carrossel com as fotos (ou, em "Ver todos", a grade com
+ * todas); clicar abre o ranking dela.
+ */
 function Trending({
   items,
   selected,
   onPick,
+  showAll,
+  onShowAll,
 }: {
-  items: Array<{ image: ImageOption; plays: number }>;
+  items: TrendingItem[];
   selected?: string;
   onPick: (id: string) => void;
+  showAll: boolean;
+  onShowAll: (showAll: boolean) => void;
 }) {
   const track = useRef<HTMLDivElement>(null);
   const [scroll, setScroll] = useState({ left: 0, width: 100, atStart: true, atEnd: true });
@@ -485,7 +686,7 @@ function Trending({
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [items]);
+  }, [items, showAll]);
 
   const page = (direction: 1 | -1) =>
     track.current?.scrollBy({ left: direction * track.current.clientWidth * 0.8 });
@@ -500,26 +701,38 @@ function Trending({
         <div className="rk-trending-nav">
           <button
             type="button"
-            className="rk-square-btn"
-            aria-label="Anteriores"
-            disabled={scroll.atStart}
-            onClick={() => page(-1)}
+            className="btn-link rk-see-all"
+            aria-expanded={showAll}
+            onClick={() => onShowAll(!showAll)}
           >
-            <ChevronDownIcon size={18} />
+            {showAll ? 'Mostrar menos' : 'Ver todos'}
           </button>
-          <button
-            type="button"
-            className="rk-square-btn next"
-            aria-label="Próximos"
-            disabled={scroll.atEnd}
-            onClick={() => page(1)}
-          >
-            <ChevronDownIcon size={18} />
-          </button>
+          {!showAll && (
+            <>
+              <button
+                type="button"
+                className="rk-square-btn"
+                aria-label="Anteriores"
+                disabled={scroll.atStart}
+                onClick={() => page(-1)}
+              >
+                <ChevronDownIcon size={18} />
+              </button>
+              <button
+                type="button"
+                className="rk-square-btn next"
+                aria-label="Próximos"
+                disabled={scroll.atEnd}
+                onClick={() => page(1)}
+              >
+                <ChevronDownIcon size={18} />
+              </button>
+            </>
+          )}
         </div>
       </div>
-      <div className="rk-track" ref={track} onScroll={measure}>
-        {items.map(({ image, plays }, index) => (
+      <div className={showAll ? 'rk-track all' : 'rk-track'} ref={track} onScroll={measure}>
+        {items.map(({ image, popular }, index) => (
           <button
             key={image.id}
             type="button"
@@ -530,17 +743,28 @@ function Trending({
             <span className="rk-card-thumb">
               <img src={image.thumb} alt="" loading="lazy" />
               <span className="rk-mono rk-card-rank">#{index + 1}</span>
+              {isTrending(popular) && (
+                <span className="rk-mono rk-card-hot">
+                  <FlameIcon size={12} />
+                  EM ALTA
+                </span>
+              )}
             </span>
             <span className="rk-card-body">
               <strong>{image.title}</strong>
-              <small>{plays === 1 ? '1 partida' : `${plays} partidas`}</small>
+              <span className="rk-card-meta">
+                <small>{popular.plays === 1 ? '1 partida' : `${popular.plays} partidas`}</small>
+                <Trend popular={popular} />
+              </span>
             </span>
           </button>
         ))}
       </div>
-      <div className="rk-track-bar" aria-hidden="true">
-        <span style={{ left: `${scroll.left}%`, width: `${scroll.width}%` }} />
-      </div>
+      {!showAll && (
+        <div className="rk-track-bar" aria-hidden="true">
+          <span style={{ left: `${scroll.left}%`, width: `${scroll.width}%` }} />
+        </div>
+      )}
     </section>
   );
 }
