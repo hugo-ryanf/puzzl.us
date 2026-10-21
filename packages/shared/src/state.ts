@@ -98,6 +98,8 @@ export const RoomState = schema(
     rank: t.uint16().default(0),
     /** Posição só entre as partidas de hoje (horário de Brasília), na mesma categoria. */
     rankToday: t.uint16().default(0),
+    /** Pontos que a partida valeu no ranking por pontos (peças × velocidade). */
+    points: t.uint32().default(0),
     /** Tamanho da equipe no momento do fim (categoria do ranking, mesmo se alguém sair depois). */
     teamSize: t.uint8().default(0),
     /** Chave: sessionId. */
