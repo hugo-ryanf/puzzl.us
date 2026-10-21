@@ -103,19 +103,27 @@ inteiro. Puzzle completo ⇔ existe 1 grupo com todas as peças.
 
 ## Estado da sala (Colyseus schema)
 
+Implementado em `packages/shared/src/state.ts` (schema 5, API `schema({...})` sem decorators):
+
 ```ts
-PuzzleState {
-  puzzle: { imageUrl, rows, cols, seed }
-  status: "lobby" | "playing" | "finished"
-  startedAt, finishedAt            // ms, definidos pelo servidor
-  groups: Map<groupId, { x, y, heldBy: sessionId | "" }>   // posição do grupo
-  pieces: Map<pieceId, { groupId, offsetX, offsetY }>      // posição relativa ao grupo
-  players: Map<sessionId, { name, color, isHost }>
+RoomState {
+  config: { seed, rows, cols, width, height, pieceCount }  // o cliente regera o puzzle localmente
+  phase: 'lobby' | 'playing' | 'completed'
+  hostId: sessionId                     // quem pode clicar "Começar" (herda se sair)
+  elapsedMs, durationMs                 // relógio do servidor (ver "Cronômetro e ranking")
+  rankStatus, rank, teamSize            // resultado no ranking, preenchido após o fim
+  players: Map<sessionId, { name, color, connected }>
+  groups: Map<groupId, { x, y, heldBy: sessionId | "" }>  // (x, y) = deslocamento do grupo
+  pieceGroup: number[]                                     // pieceGroup[pieceId] = groupId
 }
 ```
 
+O `guestId` de cada jogador fica só no servidor (nunca vai para o estado público).
+
 Guardar posição **por grupo** (não por peça) reduz muito o tráfego: arrastar um bloco de
-200 peças = 1 atualização.
+200 peças = 1 atualização. Dentro de um grupo as peças estão sempre na posição relativa
+correta, então o grupo guarda só um deslocamento: posição da peça = posição correta + (x, y).
+Um encaixe aparece no cliente como `pieceGroup` mudando e o grupo absorvido sumindo do mapa.
 
 **Cursores ficam FORA do schema** — são efêmeros e de alta frequência: mensagens
 `cursor {x,y}` com throttle ~20 Hz, retransmitidas para os outros, e o cliente **interpola**
@@ -131,53 +139,111 @@ para parecer suave.
 | `move {groupId, x, y}` (throttle ~20 Hz) | aceita só se `heldBy === eu`; atualiza posição                                                                                                                                                            |
 | `drop {groupId, x, y}`                   | solta lock; roda **snap**: para cada peça do grupo, checa vizinhos de outros grupos; se a distância entre posição atual e esperada < limiar → alinha e **funde grupos**. Se 1 grupo restante → `finished` |
 | `cursor {x, y}`                          | broadcast para os outros (sem persistir)                                                                                                                                                                  |
-| `start` (host)                           | `status = playing`, `startedAt = now`                                                                                                                                                                     |
+| `start` (só o anfitrião, no lobby)       | `phase = playing`, começa o relógio. Antes disso `grab` é ignorado                                                                                                                                        |
 
-Extras: lock expira se o jogador desconectar (`onLeave` libera `heldBy`); Colyseus
-`allowReconnection(30s)` para quedas de rede; cor do jogador pinta a borda da peça que
-ele está segurando (é o “ver o que o outro está montando”).
+Extras (implementados):
+
+- **Validação:** cada mensagem passa por um schema zod (`packages/shared/src/protocol.ts`) via
+  `validate()` do Colyseus. Payload inválido = o Colyseus **desconecta** o cliente (cliente
+  legítimo nunca faz isso). Limite de 100 mensagens/s por cliente.
+- **Encaixe não "rouba":** o snap ignora grupos que outro jogador está segurando.
+- **Quedas:** `onDrop` solta o que o jogador segurava e chama `allowReconnection(30s)`; o SDK
+  reconecta sozinho, e após um F5 o cliente usa o token salvo no `sessionStorage`.
+- **Cliente:** predição local só do grupo que eu arrasto; o resto (incluindo o meu grupo depois
+  do drop) desliza até a posição do servidor. A borda da peça segurada ganha a cor de quem
+  segura (é o “ver o que o outro está montando”).
+- A camada de cursores fica fora do hit test (`eventMode: 'none'`), senão o cursor de um amigo
+  em cima de uma peça bloquearia o clique nela.
 
 ---
 
 ## Cronômetro e ranking
 
-- Tempo **sempre medido no servidor** (`finishedAt - startedAt`) → cliente não consegue trapacear.
-- Ao terminar, `PuzzleRoom` grava a sessão no Postgres.
+Implementado na fase 3:
 
-**Tabelas (Drizzle):**
+- **Relógio:** o tempo é **medido só no servidor** (do "Começar" ao último encaixe), então o
+  cliente não consegue trapacear. O servidor publica `elapsedMs` a cada 1 s e o cliente só
+  interpola entre atualizações — sem sincronizar relógios, o horário do PC não interfere.
+- **Fim:** a sala trava (ninguém novo entra), grava a partida **sem bloquear o jogo** e depois
+  preenche `rank`/`rankStatus`. Sem `DATABASE_URL`, o jogo funciona e o ranking fica
+  "indisponível".
+- **Banco:** Postgres no Neon via Drizzle (`pg`). Migrações geradas com `pnpm db:generate` e
+  aplicadas automaticamente quando o servidor sobe. Os testes usam PGlite (Postgres em WASM, em
+  memória) com as mesmas migrações.
 
-- `players` (id, guest_id, nickname, created_at) — depois ganha `auth_provider` p/ contas
-- `images` (id, url, width, height, source: `catalog|upload`, owner_id, created_at)
-- `puzzles` (id, image_id, rows, cols, piece_count, seed) — mesma imagem+tamanho+seed = mesmo puzzle
-- `sessions` (id, puzzle_id, started_at, finished_at, duration_ms, team_size, team_key)
-- `session_players` (session_id, player_id)
+**Tabelas (`apps/server/src/db/schema.ts`):**
 
-`team_key` = ids dos jogadores ordenados e concatenados → identifica “a mesma dupla/equipe”.
-**Ranking** = `SELECT … WHERE puzzle_id = ? AND team_size = ? ORDER BY duration_ms LIMIT 20`
-(categorias por tamanho de equipe para ser justo; opção de mostrar só o melhor tempo por `team_key`).
-Ranking só faz sentido para puzzles do **catálogo** (uploads são únicos).
+- `players` (id, guest_id único, nickname, created_at) — convidado = um navegador
+- `games` (id, room_code, piece_count, rows, cols, seed, team_size, team_key, duration_ms,
+  started_at, finished_at) — índice em (piece_count, team_size, duration_ms)
+- `game_players` (game_id, player_id, nickname no momento da partida)
+
+**Categoria do ranking = imagem + tamanho escolhido + tamanho da equipe.** Na fase 3 ainda não
+havia imagem (cada sala gerava uma por código); a fase 5 acrescentou `games.image_id` — as
+partidas antigas ficaram como `'gerada'` (migração `0001`, ajustada à mão para não falhar com
+linhas existentes). Como o catálogo é um arquivo versionado e não uma tabela, não foi preciso
+criar `images`/`puzzles`: isso volta a fazer sentido no upload de fotos (fase 6).
+
+`team_key` = ids dos jogadores ordenados e unidos → identifica "a mesma equipe" entre partidas.
+O ranking (`GET /api/ranking?pieces=100&players=2`) mostra o **melhor tempo de cada equipe**
+(`DISTINCT ON team_key`); a posição de uma partida = 1 + equipes _diferentes_ com melhor
+tempo menor.
 
 ---
 
 ## Áudio
 
-1. Cliente pede `POST /api/livekit-token {roomId}` → servidor assina JWT do LiveKit (api key/secret no env) com identidade = jogador.
-2. Cliente entra na sala LiveKit de mesmo id, publica microfone; UI com mute e indicador de quem fala.
-3. Áudio é totalmente independente do Colyseus — se cair, o jogo continua.
+Implementado na fase 4 (`apps/server/src/voice.ts`, `apps/web/src/voice/`):
 
-## Upload de foto (fase futura)
+1. O token é pedido **pela conexão do jogo** (`room.request('voiceToken')`), não por uma rota
+   REST: só quem está na sala recebe um, e o servidor já sabe quem é. O servidor assina o JWT
+   do LiveKit (`LIVEKIT_*` no `.env`) com identidade = `sessionId`, nome = apelido e permissão
+   só para a chamada `quebra-cabeca-<código>`: falar e ouvir, sem canal de dados.
+2. O cliente entra por clique (navegadores só liberam microfone/som após um gesto), publica o
+   microfone com cancelamento de eco e supressão de ruído. Como identidade = `sessionId`, a
+   lista de jogadores mostra 🎤/🔇 e um anel na cor do jogador enquanto ele fala, sem
+   mapeamento extra.
+3. Microfone negado não derruba a chamada (a pessoa fica só ouvindo). O SDK do LiveKit
+   (~570 kB) só é baixado quando alguém entra na chamada, e só depois de o servidor confirmar
+   que há LiveKit configurado.
+4. Áudio é totalmente independente do Colyseus — se cair, o jogo continua. Sem `LIVEKIT_*`, o
+   jogo funciona e aparece "Chamada indisponível".
 
-1. `POST /api/uploads` → servidor devolve URL pré-assinada do R2 (limite de tamanho/tipo).
-2. Cliente envia direto ao R2; depois chama `POST /api/images/:id/process`.
-3. Servidor com `sharp`: valida que é imagem, remove EXIF (privacidade/GPS), redimensiona (ex.: máx 2048 px), gera thumbnail.
-4. A imagem vira `images.source = upload` e pode ser usada ao criar sala.
+## Upload de foto
+
+Implementado na fase 6 (`apps/server/src/uploads/`, `apps/web/src/net/uploads.ts`). Decisão: as
+fotos ficam **no próprio Postgres (Neon)** em vez do R2 — o R2 exige cartão de crédito mesmo no
+plano grátis, e na escala do projeto (amigos, fotos expirando em 7 dias) os 0,5 GB do Neon bastam.
+A interface `UploadStore` isola isso: trocar por R2 depois não muda rotas nem sala.
+
+1. O navegador reduz a foto (≤ 2048 px, JPEG) antes de enviar: 8 MB viram ~600 kB.
+2. `POST /api/uploads` (bytes crus, ≤ 15 MB, 20 por hora por IP): o servidor **não confia no
+   arquivo** — decodifica com `sharp` com teto de 50 MP (barra "bombas de descompressão"),
+   aplica a rotação, recodifica em WebP (descarta EXIF/GPS e qualquer conteúdo embutido) e
+   recusa foto pequena (< 400 px) ou panorâmica (> 3:1).
+3. Guarda em `uploads` (bytea) com id aleatório de 128 bits; a sala usa `imageId =
+"upload:<id>"`. `GET /api/uploads/:id` serve com CORS (o WebGL exige para textura de outra
+   origem; o cliente usa `crossOrigin = 'anonymous'`) e cache imutável.
+4. Criar sala com a foto renova `last_used_at`; uma limpeza a cada 6 h apaga fotos sem uso há 7
+   dias. Partidas com foto própria terminam com `rankStatus = 'unranked'` (fora do ranking).
 
 ## Fluxo de sala
 
-Home → “Criar sala” (escolhe imagem + tamanho) → `POST /api/rooms` cria `PuzzleRoom` e devolve
-código curto (ex.: `K7QF`) / link `/{code}` → amigo abre o link, digita apelido, entra →
-lobby mostra jogadores + áudio → host clica “Começar” → jogo → tela de vitória com tempo e
-posição no ranking.
+Home → “Criar sala” (escolhe tamanho) → `client.create('puzzle')` pelo matchmaker do Colyseus
+(não precisou de rota REST) → a sala usa como `roomId` um código de 5 caracteres sem
+ambíguos (ex.: `K7QF2`) → link `/{code}` → amigo abre o link, digita apelido,
+`client.joinById(code)` → jogo.
+
+**Catálogo (fase 5):** a imagem vem de um catálogo fixo de fotos escolhidas pelo dono do projeto.
+`pnpm catalog` (`scripts/build-catalog.ts`, com `sharp`) processa `catalogo/originais/` (fora do
+git): aplica a rotação EXIF, **descarta os metadados (GPS)**, gera WebP ≤ 2048 px + miniatura
+em `apps/web/public/catalog/` (servido pelo próprio front, sem R2 por enquanto) e escreve
+`packages/shared/src/catalog.ts`. O servidor só aceita `imageId` do catálogo (zod) e usa o
+tamanho real da foto para montar a grade. Título e crédito (atribuição) aparecem no lobby e no
+fim.
+
+Na sala: lobby (anfitrião 👑 clica “Começar”) → jogo com relógio → painel de vitória com tempo
+e posição no ranking, câmera enquadrando a imagem montada. _Fase 4:_ áudio no lobby e no jogo.
 
 ---
 
