@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
 import {
+  CATALOG,
   MAX_PLAYERS,
   PIECE_COUNT_PRESETS,
   findCatalogImage,
   type RankingEntry,
   type RankingQuery,
 } from '@puzzle/shared';
+import { catalogThumbUrl } from '../board/images';
 import { formatDuration } from '../format';
 import { fetchRanking } from '../net/ranking';
-import { ImagePicker } from './ImagePicker';
+import { Pips, difficultyOf } from '../ui/difficulty';
 
 interface RankingScreenProps {
   initial: RankingQuery;
-  onBack: () => void;
 }
 
 interface Loaded {
@@ -26,7 +27,7 @@ const TEAM_LABELS: Record<number, string> = { 1: 'Solo', 2: 'Duplas', 3: 'Trios'
 const teamLabel = (n: number) => TEAM_LABELS[n] ?? `${n} jogadores`;
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
 
-export function RankingScreen({ initial, onBack }: RankingScreenProps) {
+export function RankingScreen({ initial }: RankingScreenProps) {
   const [query, setQuery] = useState(initial);
   const [loaded, setLoaded] = useState<Loaded>();
   const key = `${query.image}:${query.pieces}:${query.players}`;
@@ -45,73 +46,99 @@ export function RankingScreen({ initial, onBack }: RankingScreenProps) {
   }, [query, key]);
 
   const result = loaded?.key === key ? loaded : undefined;
+  const imageTitle = findCatalogImage(query.image)?.title;
 
   return (
-    <main className="ranking">
-      <button onClick={onBack}>← Voltar</button>
-      <h1>Ranking</h1>
-      <p className="subtitle">Melhor tempo de cada equipe. Tempo medido pelo servidor.</p>
-
-      <ImagePicker value={query.image} onChange={(image) => setQuery({ ...query, image })} />
-      <div className="filters">
-        <label className="field">
-          Peças
-          <select
-            value={query.pieces}
-            onChange={(e) => setQuery({ ...query, pieces: Number(e.target.value) })}
-          >
-            {PIECE_COUNT_PRESETS.map((count) => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
-          Equipe
-          <select
-            value={query.players}
-            onChange={(e) => setQuery({ ...query, players: Number(e.target.value) })}
-          >
-            {Array.from({ length: MAX_PLAYERS }, (_, i) => i + 1).map((n) => (
-              <option key={n} value={n}>
-                {teamLabel(n)}
-              </option>
-            ))}
-          </select>
-        </label>
+    <>
+      <div className="page-header">
+        <div>
+          <h1>Ranking</h1>
+          <p>Melhor tempo de cada equipe, medido pelo servidor.</p>
+        </div>
       </div>
 
-      {!result && <p>Carregando…</p>}
+      <div className="filter-group" role="radiogroup" aria-labelledby="filter-image">
+        <span id="filter-image">Imagem</span>
+        <div className="chips">
+          {CATALOG.map((image) => (
+            <button
+              key={image.id}
+              type="button"
+              role="radio"
+              aria-checked={image.id === query.image}
+              className="chip image-chip"
+              onClick={() => setQuery({ ...query, image: image.id })}
+            >
+              <img src={catalogThumbUrl(image.id)} alt="" />
+              {image.title}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="filter-group" role="radiogroup" aria-labelledby="filter-pieces">
+        <span id="filter-pieces">Peças</span>
+        <div className="chips">
+          {PIECE_COUNT_PRESETS.map((count) => (
+            <button
+              key={count}
+              type="button"
+              role="radio"
+              aria-checked={count === query.pieces}
+              className="chip"
+              onClick={() => setQuery({ ...query, pieces: count })}
+            >
+              <Pips level={difficultyOf(count)} />
+              {count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="filter-group" role="radiogroup" aria-labelledby="filter-team">
+        <span id="filter-team">Equipe</span>
+        <div className="chips">
+          {Array.from({ length: MAX_PLAYERS }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={n === query.players}
+              className="chip"
+              onClick={() => setQuery({ ...query, players: n })}
+            >
+              {teamLabel(n)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!result && <p className="loading">Carregando…</p>}
       {result?.error && <p className="error">{result.error}</p>}
       {result?.entries?.length === 0 && (
-        <p>
-          Ninguém montou “{findCatalogImage(query.image)?.title}” com {query.pieces} peças nessa
-          categoria ainda. Seja o primeiro!
-        </p>
+        <div className="empty">
+          <strong>Ninguém no pódio ainda</strong>
+          <p>
+            Ninguém montou “{imageTitle}” com {query.pieces} peças em {teamLabel(query.players)}
+            {'. '}
+            Seja o primeiro!
+          </p>
+        </div>
       )}
       {!!result?.entries?.length && (
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Equipe</th>
-              <th>Tempo</th>
-              <th>Data</th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.entries.map((entry) => (
-              <tr key={entry.position}>
-                <td>{entry.position}º</td>
-                <td>{entry.players.join(' & ')}</td>
-                <td className="time">{formatDuration(entry.durationMs)}</td>
-                <td>{dateFormat.format(new Date(entry.finishedAt))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ol className="ranking-list" aria-label={`Ranking de ${imageTitle}`}>
+          {result.entries.map((entry) => (
+            <li key={entry.position}>
+              <span className={entry.position <= 3 ? 'position podium' : 'position'}>
+                {entry.position}º
+              </span>
+              <span>{entry.players.join(' & ')}</span>
+              <span className="time">{formatDuration(entry.durationMs)}</span>
+              <span className="date">{dateFormat.format(new Date(entry.finishedAt))}</span>
+            </li>
+          ))}
+        </ol>
       )}
-    </main>
+    </>
   );
 }
