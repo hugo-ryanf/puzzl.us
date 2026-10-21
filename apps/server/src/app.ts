@@ -5,6 +5,8 @@ import { WebSocketTransport } from '@colyseus/ws-transport';
 import { GeneralRankingQuery, PIECE_COUNT_PRESETS, ROOM_NAME, RankingQuery } from '@puzzle/shared';
 import type { AccountStore } from './auth/accounts';
 import { registerAuthRoutes, type AuthOptions } from './auth/routes';
+import type { CommunityStore } from './community/community';
+import { registerCommunityRoutes } from './community/routes';
 import type { GameStore } from './db/gameStore';
 import { PuzzleRoom } from './rooms/PuzzleRoom';
 import type { SnapshotStore } from './rooms/snapshots';
@@ -21,6 +23,8 @@ export interface GameServerOptions {
   voice?: VoiceTokenIssuer;
   /** Sem snapshots (também depende do banco) as salas não sobrevivem a um reinício. */
   snapshots?: SnapshotStore;
+  /** Quebra-cabeças publicados pelos jogadores. Sem banco, o Explorar mostra só o catálogo. */
+  community?: CommunityStore;
   /**
    * Contas (login com Google). Sem banco fica undefined: todo mundo joga como convidado e o
    * /api/me responde que não há login.
@@ -47,6 +51,7 @@ export function createGameServer({
   uploads,
   voice,
   snapshots,
+  community,
   auth,
   webDist,
   trustProxy = false,
@@ -82,7 +87,8 @@ export function createGameServer({
         });
       });
 
-      registerUploadRoutes(app, uploads);
+      registerUploadRoutes(app, uploads, accounts);
+      registerCommunityRoutes(app, accounts, community);
 
       if (auth) registerAuthRoutes(app, auth);
       else {
@@ -135,6 +141,7 @@ export function createGameServer({
         protected override snapshots = snapshots;
         protected override accounts = accounts;
         protected override savedGames = savedGames;
+        protected override community = community;
       },
     )
     .filterBy(['restore']);
