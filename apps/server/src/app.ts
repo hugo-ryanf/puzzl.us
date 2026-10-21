@@ -2,11 +2,20 @@ import { join, sep } from 'node:path';
 import { Server } from '@colyseus/core';
 import express from 'express';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { GeneralRankingQuery, PIECE_COUNT_PRESETS, ROOM_NAME, RankingQuery } from '@puzzle/shared';
+import {
+  GeneralRankingQuery,
+  PIECE_COUNT_PRESETS,
+  PRESENCE_ROOM,
+  ROOM_NAME,
+  RankingQuery,
+} from '@puzzle/shared';
 import type { AccountStore } from './auth/accounts';
 import { registerAuthRoutes, type AuthOptions } from './auth/routes';
 import type { CommunityStore } from './community/community';
 import { registerCommunityRoutes } from './community/routes';
+import { PresenceRoom } from './friends/PresenceRoom';
+import { createPresenceHub } from './friends/presence';
+import { registerFriendRoutes } from './friends/routes';
 import type { GameStore } from './db/gameStore';
 import { PuzzleRoom } from './rooms/PuzzleRoom';
 import type { SnapshotStore } from './rooms/snapshots';
@@ -58,6 +67,16 @@ export function createGameServer({
 }: GameServerOptions = {}): Server {
   const accounts: AccountStore | undefined = auth?.accounts;
   const savedGames = auth?.savedGames;
+  const friends = auth?.friends;
+  // Quem está online e onde (só com contas: convidado não tem amigos).
+  const presence = accounts && friends ? createPresenceHub() : undefined;
+  // Mudou o status de alguém: os amigos dele buscam a lista de novo.
+  presence?.onChange((userId) => {
+    void friends!
+      .friendIds(userId)
+      .then((ids) => ids.forEach((id) => presence.send(id, 'friendsChanged', {})))
+      .catch(() => {});
+  });
   const server = new Server({
     transport: new WebSocketTransport(),
     greet: false,
@@ -89,6 +108,7 @@ export function createGameServer({
 
       registerUploadRoutes(app, uploads, accounts);
       registerCommunityRoutes(app, accounts, community);
+      if (accounts && friends && presence) registerFriendRoutes(app, accounts, friends, presence);
 
       if (auth) registerAuthRoutes(app, auth);
       else {
@@ -142,9 +162,17 @@ export function createGameServer({
         protected override accounts = accounts;
         protected override savedGames = savedGames;
         protected override community = community;
+        protected override onlineHub = presence;
       },
     )
     .filterBy(['restore']);
+  server.define(
+    PRESENCE_ROOM,
+    class extends PresenceRoom {
+      protected override accounts = accounts;
+      protected override onlineHub = presence;
+    },
+  );
   return server;
 }
 
