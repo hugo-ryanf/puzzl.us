@@ -64,6 +64,13 @@
       "when": 1792606400032,
       "tag": "0008_comunidade",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792607531018,
+      "tag": "0009_amigos",
+      "breakpoints": true
     }
   ]
 }
