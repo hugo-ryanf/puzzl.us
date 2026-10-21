@@ -107,6 +107,10 @@ export const RestoreRoomOptions = JoinOptions.extend({
 });
 export type RestoreRoomOptions = z.infer<typeof RestoreRoomOptions>;
 
+/** Retomar uma partida salva ("Em andamento"): só quem salvou consegue (o servidor confere). */
+export const ResumeRoomOptions = JoinOptions.extend({ resume: z.uuid() });
+export type ResumeRoomOptions = z.infer<typeof ResumeRoomOptions>;
+
 // ── Cliente → servidor durante o jogo ───────────────────────────────────────
 
 export const GrabMessage = z.object({ groupId });
@@ -173,6 +177,26 @@ export interface LibraryResponse {
   records: PuzzleRecord[];
   favorites: string[];
 }
+
+/** Uma partida salva para continuar depois (GET /api/me/saved). */
+export interface SavedGameSummary {
+  id: string;
+  imageId: string;
+  pieceCount: number;
+  maxPlayers: number;
+  /** Total de peças e quantas já estão encaixadas (o progresso). */
+  pieces: number;
+  placed: number;
+  elapsedMs: number;
+  /** ISO 8601 de quando foi salva. */
+  savedAt: string;
+}
+
+/** Quantas partidas salvas cabem por conta; salvar mais apaga a mais antiga. */
+export const MAX_SAVED_GAMES = 20;
+
+/** DELETE /api/me/saved/:id */
+export const SavedGameId = z.uuid();
 
 /** PUT/DELETE /api/me/favorites/:imageId — foto do catálogo ou enviada. */
 export const FavoriteImageId = imageId;
