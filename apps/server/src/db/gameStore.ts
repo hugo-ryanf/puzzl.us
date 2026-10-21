@@ -20,6 +20,7 @@ import {
   gamePoints,
   type GeneralRankingEntry,
   type PopularImage,
+  type PopularQuery,
   type GeneralRankingQuery,
   type RankingEntry,
   type RankingPeriod,
@@ -138,7 +139,7 @@ export interface GameStore {
     limit?: number,
   ): Promise<GeneralRankingEntry[]>;
   /** Fotos mais jogadas na modalidade e no período (para escolher no ranking por foto). */
-  popular(query: WithOptionalPeriod<GeneralRankingQuery>, limit?: number): Promise<PopularImage[]>;
+  popular(query: WithOptionalPeriod<PopularQuery>, limit?: number): Promise<PopularImage[]>;
 }
 
 const PERIOD_UNIT = { day: 'day', week: 'week', month: 'month' } as const;
@@ -318,7 +319,7 @@ export function createGameStore(db: AppDatabase): GameStore {
       const rows = await db
         .select({ imageId: games.imageId, plays })
         .from(games)
-        .where(and(eq(games.teamSize, teamSize), inPeriod(period)))
+        .where(and(teamSize ? eq(games.teamSize, teamSize) : undefined, inPeriod(period)))
         .groupBy(games.imageId)
         .orderBy(desc(plays), asc(games.imageId))
         .limit(limit);
