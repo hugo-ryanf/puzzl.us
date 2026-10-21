@@ -148,3 +148,16 @@ export const roomSnapshots = pgTable(
   },
   (table) => [index('room_snapshots_updated_idx').on(table.updatedAt)],
 );
+
+/** Quebra-cabeças que a pessoa marcou para montar depois (só com conta). */
+export const favorites = pgTable(
+  'favorites',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    imageId: text('image_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.imageId] })],
+);
