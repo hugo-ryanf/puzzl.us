@@ -70,7 +70,9 @@ foto é apagada depois de **7 dias sem uso**. Precisa do banco configurado (`DAT
 ## Banco de dados (ranking)
 
 O ranking usa Postgres no [Neon](https://neon.tech) (plano gratuito). Sem banco o jogo funciona
-normalmente, só o ranking fica indisponível.
+normalmente, só o ranking fica indisponível. Há o ranking **por quebra-cabeça** (melhor tempo
+numa foto + tamanho) e o **geral** (peças somadas de todas as fotos), ambos por modalidade (solo,
+dupla, trio, quarteto) e período (hoje, semana, mês, sempre — no horário de Brasília).
 
 1. Crie um projeto no Neon e copie a connection string (**Connect** no painel).
 2. Copie `apps/server/.env.example` para `apps/server/.env` e cole em `DATABASE_URL`.
@@ -90,6 +92,21 @@ desligada). Sem LiveKit o jogo funciona normalmente e o ícone do microfone apar
    no `apps/server/.env`. O secret só aparece nesse momento; depois o painel mostra `••••` (se
    copiar a máscara, o LiveKit recusa com "invalid token" — revogue e crie outra chave).
 3. Reinicie o `pnpm dev`: deve aparecer `[server] chamada de áudio via wss://…`.
+
+## Login com Google
+
+Opcional: sem ele todo mundo joga como convidado. Com ele, a conta guarda amigos, salvos e
+favoritos em qualquer aparelho.
+
+1. No [Google Cloud Console](https://console.cloud.google.com), crie um projeto e vá em
+   **APIs e serviços → Tela de permissão OAuth**: tipo **Externo**, nome do app, seu e-mail.
+2. **Credenciais → Criar credenciais → ID do cliente OAuth** → **Aplicativo da Web**, com estes
+   **URIs de redirecionamento autorizados**:
+   - `http://localhost:5173/auth/google/callback` (dev)
+   - `https://<seu-site>.onrender.com/auth/google/callback` (produção)
+3. Copie o ID e a chave secreta para `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no
+   `apps/server/.env` (e no painel do Render, junto com `PUBLIC_URL=https://<seu-site>.onrender.com`).
+4. Reinicie o servidor: deve aparecer `[server] login com Google ligado`.
 
 ## Deploy (Render)
 
