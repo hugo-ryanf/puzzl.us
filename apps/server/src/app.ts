@@ -52,6 +52,7 @@ export function createGameServer({
   trustProxy = false,
 }: GameServerOptions = {}): Server {
   const accounts: AccountStore | undefined = auth?.accounts;
+  const savedGames = auth?.savedGames;
   const server = new Server({
     transport: new WebSocketTransport(),
     greet: false,
@@ -133,6 +134,7 @@ export function createGameServer({
         protected override voice = voice;
         protected override snapshots = snapshots;
         protected override accounts = accounts;
+        protected override savedGames = savedGames;
       },
     )
     .filterBy(['restore']);
