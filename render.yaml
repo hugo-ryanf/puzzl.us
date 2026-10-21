@@ -3,7 +3,8 @@
 # na criação e ficam só no painel do Render, nunca no git.
 services:
   - type: web
-    name: quebra-cabeca
+    # Endereço: https://puzzl-us.onrender.com (subdomínio do Render não aceita ponto).
+    name: puzzl-us
     runtime: node
     plan: free
     # Mesma região do banco no Neon (us-east-2): cada consulta ao ranking fica rápida.
