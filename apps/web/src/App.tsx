@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { CATALOG, type RankingQuery } from '@puzzle/shared';
 import { useAccount } from './net/account';
+import { useCommunity } from './net/community';
 import { useLibrary } from './net/library';
 import { hasSavedSession, resumeRoom, type PuzzleRoom } from './net/connection';
 import { loadPlayerName } from './net/playerName';
@@ -40,6 +41,9 @@ export function App() {
   const playerName = name.trim() ? name : (accountName ?? name);
   const library = useLibrary(account.user);
   const signedIn = !!account.user;
+  const community = useCommunity(
+    account.user === undefined ? undefined : (account.user?.id ?? null),
+  );
   const [createRequested, setCreateRequested] = useState(false);
   // Link de convite (/K7QF2) sem sessão salva: abre "Entrar com código" já preenchido.
   const [joinOpen, setJoinOpen] = useState(() => codeFromUrl() !== '');
@@ -87,7 +91,11 @@ export function App() {
             <ArrowLeftIcon size={18} />
             Voltar para a sala
           </button>
-          <RankingScreen key={JSON.stringify(ranking)} initial={ranking} />
+          <RankingScreen
+            key={JSON.stringify(ranking)}
+            initial={ranking}
+            community={community.puzzles}
+          />
         </div>
       );
     }
@@ -99,6 +107,7 @@ export function App() {
         onLeave={leave}
         onRejoin={enter}
         onShowRanking={setRanking}
+        account={account.user ? { name: account.user.name, publish: community.publish } : undefined}
       />
     );
   }
@@ -126,7 +135,11 @@ export function App() {
     >
       {ranking ? (
         // `key`: abrir o ranking de outra foto recomeça os filtros a partir dela.
-        <RankingScreen key={JSON.stringify(ranking)} initial={ranking} />
+        <RankingScreen
+          key={JSON.stringify(ranking)}
+          initial={ranking}
+          community={community.puzzles}
+        />
       ) : section === 'saved' ? (
         <SavedScreen
           signedIn={signedIn}
@@ -147,6 +160,8 @@ export function App() {
           library={library}
           signedIn={signedIn}
           googleLogin={account.googleLogin}
+          community={community}
+          isAdmin={account.user?.isAdmin ?? false}
           notice={notice ?? account.loginNotice}
           name={playerName}
           onNameChange={setName}
