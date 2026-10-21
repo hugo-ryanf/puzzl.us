@@ -7,6 +7,7 @@ import { createGoogleAuth, googleConfigFromEnv } from './auth/google';
 import type { AuthOptions } from './auth/routes';
 import { createLibraryStore } from './library/library';
 import { createSavedGameStore } from './rooms/savedGames';
+import { createFriendStore } from './friends/friends';
 import { createCommunityStore, type CommunityStore } from './community/community';
 import { connectDatabase } from './db/database';
 import { createGameStore, type GameStore } from './db/gameStore';
@@ -56,6 +57,7 @@ if (databaseUrl) {
     secureCookies: publicUrl.startsWith('https://'),
     library: createLibraryStore(db),
     savedGames: createSavedGameStore(db),
+    friends: createFriendStore(db),
   };
   console.log('[server] banco conectado, migrações em dia');
   if (auth.google) console.log(`[server] login com Google ligado (volta para ${publicUrl})`);
