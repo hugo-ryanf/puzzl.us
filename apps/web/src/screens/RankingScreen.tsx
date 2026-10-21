@@ -16,7 +16,13 @@ import {
 } from '@puzzle/shared';
 import { catalogThumbUrl, puzzleImageInfo } from '../board/images';
 import { formatDuration } from '../format';
-import { fetchBulletRanking, fetchGeneralRanking, fetchRanking } from '../net/ranking';
+import {
+  fetchBulletRanking,
+  fetchGeneralRanking,
+  fetchPopularImages,
+  fetchRanking,
+} from '../net/ranking';
+import { SearchIcon } from '../ui/icons';
 import { Pips, difficultyOf } from '../ui/difficulty';
 
 /** O que abre o ranking: a categoria de uma foto e, vindo de um Bullet, a categoria dele. */
@@ -59,6 +65,16 @@ const PERIOD_PHRASES: Record<RankingPeriod, string> = {
 const TEAM_LABELS: Record<number, string> = { 1: 'Solo', 2: 'Duplas', 3: 'Trios', 4: 'Quartetos' };
 const teamLabel = (n: number) => TEAM_LABELS[n] ?? `${n} jogadores`;
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+/** Quantas fotos aparecem para escolher (busca ou mais jogadas). */
+const IMAGE_CHOICES = 12;
+
+/** Busca sem acento e sem caixa: "patio" acha "Pátio com chafariz". */
+const normalize = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
 
 export function RankingScreen({ initial, community }: RankingScreenProps) {
   const images = [
@@ -119,6 +135,31 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
   const result = loaded?.key === key ? loaded : undefined;
   const imageTitle = puzzleImageInfo(query.image)?.title;
 
+  // Escolher a foto: com busca, as que batem com o título; sem busca, as mais jogadas.
+  const [search, setSearch] = useState('');
+  const [popular, setPopular] = useState<string[]>();
+  useEffect(() => {
+    if (tab !== 'puzzle') return;
+    let current = true;
+    fetchPopularImages({ players, period })
+      .then((list) => current && setPopular(list.map((entry) => entry.imageId)))
+      .catch(() => current && setPopular([]));
+    return () => {
+      current = false;
+    };
+  }, [tab, players, period]);
+  const byId = new Map(images.map((image) => [image.id, image]));
+  const q = normalize(search);
+  const candidates = q
+    ? images.filter((image) => normalize(image.title).includes(q))
+    : (popular ?? []).flatMap((id) => byId.get(id) ?? []);
+  // A foto escolhida aparece sempre, primeiro.
+  const selected = byId.get(query.image);
+  const choices = [
+    ...(selected ? [selected] : []),
+    ...candidates.filter((image) => image.id !== query.image),
+  ].slice(0, IMAGE_CHOICES);
+
   return (
     <>
       <div className="page-header">
@@ -129,7 +170,7 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
               ? 'Melhor tempo de cada equipe em cada foto, medido pelo servidor.'
               : tab === 'bullet'
                 ? 'Quantos quebra-cabeças cada equipe montou no tempo. Empate: peças do último.'
-                : 'Peças montadas somando todas as fotos. Empate: menos tempo no total.'}
+                : 'Pontos somados no período: peças × velocidade, a melhor partida de cada foto.'}
           </p>
         </div>
         <div className="chips" role="group" aria-label="Tipo de ranking">
@@ -147,7 +188,7 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
             aria-pressed={tab === 'general'}
             onClick={() => setTab('general')}
           >
-            Geral
+            Pontos
           </button>
           <button
             type="button"
@@ -200,8 +241,28 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
         <>
           <div className="filter-group" role="radiogroup" aria-labelledby="filter-image">
             <span id="filter-image">Imagem</span>
+            <label className="search ranking-search">
+              <SearchIcon size={18} />
+              <span className="sr-only">Buscar foto</span>
+              <input
+                type="search"
+                placeholder="Buscar foto pelo título…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+            {!q && popular?.length === 0 && (
+              <p className="result-note">
+                Ninguém jogou em {teamLabel(players).toLowerCase()} {PERIOD_PHRASES[period]}: busque
+                uma foto pelo título.
+              </p>
+            )}
+            {!q && !!popular?.length && <small className="field-hint">Mais jogadas</small>}
+            {q && candidates.length === 0 && (
+              <p className="result-note">Nenhuma foto com esse título.</p>
+            )}
             <div className="chips">
-              {images.map((image) => (
+              {choices.map((image) => (
                 <button
                   key={image.id}
                   type="button"
@@ -335,10 +396,9 @@ export function RankingScreen({ initial, community }: RankingScreenProps) {
                 {entry.position}º
               </span>
               <span>{entry.players.join(' & ')}</span>
-              <span className="time">{entry.points.toLocaleString('pt-BR')} peças</span>
+              <span className="time">{entry.points.toLocaleString('pt-BR')} pts</span>
               <span className="date">
-                {entry.puzzles === 1 ? '1 quebra-cabeça' : `${entry.puzzles} quebra-cabeças`} ·{' '}
-                {formatDuration(entry.totalMs)}
+                {entry.puzzles === 1 ? '1 quebra-cabeça' : `${entry.puzzles} quebra-cabeças`}
               </span>
             </li>
           ))}
