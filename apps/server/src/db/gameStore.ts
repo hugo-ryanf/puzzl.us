@@ -1,33 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  gte,
-  inArray,
-  isNull,
-  lt,
-  min,
-  ne,
-  sql,
-  type SQL,
-} from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNull, lt, min, ne, sql, type SQL } from 'drizzle-orm';
 import {
   POINTS_MIN_SAMPLES,
-  RANKING_TIME_ZONE,
   gamePoints,
   type GeneralRankingEntry,
   type PopularImage,
   type PopularQuery,
+  type RankingPage,
   type GeneralRankingQuery,
   type RankingEntry,
   type RankingPeriod,
   type RankingQuery,
 } from '@puzzle/shared';
-import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import type { AppDatabase } from './database';
+import { finishedInPeriod, rankingPage } from './rankingPage';
 import { gamePlayers, games, players } from './schema';
 
 export interface GameResult {
@@ -94,33 +80,6 @@ export async function resolveTeam(tx: Transaction, team: TeamMember[]) {
   return { playerIds, teamKey: [...playerIds].sort().join(',') };
 }
 
-/** Nome de cada equipe pela team_key: os apelidos mais recentes, em ordem alfabética. */
-export async function teamNames(
-  db: AppDatabase,
-  teamKeys: string[],
-): Promise<Map<string, string[]>> {
-  const ids = [...new Set(teamKeys.flatMap((key) => key.split(',')))];
-  const names = new Map(
-    ids.length === 0
-      ? []
-      : (
-          await db
-            .select({ id: players.id, nickname: players.nickname })
-            .from(players)
-            .where(inArray(players.id, ids))
-        ).map((p) => [p.id, p.nickname]),
-  );
-  return new Map(
-    teamKeys.map((key) => [
-      key,
-      key
-        .split(',')
-        .map((id) => names.get(id) ?? '?')
-        .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    ]),
-  );
-}
-
 /** Como na URL: sem período, vale "desde sempre". */
 type WithOptionalPeriod<T extends { period: RankingPeriod }> = Omit<T, 'period'> &
   Partial<Pick<T, 'period'>>;
@@ -132,34 +91,27 @@ export interface GameStore {
    * pontos que ela valeu.
    */
   saveGame(result: GameResult): Promise<{ rank: number; rankToday: number; points: number }>;
-  leaderboard(query: WithOptionalPeriod<RankingQuery>, limit?: number): Promise<RankingEntry[]>;
-  /** Ranking geral da modalidade no período: soma de peças de todas as fotos. */
+  /** Melhor tempo de cada equipe na categoria; `viewerPlayerId` acha "Sua posição". */
+  leaderboard(
+    query: WithOptionalPeriod<RankingQuery>,
+    viewerPlayerId?: string,
+    limit?: number,
+  ): Promise<RankingPage<RankingEntry>>;
+  /** Ranking por pontos da modalidade no período (a melhor partida de cada foto e tamanho). */
   generalLeaderboard(
     query: WithOptionalPeriod<GeneralRankingQuery>,
+    viewerPlayerId?: string,
     limit?: number,
-  ): Promise<GeneralRankingEntry[]>;
-  /** Fotos mais jogadas na modalidade e no período (para escolher no ranking por foto). */
-  popular(query: WithOptionalPeriod<PopularQuery>, limit?: number): Promise<PopularImage[]>;
+  ): Promise<RankingPage<GeneralRankingEntry>>;
+  /** Fotos mais jogadas no período (e no anterior, para a tendência). */
+  popular(query: Partial<PopularQuery>): Promise<PopularImage[]>;
+  /** O jogador do ranking de quem está vendo: o da conta, ou o convidado deste navegador. */
+  playerIdFor(viewer: { userId?: string; guestId?: string }): Promise<string | undefined>;
 }
 
-const PERIOD_UNIT = { day: 'day', week: 'week', month: 'month' } as const;
-
-/**
- * Partidas terminadas desde o começo do período, contado no horário de Brasília (o servidor
- * roda em UTC: sem isso, "hoje" viraria às 21h). No Postgres a semana começa na segunda.
- */
-function inPeriod(period: RankingPeriod): SQL | undefined {
-  return finishedInPeriod(games.finishedAt, period);
-}
-
-/** O mesmo filtro de período para outra tabela (a coluna de quando terminou). */
-export function finishedInPeriod(column: AnyPgColumn, period: RankingPeriod): SQL | undefined {
-  if (period === 'all') return undefined;
-  const unit = PERIOD_UNIT[period];
-  return gte(
-    column,
-    sql`date_trunc(${unit}, now() at time zone ${RANKING_TIME_ZONE}) at time zone ${RANKING_TIME_ZONE}`,
-  );
+/** Partidas terminadas no período (ou no anterior equivalente, para comparar). */
+function inPeriod(period: RankingPeriod, previous = false): SQL | undefined {
+  return finishedInPeriod(games.finishedAt, period, previous);
 }
 
 /** Só se compara tempo de partidas iguais: mesma imagem, mesmo tamanho, mesma equipe. */
@@ -243,87 +195,94 @@ export function createGameStore(db: AppDatabase): GameStore {
       });
     },
 
-    async leaderboard({ image, pieces, players: teamSize, period = 'all' }, limit = 20) {
-      // Melhor partida de cada equipe (DISTINCT ON), depois ordena essas partidas por tempo.
-      const bestGames = db
-        .selectDistinctOn([games.teamKey], {
-          id: games.id,
-          durationMs: games.durationMs,
-          finishedAt: games.finishedAt,
-        })
-        .from(games)
-        .where(and(sameCategory(image, pieces, teamSize), inPeriod(period)))
-        .orderBy(games.teamKey, asc(games.durationMs), asc(games.finishedAt))
-        .as('best_games');
-      const top = await db
-        .select()
-        .from(bestGames)
-        .orderBy(asc(bestGames.durationMs), asc(bestGames.finishedAt))
-        .limit(limit);
-      if (top.length === 0) return [];
-
-      const names = await db
-        .select({ gameId: gamePlayers.gameId, nickname: gamePlayers.nickname })
-        .from(gamePlayers)
-        .where(
-          inArray(
-            gamePlayers.gameId,
-            top.map((g) => g.id),
-          ),
-        )
-        .orderBy(asc(gamePlayers.nickname));
-
-      return top.map((game, index) => ({
-        position: index + 1,
-        players: names.filter((n) => n.gameId === game.id).map((n) => n.nickname),
-        durationMs: game.durationMs,
-        finishedAt: game.finishedAt.toISOString(),
-      }));
+    async leaderboard(
+      { image, pieces, players: teamSize, period = 'all' },
+      viewerPlayerId,
+      limit = 20,
+    ) {
+      // Melhor partida de cada equipe (DISTINCT ON), depois todas por tempo.
+      const ordered = (previous: boolean) => {
+        const best = db
+          .selectDistinctOn([games.teamKey], {
+            teamKey: games.teamKey,
+            durationMs: games.durationMs,
+            finishedAt: games.finishedAt,
+          })
+          .from(games)
+          .where(and(sameCategory(image, pieces, teamSize), inPeriod(period, previous)))
+          .orderBy(games.teamKey, asc(games.durationMs), asc(games.finishedAt))
+          .as('best_games');
+        return db.select().from(best).orderBy(asc(best.durationMs), asc(best.finishedAt));
+      };
+      return rankingPage(db, {
+        rows: await ordered(false),
+        previous: period === 'all' ? undefined : await ordered(true),
+        viewerPlayerId,
+        limit,
+        streakSource: 'games',
+        toEntry: (row) => ({
+          durationMs: row.durationMs,
+          finishedAt: row.finishedAt.toISOString(),
+        }),
+      });
     },
 
-    async generalLeaderboard({ players: teamSize, period = 'all' }, limit = 20) {
+    async generalLeaderboard({ players: teamSize, period = 'all' }, viewerPlayerId, limit = 20) {
       // Melhor partida de cada equipe em cada foto e tamanho: repetir não acumula pontos.
-      const best = db
-        .select({
-          teamKey: games.teamKey,
-          best: sql<number>`max(${games.points})`.as('best'),
-        })
-        .from(games)
-        .where(and(eq(games.teamSize, teamSize), inPeriod(period)))
-        .groupBy(games.teamKey, games.imageId, games.pieceCount)
-        .as('best_by_puzzle');
-      const points = sql<number>`sum(${best.best})::int`.as('points');
-      const top = await db
-        .select({ teamKey: best.teamKey, points, puzzles: count() })
-        .from(best)
-        .groupBy(best.teamKey)
-        .orderBy(desc(points), desc(count()))
-        .limit(limit);
-      if (top.length === 0) return [];
-
-      // team_key = ids dos jogadores unidos por vírgula; o nome mostrado é o apelido mais recente.
-      const names = await teamNames(
-        db,
-        top.map((row) => row.teamKey),
-      );
-      return top.map((row, index) => ({
-        position: index + 1,
-        players: names.get(row.teamKey)!,
-        points: row.points,
-        puzzles: row.puzzles,
-      }));
+      const ordered = (previous: boolean) => {
+        const best = db
+          .select({
+            teamKey: games.teamKey,
+            best: sql<number>`max(${games.points})`.as('best'),
+          })
+          .from(games)
+          .where(and(eq(games.teamSize, teamSize), inPeriod(period, previous)))
+          .groupBy(games.teamKey, games.imageId, games.pieceCount)
+          .as('best_by_puzzle');
+        const points = sql<number>`sum(${best.best})::int`.as('points');
+        return db
+          .select({ teamKey: best.teamKey, points, puzzles: count() })
+          .from(best)
+          .groupBy(best.teamKey)
+          .orderBy(desc(points), desc(count()), asc(best.teamKey));
+      };
+      return rankingPage(db, {
+        rows: await ordered(false),
+        previous: period === 'all' ? undefined : await ordered(true),
+        viewerPlayerId,
+        limit,
+        streakSource: 'games',
+        toEntry: (row) => ({ points: row.points, puzzles: row.puzzles }),
+      });
     },
 
-    async popular({ players: teamSize, period = 'all' }, limit = 20) {
-      const plays = count().as('plays');
-      const rows = await db
-        .select({ imageId: games.imageId, plays })
-        .from(games)
-        .where(and(teamSize ? eq(games.teamSize, teamSize) : undefined, inPeriod(period)))
-        .groupBy(games.imageId)
-        .orderBy(desc(plays), asc(games.imageId))
-        .limit(limit);
-      return rows;
+    async popular({ players: teamSize, period = 'all', limit = 20 }) {
+      const byImage = (previous: boolean) => {
+        const plays = count().as('plays');
+        return db
+          .select({ imageId: games.imageId, plays })
+          .from(games)
+          .where(
+            and(teamSize ? eq(games.teamSize, teamSize) : undefined, inPeriod(period, previous)),
+          )
+          .groupBy(games.imageId)
+          .orderBy(desc(plays), asc(games.imageId));
+      };
+      const top = await byImage(false).limit(limit);
+      if (period === 'all' || top.length === 0) {
+        return top.map((row) => ({ ...row, previousPlays: 0 }));
+      }
+      const before = new Map((await byImage(true)).map((row) => [row.imageId, row.plays] as const));
+      return top.map((row) => ({ ...row, previousPlays: before.get(row.imageId) ?? 0 }));
+    },
+
+    async playerIdFor({ userId, guestId }) {
+      if (!userId && !guestId) return undefined;
+      const [row] = await db
+        .select({ id: players.id })
+        .from(players)
+        .where(userId ? eq(players.userId, userId) : eq(players.guestId, guestId!));
+      return row?.id;
     },
   };
 }
