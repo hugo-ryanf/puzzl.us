@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { boot, type ColyseusTestServer } from '@colyseus/testing';
+import { ColyseusSDK } from '@colyseus/sdk';
 import { TokenVerifier } from 'livekit-server-sdk';
 import sharp from 'sharp';
 import {
@@ -13,17 +14,21 @@ import {
   type UploadResponse,
 } from '@puzzle/shared';
 import { createGameServer } from '../app';
+import { createAccountStore, type AccountStore } from '../auth/accounts';
 import type { AppDatabase } from '../db/database';
 import { createGameStore } from '../db/gameStore';
 import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
 import { createUploadStore } from '../uploads/uploadStore';
 import { createVoiceTokenIssuer, voiceRoomName } from '../voice';
 import type { PuzzleRoom } from './PuzzleRoom';
+import { createSavedGameStore, type SavedGameStore } from './savedGames';
 import { createSnapshotStore, type SnapshotStore } from './snapshots';
 
 let colyseus: ColyseusTestServer;
 let db: AppDatabase;
 let snapshots: SnapshotStore;
+let accounts: AccountStore;
+let savedGames: SavedGameStore;
 
 const voiceConfig = {
   url: 'wss://teste.livekit.cloud',
@@ -37,7 +42,16 @@ beforeAll(async () => {
   const uploads = createUploadStore(db);
   const voice = createVoiceTokenIssuer(voiceConfig);
   snapshots = createSnapshotStore(db);
-  colyseus = await boot(createGameServer({ store, uploads, voice, snapshots }), 2568);
+  accounts = createAccountStore(db);
+  savedGames = createSavedGameStore(db);
+  const auth = {
+    accounts,
+    savedGames,
+    publicUrl: 'http://localhost:5173',
+    adminEmails: [],
+    secureCookies: false,
+  };
+  colyseus = await boot(createGameServer({ store, uploads, voice, snapshots, auth }), 2568);
 });
 afterAll(() => colyseus.shutdown());
 beforeEach(async () => {
@@ -557,5 +571,144 @@ describe('PuzzleRoom — snapshot e reinício do servidor', () => {
     await anaClient.leave();
     await biaClient.leave();
     expect(await waitForSnapshot(code, false)).toBe(false);
+  });
+});
+
+describe('PuzzleRoom — salvar e retomar (Em andamento)', () => {
+  /** Conta logada: o cookie da sessão vai no WebSocket, como no navegador. */
+  async function login(name: string) {
+    const account = await accounts.signInWithGoogle({ sub: randomUUID(), name }, false);
+    const { token } = await accounts.createSession(account.id);
+    const sdk = new ColyseusSDK('ws://127.0.0.1:2568', { headers: { cookie: `sid=${token}` } });
+    return { account, sdk, guest: player(name) };
+  }
+
+  /** Espera a gravação (assíncrona) chegar ao banco. */
+  async function waitForSaved(userId: string, count: number) {
+    for (let i = 0; i < 50 && (await savedGames.list(userId)).length !== count; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    return savedGames.list(userId);
+  }
+
+  /** Hugo (logado) cria, Bia entra, começam e fazem um encaixe. */
+  async function playLoggedIn() {
+    const hugo = await login('Hugo');
+    const hugoClient = await hugo.sdk.create(ROOM_NAME, {
+      ...hugo.guest,
+      pieceCount: 24,
+      imageId: IMAGE.id,
+    });
+    const room = colyseus.getRoomById(hugoClient.roomId) as unknown as PuzzleRoom;
+    const bia = await colyseus.connectTo(room, player('Bia'));
+    const state = room.state as RoomState;
+    type Message = 'start' | 'grab' | 'drop' | 'saveAndLeave';
+    const send = async (client: typeof bia, type: Message, payload?: object) => {
+      client.send(type, payload);
+      await room.waitForNextMessage();
+    };
+    await send(hugoClient, 'start');
+    const anchor = state.groups.get('0')!;
+    await send(hugoClient, 'grab', { groupId: 1 });
+    await send(hugoClient, 'drop', { groupId: 1, x: anchor.x, y: anchor.y });
+    return { hugo, hugoClient, bia, room, state, send };
+  }
+
+  /** "Salvar e sair" do Hugo; devolve a partida salva. */
+  async function saveAndLeave(
+    hugo: { account: { id: string } },
+    client: Awaited<ReturnType<typeof playLoggedIn>>['hugoClient'],
+  ) {
+    client.onMessage('saved', () => {});
+    const left = new Promise((resolve) => client.onLeave(resolve));
+    client.send('saveAndLeave');
+    await left;
+    const [game] = await savedGames.list(hugo.account.id);
+    return game!;
+  }
+
+  it('quem cria logado é o dono; só ele salva, e a sala fecha para todos', async () => {
+    const { hugo, hugoClient, bia, state, send } = await playLoggedIn();
+    expect(state.ownerId).toBe(hugoClient.sessionId);
+
+    await send(bia, 'saveAndLeave'); // Bia não é a dona: ignorado
+    expect(await savedGames.list(hugo.account.id)).toHaveLength(0);
+
+    const saved = new Promise((resolve) => bia.onMessage('saved', resolve));
+    const biaLeft = new Promise((resolve) => bia.onLeave(resolve));
+    const game = await saveAndLeave(hugo, hugoClient);
+    await saved;
+    await biaLeft;
+    expect(game).toMatchObject({ imageId: IMAGE.id, pieceCount: 24, pieces: 24, placed: 2 });
+  });
+
+  it('retoma numa sala nova, no lobby, com a mesa e o tempo de antes; só o dono', async () => {
+    const { hugo, hugoClient, state } = await playLoggedIn();
+    const before = { code: hugoClient.roomId, pieceGroup: [...state.pieceGroup] };
+    const game = await saveAndLeave(hugo, hugoClient);
+    const resume = (who: { guestId: string; name: string }) => ({ ...who, resume: game.id });
+
+    // Outra conta e convidado não retomam a partida do Hugo.
+    const maria = await login('Maria');
+    await expect(maria.sdk.create(ROOM_NAME, resume(maria.guest))).rejects.toThrow();
+    await expect(colyseus.sdk.create(ROOM_NAME, resume(player('Zé')))).rejects.toThrow();
+
+    const client = await hugo.sdk.create(ROOM_NAME, resume(hugo.guest));
+    expect(client.roomId).not.toBe(before.code);
+    const room = colyseus.getRoomById(client.roomId);
+    const resumed = room.state as RoomState;
+    expect(resumed.phase).toBe('lobby');
+    expect([...resumed.pieceGroup]).toEqual(before.pieceGroup);
+    expect(resumed.elapsedMs).toBe(game.elapsedMs);
+    expect(resumed.ownerId).toBe(client.sessionId);
+    expect(resumed.players.get(client.sessionId)!.snaps).toBe(1); // os encaixes de antes
+
+    client.send('start');
+    await room.waitForNextMessage();
+    expect(resumed.phase).toBe('playing');
+    expect(resumed.elapsedMs).toBeGreaterThanOrEqual(game.elapsedMs);
+  });
+
+  it('ao montar tudo na partida retomada, ela sai do Em andamento', async () => {
+    const { hugo, hugoClient } = await playLoggedIn();
+    const game = await saveAndLeave(hugo, hugoClient);
+
+    const client = await hugo.sdk.create(ROOM_NAME, { ...hugo.guest, resume: game.id });
+    const room = colyseus.getRoomById(client.roomId) as unknown as PuzzleRoom;
+    const state = room.state as RoomState;
+    const send = async (_who: unknown, type: 'start' | 'grab' | 'drop', payload?: unknown) => {
+      client.send(type, payload);
+      await room.waitForNextMessage();
+    };
+    await send(client, 'start');
+    const group = (id: number) => state.groups.get(String(id))!;
+    await solve({ ana: client, state, group, send } as unknown as Parameters<typeof solve>[0]);
+    // A última jogada pode ainda estar na fila do servidor: espera o fim.
+    for (let i = 0; i < 50 && state.phase !== 'completed'; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(state.phase).toBe('completed');
+    expect(await waitForSaved(hugo.account.id, 0)).toHaveLength(0);
+  });
+
+  it('se todo mundo sai no meio da partida, ela vai para o Em andamento do dono', async () => {
+    const { hugo, hugoClient, bia } = await playLoggedIn();
+    await bia.leave();
+    await hugoClient.leave();
+    expect(await waitForSaved(hugo.account.id, 1)).toHaveLength(1);
+  });
+
+  it('o servidor desligando também salva a partida do dono', async () => {
+    const { hugo, room } = await playLoggedIn();
+    await room.onBeforeShutdown();
+    expect(await savedGames.list(hugo.account.id)).toHaveLength(1);
+  });
+
+  it('sala criada por convidado não tem dono (não dá para salvar)', async () => {
+    const { state, ana, room } = await setup();
+    expect(state.ownerId).toBe('');
+    ana.send('saveAndLeave');
+    await room.waitForNextMessage();
+    expect(state.phase).toBe('playing');
   });
 });
