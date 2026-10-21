@@ -3,6 +3,7 @@ import type {
   BulletRankingQuery,
   GeneralRankingEntry,
   GeneralRankingQuery,
+  PopularImage,
   RankingEntry,
   RankingQuery,
 } from '@puzzle/shared';
@@ -30,4 +31,9 @@ export function fetchGeneralRanking(query: GeneralRankingQuery): Promise<General
 /** Bullet: melhor corrida de cada equipe (minutos + peças + modalidade) no período. */
 export function fetchBulletRanking(query: BulletRankingQuery): Promise<BulletRankingEntry[]> {
   return getRanking('/api/ranking/bullet', query);
+}
+
+/** Fotos mais jogadas na modalidade e no período (a escolha da foto no ranking). */
+export function fetchPopularImages(query: GeneralRankingQuery): Promise<PopularImage[]> {
+  return getRanking('/api/ranking/popular', query);
 }
