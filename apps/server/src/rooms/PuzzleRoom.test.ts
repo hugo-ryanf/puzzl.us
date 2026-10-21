@@ -62,7 +62,7 @@ async function setup({ started = true } = {}) {
    */
   const send = async (
     client: typeof ana,
-    type: 'start' | 'grab' | 'move' | 'drop',
+    type: 'start' | 'grab' | 'move' | 'drop' | 'scatter',
     payload?: unknown,
   ) => {
     client.send(type, payload as GrabMessage);
@@ -188,7 +188,7 @@ describe('PuzzleRoom — jogo', () => {
   });
 
   it('encaixa ao soltar perto da vizinha e funde os grupos', async () => {
-    const { ana, state, group, send } = await setup();
+    const { ana, bia, state, group, send } = await setup();
     const target = group(0);
     await send(ana, 'grab', { groupId: 1 });
     await send(ana, 'drop', { groupId: 1, x: target.x + 5, y: target.y - 5 });
@@ -196,6 +196,9 @@ describe('PuzzleRoom — jogo', () => {
     expect(state.groups.has('0')).toBe(false);
     expect(state.pieceGroup[0]).toBe(1);
     expect(group(1).heldBy).toBe('');
+    // O encaixe conta para quem soltou.
+    expect(state.players.get(ana.sessionId)?.snaps).toBe(1);
+    expect(state.players.get(bia.sessionId)?.snaps).toBe(0);
   });
 
   it('não absorve um grupo que outro jogador está segurando', async () => {
@@ -211,6 +214,36 @@ describe('PuzzleRoom — jogo', () => {
     const received = bia.waitForMessage('cursor');
     ana.send('cursor', { x: 10, y: 20 });
     expect(await received).toEqual({ sessionId: ana.sessionId, x: 10, y: 20 });
+  });
+
+  it('espalhar move as peças soltas, mas não blocos montados nem peças na mão de alguém', async () => {
+    const { ana, bia, state, group, send } = await setup();
+    // Bloco 0+1 montado, e a Bia segurando a peça 5.
+    await send(ana, 'grab', { groupId: 1 });
+    await send(ana, 'drop', { groupId: 1, x: group(0).x, y: group(0).y });
+    await send(bia, 'grab', { groupId: 5 });
+    const before = new Map([...state.groups.entries()].map(([id, g]) => [id, { x: g.x, y: g.y }]));
+
+    await send(ana, 'scatter');
+
+    const position = (id: string) => ({ x: group(Number(id)).x, y: group(Number(id)).y });
+    expect(position('1')).toEqual(before.get('1'));
+    expect(position('5')).toEqual(before.get('5'));
+    const moved = [...before.keys()].filter((id) => id !== '1' && id !== '5');
+    expect(moved.every((id) => position(id).x !== before.get(id)!.x)).toBe(true);
+  });
+
+  it('espalhar não funciona no lobby nem duas vezes seguidas', async () => {
+    const { ana, group, send } = await setup({ started: false });
+    const lobby = { x: group(3).x, y: group(3).y };
+    await send(ana, 'scatter');
+    expect({ x: group(3).x, y: group(3).y }).toEqual(lobby);
+
+    await send(ana, 'start');
+    await send(ana, 'scatter');
+    const first = { x: group(3).x, y: group(3).y };
+    await send(ana, 'scatter');
+    expect({ x: group(3).x, y: group(3).y }).toEqual(first);
   });
 
   it('solta o grupo quando o jogador sai', async () => {
@@ -248,6 +281,8 @@ describe('PuzzleRoom — fim e ranking', () => {
     expect(state.phase).toBe('completed');
     expect(state.durationMs).toBeGreaterThan(0);
     expect(state.teamSize).toBe(2);
+    // A Ana montou tudo sozinha: todos os encaixes (peças − 1) são dela.
+    expect(state.players.get(game.ana.sessionId)?.snaps).toBe(state.pieceGroup.length - 1);
     await waitForRankStatus(room, state);
     expect(state.rankStatus).toBe('saved');
     expect(state.rank).toBe(1);
