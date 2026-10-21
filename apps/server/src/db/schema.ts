@@ -127,6 +127,8 @@ export const uploads = pgTable(
     width: integer('width').notNull(),
     height: integer('height').notNull(),
     data: bytea('data').notNull(),
+    /** Conta de quem enviou, se estava logado: só ela pode publicar a foto para todos. */
+    ownerUserId: uuid('owner_user_id').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -185,4 +187,47 @@ export const savedGames = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('saved_games_owner_idx').on(table.ownerUserId, table.updatedAt)],
+);
+
+/**
+ * Fotos enviadas que o dono publicou para todos (aparecem no Explorar e entram no ranking).
+ * `hidden`: denunciada demais, fora do ar até o admin decidir. `removed`: tirada pelo autor ou
+ * pelo admin (a linha fica para o mesmo upload não ser publicado de novo sem revisão).
+ */
+export const communityPuzzles = pgTable(
+  'community_puzzles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    uploadId: text('upload_id')
+      .notNull()
+      .unique()
+      .references(() => uploads.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    authorUserId: uuid('author_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    authorName: text('author_name').notNull(),
+    status: text('status', { enum: ['published', 'hidden', 'removed'] })
+      .notNull()
+      .default('published'),
+    /** Miniatura (WebP, 480 px) para o card: a foto inteira pesaria demais na grade. */
+    mini: bytea('mini').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('community_puzzles_status_idx').on(table.status, table.createdAt)],
+);
+
+/** Uma denúncia por conta e quebra-cabeça; COMMUNITY_HIDE_REPORTS delas ocultam a foto. */
+export const puzzleReports = pgTable(
+  'puzzle_reports',
+  {
+    puzzleId: uuid('puzzle_id')
+      .notNull()
+      .references(() => communityPuzzles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.puzzleId, table.userId] })],
 );
