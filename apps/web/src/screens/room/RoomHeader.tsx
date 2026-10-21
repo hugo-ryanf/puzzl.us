@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { puzzleImageInfo } from '../../board/images';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
-import { CheckIcon, LinkIcon, LogOutIcon, PuzzleIcon } from '../../ui/icons';
+import logoUrl from '../../assets/logo.webp';
+import { CheckIcon, LinkIcon, LogOutIcon } from '../../ui/icons';
 import type { VoiceChat } from '../../voice/useVoiceChat';
 import { VoiceMenu } from '../../voice/VoiceMenu';
 import { GameClock } from '../GameClock';
@@ -31,9 +32,7 @@ export function RoomHeader({ roomId, snapshot, voice, onLeave }: RoomHeaderProps
   return (
     <header className="room-header">
       <div className="room-title">
-        <span className="brand-mark" aria-hidden="true">
-          <PuzzleIcon size={18} />
-        </span>
+        <img className="brand-logo" src={logoUrl} alt="" />
         <div>
           <h1>{title}</h1>
           <p>
