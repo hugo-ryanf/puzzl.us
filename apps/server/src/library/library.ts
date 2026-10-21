@@ -1,10 +1,17 @@
 import express, { type Application } from 'express';
 import { and, count, desc, eq, max, min } from 'drizzle-orm';
-import { FavoriteImageId, type LibraryResponse, type PuzzleRecord } from '@puzzle/shared';
+import {
+  FavoriteImageId,
+  SavedGameId,
+  type LibraryResponse,
+  type PuzzleRecord,
+  type SavedGameSummary,
+} from '@puzzle/shared';
 import type { AccountStore } from '../auth/accounts';
 import { accountFromCookieHeader } from '../auth/routes';
 import type { AppDatabase } from '../db/database';
 import { favorites, gamePlayers, games, players } from '../db/schema';
+import type { SavedGameStore } from '../rooms/savedGames';
 
 /** Coisas só da conta: records (quebra-cabeças concluídos) e favoritos. */
 export interface LibraryStore {
@@ -71,12 +78,15 @@ export function createLibraryStore(db: AppDatabase): LibraryStore {
  * GET    /api/me/library            → { records, favorites }
  * PUT    /api/me/favorites/:imageId → favorita
  * DELETE /api/me/favorites/:imageId → desfavorita
+ * GET    /api/me/saved              → partidas salvas ("Em andamento")
+ * DELETE /api/me/saved/:id          → descarta uma partida salva
  * Tudo exige login (401 sem sessão). Cookie SameSite=Lax: outro site não consegue disparar.
  */
 export function registerLibraryRoutes(
   app: Application,
   accounts: AccountStore,
   library: LibraryStore,
+  savedGames?: SavedGameStore,
 ) {
   const router = express.Router();
   router.use(async (req, res, next) => {
@@ -112,6 +122,23 @@ export function registerLibraryRoutes(
     };
   router.put('/favorites/:imageId', favoriteRoute(true));
   router.delete('/favorites/:imageId', favoriteRoute(false));
+
+  if (savedGames) {
+    router.get('/saved', async (_req, res) => {
+      const body: SavedGameSummary[] = await savedGames.list(res.locals.userId as string);
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(body);
+    });
+    router.delete('/saved/:id', async (req, res) => {
+      const id = SavedGameId.safeParse(req.params.id);
+      if (!id.success) {
+        res.status(400).json({ error: 'Partida inválida.' });
+        return;
+      }
+      await savedGames.delete(id.data, res.locals.userId as string); // só apaga se for da conta
+      res.sendStatus(204);
+    });
+  }
 
   app.use('/api/me', router);
 }
