@@ -455,7 +455,8 @@ select {
   line-height: 1.4;
 }
 
-.google-btn {
+/* Links com cara de botão (entrar com Google, voltar ao jogo): sem sublinhado de link. */
+a.btn {
   text-decoration: none;
 }
 
@@ -526,6 +527,11 @@ select {
  * menu em linha e sem os itens "em breve", que não levam a lugar nenhum.
  */
 @media (max-width: 640px) {
+  /* Com pouco conteúdo, a linha da barra lateral esticaria até o fim da tela (flex-wrap). */
+  .shell {
+    align-content: flex-start;
+  }
+
   .main {
     padding: 24px 16px 40px;
   }
@@ -631,6 +637,7 @@ select {
 }
 
 .card {
+  position: relative; /* o marcador de favorito fica no canto da foto */
   display: flex;
   flex-direction: column;
   padding: 8px;
@@ -676,10 +683,19 @@ select {
   display: block;
 }
 
-.card-badge {
+/* Selos no pé da foto: orientação e, se já montou, "Montado". */
+.card-badges {
   position: absolute;
   left: 10px;
   bottom: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 5px 10px;
   border-radius: 999px;
   background: rgba(21, 23, 28, 0.74);
@@ -687,6 +703,42 @@ select {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+.card-badge.done {
+  background: var(--speaking); /* o mesmo verde do "falando": aqui, "feito" */
+}
+
+/* Marcador de favorito, no canto da foto (fora do botão do card). */
+.card-favorite {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(21, 23, 28, 0.14);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.card-favorite:hover {
+  transform: scale(1.06);
+}
+
+.card-favorite.on {
+  color: var(--accent);
+}
+
+.card-favorite.on svg {
+  fill: currentColor;
 }
 
 .card-title {
@@ -2412,6 +2464,89 @@ select {
 .caption .credit {
   color: var(--text-3);
   font-size: 13px;
+}
+
+/* ── Meus records ──────────────────────────────────────────────────────── */
+
+.records-list {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  list-style: none;
+}
+
+.records-list li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--divider);
+}
+
+.records-list li:first-child {
+  border-top: 0;
+}
+
+.records-list img,
+.records-thumb {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--hover);
+}
+
+.records-title,
+.records-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.records-title strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.records-title small,
+.records-time small {
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.records-time {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.records-time strong {
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+}
+
+.records-list .btn {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* Celular: o botão do ranking desce para a linha de baixo. */
+@media (max-width: 640px) {
+  .records-list li {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    padding: 12px;
+  }
+
+  .records-list .btn {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
 }
 
 /* ── Página de texto (política de privacidade) ──────────────────────────── */
