@@ -37,6 +37,9 @@ const groupId = z.number().int().nonnegative();
 /** Limite generoso: a mesa ocupa ~2× a imagem; só barramos valores absurdos. */
 const coordinate = z.number().min(-100_000).max(100_000);
 
+/** Modo da sala: clássico (um quebra-cabeça), Bullet (contra o relógio) ou Batalha (lados). */
+export type GameMode = 'classic' | 'bullet' | 'battle';
+
 /** Andamento da partida: lobby (esperando o anfitrião) → playing → completed. */
 export type GamePhase = 'lobby' | 'playing' | 'completed';
 
@@ -114,14 +117,17 @@ export type ResumeRoomOptions = z.infer<typeof ResumeRoomOptions>;
 
 // ── Cliente → servidor durante o jogo ───────────────────────────────────────
 
-export const GrabMessage = z.object({ groupId });
+/** Tabuleiro da mensagem nos modos novos ('main', 'a' ou 'b'); ausente no clássico. */
+const boardKey = z.enum(['main', 'a', 'b']).optional();
+
+export const GrabMessage = z.object({ groupId, board: boardKey });
 export type GrabMessage = z.infer<typeof GrabMessage>;
 
 /** Usado tanto para mover quanto para soltar (o drop leva a posição final). */
-export const MoveMessage = z.object({ groupId, x: coordinate, y: coordinate });
+export const MoveMessage = z.object({ groupId, x: coordinate, y: coordinate, board: boardKey });
 export type MoveMessage = z.infer<typeof MoveMessage>;
 
-export const CursorMessage = z.object({ x: coordinate, y: coordinate });
+export const CursorMessage = z.object({ x: coordinate, y: coordinate, board: boardKey });
 export type CursorMessage = z.infer<typeof CursorMessage>;
 
 // ── Servidor → cliente ──────────────────────────────────────────────────────
@@ -131,6 +137,8 @@ export interface CursorBroadcast {
   sessionId: string;
   x: number;
   y: number;
+  /** Em qual tabuleiro o cursor está (modos novos). */
+  board?: string;
 }
 
 /**
@@ -355,3 +363,68 @@ export interface InviteMessage {
   /** Foto da sala (para o aviso dizer o que vão montar). */
   imageId: string;
 }
+
+// ── Modo Bullet ─────────────────────────────────────────────────────────────
+
+/** Nome das salas de cada modo no Colyseus (o clássico é ROOM_NAME). */
+export const BULLET_ROOM = 'bullet';
+export const BATTLE_ROOM = 'battle';
+
+/** Durações do Bullet, em minutos. */
+export const BULLET_MINUTES = [3, 5, 10] as const;
+/** Tamanhos do Bullet: quebra-cabeças pequenos, um atrás do outro. */
+export const BULLET_PIECES = [12, 24] as const;
+
+const bulletMinutes = z.union(BULLET_MINUTES.map((n) => z.literal(n)));
+const bulletPieces = z.union(BULLET_PIECES.map((n) => z.literal(n)));
+
+/** Criar sala de Bullet: as fotos são sorteadas do catálogo a cada quebra-cabeça. */
+export const CreateBulletOptions = JoinOptions.extend({
+  minutes: bulletMinutes,
+  pieces: bulletPieces,
+  maxPlayers: maxPlayers.default(MAX_PLAYERS),
+});
+export type CreateBulletOptions = z.infer<typeof CreateBulletOptions>;
+
+/** GET /api/ranking/bullet?minutes=5&pieces=12&players=2&period=week */
+export const BulletRankingQuery = z.object({
+  minutes: z.coerce.number().pipe(bulletMinutes),
+  pieces: z.coerce.number().pipe(bulletPieces),
+  players: teamSize,
+  period,
+});
+export type BulletRankingQuery = z.infer<typeof BulletRankingQuery>;
+
+/** Melhor corrida de cada equipe: mais montados; empate, mais peças no que ficou pela metade. */
+export interface BulletRankingEntry {
+  position: number;
+  players: string[];
+  solved: number;
+  partial: number;
+  /** ISO 8601. */
+  finishedAt: string;
+}
+
+// ── Modo Batalha ────────────────────────────────────────────────────────────
+
+/** Os dois lados da Batalha. */
+export const BATTLE_TEAMS = ['a', 'b'] as const;
+export type BattleTeam = (typeof BATTLE_TEAMS)[number];
+
+/** 1v1 (2 vagas) ou 2v2 (4 vagas). */
+export const BATTLE_FORMATS = { '1v1': 2, '2v2': 4 } as const;
+export type BattleFormat = keyof typeof BATTLE_FORMATS;
+
+/** Criar sala de Batalha: os dois lados montam a mesma foto, do mesmo tamanho. */
+export const CreateBattleOptions = JoinOptions.extend({
+  pieceCount,
+  imageId: z.union([imageId, z.literal(RANDOM_IMAGE)]),
+  format: z.enum(['1v1', '2v2']),
+});
+export type CreateBattleOptions = z.infer<typeof CreateBattleOptions>;
+
+/** Lobby da Batalha: trocar de lado. */
+export const ChooseTeamMessage = z.object({ team: z.enum(BATTLE_TEAMS) });
+
+/** "Espalhar" dos modos novos diz o tabuleiro. */
+export const ScatterMessage = z.object({ board: z.enum(['main', 'a', 'b']).optional() });
