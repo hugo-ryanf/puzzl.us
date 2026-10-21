@@ -28,6 +28,11 @@ export const PlayerSchema = schema(
     color: t.string(),
     /** false enquanto o jogador caiu e o servidor espera ele reconectar. */
     connected: t.boolean().default(true),
+    /**
+     * Encaixes que este jogador fez (cada grupo absorvido ao soltar conta 1). Somando todos os
+     * jogadores dá peças − 1 no fim: é a "contribuição" de cada um no resultado.
+     */
+    snaps: t.uint16().default(0),
   },
   'PlayerSchema',
 );
