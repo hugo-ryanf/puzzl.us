@@ -298,3 +298,60 @@ export interface CommunityPuzzle {
   /** A conta que pediu a lista já denunciou. */
   reported: boolean;
 }
+
+// ── Amigos, presença e convites ─────────────────────────────────────────────
+
+/** Sala Colyseus que todo cliente logado mantém aberta: status online e convites chegam por ela. */
+export const PRESENCE_ROOM = 'presence';
+
+/** Código de amigo "K7QF-2M9D"; aceita digitado sem hífen e em minúsculas. */
+export const FriendCode = z
+  .string()
+  .transform((code) => code.toUpperCase().replace(/[^A-Z0-9]/g, ''))
+  .pipe(z.string().length(8, 'O código tem 8 letras e números'))
+  .transform((code) => `${code.slice(0, 4)}-${code.slice(4)}`);
+
+/** POST /api/me/friends — pede amizade pelo código (se a outra pessoa já pediu, aceita). */
+export const AddFriendRequest = z.object({ code: FriendCode });
+
+/** Id da outra conta nas rotas /api/me/friends/:id. */
+export const FriendId = z.uuid();
+
+/** Online = com o site aberto; jogando = numa sala; offline = nenhum dos dois. */
+export type FriendStatus = 'online' | 'playing' | 'offline';
+
+export interface FriendView {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  /** Só para amigos aceitos; pedidos pendentes vêm sempre 'offline'. */
+  status: FriendStatus;
+}
+
+/** GET /api/me/friends */
+export interface FriendsResponse {
+  /** O código desta conta, para passar adiante. */
+  friendCode: string;
+  friends: FriendView[];
+  /** Pedidos recebidos (esperando aceitar). */
+  incoming: FriendView[];
+  /** Pedidos enviados (esperando a outra pessoa). */
+  outgoing: FriendView[];
+}
+
+/** POST /api/me/invites — chama um amigo online para a sala em que você está. */
+export const InviteRequest = z.object({
+  friendId: FriendId,
+  roomCode: z.string().regex(/^[A-Z2-9]{5}$/),
+});
+export type InviteRequest = z.infer<typeof InviteRequest>;
+
+/** Mensagem 'invite' da sala de presença: aparece como aviso para o amigo. */
+export interface InviteMessage {
+  fromId: string;
+  fromName: string;
+  fromAvatarUrl: string | null;
+  roomCode: string;
+  /** Foto da sala (para o aviso dizer o que vão montar). */
+  imageId: string;
+}
