@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CATALOG, type InviteMessage, type RankingQuery } from '@puzzle/shared';
+import {
+  CATALOG,
+  type BulletRankingQuery,
+  type InviteMessage,
+  type RankingQuery,
+} from '@puzzle/shared';
 import { useAccount } from './net/account';
 import { useCommunity } from './net/community';
 import { useFriends } from './net/friends';
@@ -45,7 +50,9 @@ const DEFAULT_RANKING: RankingQuery = {
 export function App() {
   const [room, setRoom] = useState<PuzzleRoom | null>(null);
   // Ranking aberto por cima (do menu ou do fim da partida); a sala continua conectada por trás.
-  const [ranking, setRanking] = useState<RankingQuery | null>(null);
+  const [ranking, setRanking] = useState<(RankingQuery & { bullet?: BulletRankingQuery }) | null>(
+    null,
+  );
   /** Tela da barra lateral (o ranking, quando aberto, fica por cima dela). */
   const [section, setSection] = useState<Exclude<Section, 'ranking'>>(() =>
     friendCodeFromUrl() ? 'friends' : 'explore',
@@ -148,7 +155,7 @@ export function App() {
           room={room}
           onLeave={leave}
           onRejoin={enter}
-          onShowRanking={setRanking}
+          onShowRanking={(open) => setRanking({ ...DEFAULT_RANKING, ...open })}
           account={
             account.user ? { name: account.user.name, publish: community.publish } : undefined
           }
