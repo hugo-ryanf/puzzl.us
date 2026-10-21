@@ -91,6 +91,12 @@ export function AppShell({
 
         <div className="sidebar-footer">
           <SoonLink icon={<SettingsIcon />} label="Configurações" />
+          <p className="credits">
+            Feito por{' '}
+            <a href="https://github.com/hugo-ryanf" target="_blank" rel="noreferrer">
+              hugo-ryanf
+            </a>
+          </p>
         </div>
       </aside>
 

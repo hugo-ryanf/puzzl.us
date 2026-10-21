@@ -433,6 +433,23 @@ select {
   border-top: 1px solid var(--divider);
 }
 
+.credits {
+  margin: 12px 12px 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.credits a {
+  color: var(--text-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.credits a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .main {
   flex: 999 1 560px;
   min-width: 0;
@@ -474,9 +491,19 @@ select {
     width: auto;
   }
 
-  .nav-link:disabled,
-  .sidebar-footer {
+  .nav-link:disabled {
     display: none;
+  }
+
+  /* No celular o rodapé só mostra os créditos, sem a linha divisória. */
+  .sidebar-footer {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .credits {
+    margin: 0 4px;
   }
 }
 
