@@ -248,15 +248,38 @@ export const GeneralRankingQuery = z.object({ players: teamSize, period });
 export type GeneralRankingQuery = z.infer<typeof GeneralRankingQuery>;
 
 /**
- * Uma linha do ranking geral. Pontos = peças somadas dos quebra-cabeças completados no período
- * (montar um de 500 vale mais que um de 24); empate, ganha quem gastou menos tempo no total.
+ * Pontos de uma partida: peças × fator de velocidade. O fator compara o tempo com o tempo típico
+ * (mediana) das partidas com o mesmo número de peças e a mesma modalidade, em qualquer foto, e
+ * fica entre POINTS_MIN_FACTOR e POINTS_MAX_FACTOR. Com menos de POINTS_MIN_SAMPLES partidas para
+ * comparar, vale 1×.
+ */
+export const POINTS_MIN_FACTOR = 0.5;
+export const POINTS_MAX_FACTOR = 2;
+export const POINTS_MIN_SAMPLES = 5;
+
+export function gamePoints(pieceCount: number, durationMs: number, typicalMs?: number): number {
+  const factor =
+    typicalMs && durationMs > 0
+      ? Math.min(POINTS_MAX_FACTOR, Math.max(POINTS_MIN_FACTOR, typicalMs / durationMs))
+      : 1;
+  return Math.round(pieceCount * factor);
+}
+
+/**
+ * Uma linha do ranking por pontos: soma, no período, da melhor partida da equipe em cada foto e
+ * tamanho (repetir o mesmo quebra-cabeça não acumula). Empate: mais quebra-cabeças diferentes.
  */
 export interface GeneralRankingEntry {
   position: number;
   players: string[];
   points: number;
   puzzles: number;
-  totalMs: number;
+}
+
+/** GET /api/ranking/popular?players=2&period=week — fotos mais jogadas (para escolher no ranking). */
+export interface PopularImage {
+  imageId: string;
+  plays: number;
 }
 
 /** Uma linha do ranking: o melhor tempo de cada equipe na categoria. */
