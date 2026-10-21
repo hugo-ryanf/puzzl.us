@@ -4,6 +4,7 @@ import type { RankingQuery } from '@puzzle/shared';
 import { Board } from '../board/Board';
 import { puzzleImageInfo } from '../board/images';
 import { usePuzzleImage } from '../board/usePuzzleImage';
+import { formatDuration } from '../format';
 import { leaveRoom, rejoinRoom, type PuzzleRoom } from '../net/connection';
 import { loadPlayerName } from '../net/playerName';
 import { useRoomSnapshot, type RoomSnapshot } from '../net/useRoomSnapshot';
@@ -26,6 +27,9 @@ export function RoomScreen({ room, onLeave, onRejoin, onShowRanking }: RoomScree
   // Solo não entra na chamada: não há com quem falar (e poupa a cota do LiveKit).
   const voice = useVoiceChat(room, !solo);
   const [reconnecting, setReconnecting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const isOwner = snapshot.ownerId !== '' && snapshot.ownerId === room.sessionId;
 
   const image = usePuzzleImage(snapshot.imageId);
 
@@ -53,13 +57,35 @@ export function RoomScreen({ room, onLeave, onRejoin, onShowRanking }: RoomScree
     room.onDrop(handleDrop);
     room.onReconnect(handleReconnect);
     room.onLeave(handleLeave);
+    // O dono salvou: a sala fecha para todos (com CONSENTED, então o handleLeave não reage).
+    const removeSaved = room.onMessage('saved', () => {
+      const owner = room.state.ownerId === room.sessionId;
+      leaveRoom(room);
+      onLeave(
+        owner
+          ? 'Partida salva. Continue quando quiser em "Em andamento".'
+          : 'Quem criou a sala salvou a partida para continuar depois.',
+      );
+    });
+    const removeSaveFailed = room.onMessage('saveFailed', () => {
+      setSaving(false);
+      setSaveError(true);
+    });
     return () => {
       unmounted = true;
       room.onDrop.remove(handleDrop);
       room.onReconnect.remove(handleReconnect);
       room.onLeave.remove(handleLeave);
+      removeSaved();
+      removeSaveFailed();
     };
   }, [room, onLeave, onRejoin]);
+
+  function saveAndLeave() {
+    setSaving(true);
+    setSaveError(false);
+    room.send('saveAndLeave');
+  }
 
   function leave() {
     leaveRoom(room);
@@ -68,8 +94,16 @@ export function RoomScreen({ room, onLeave, onRejoin, onShowRanking }: RoomScree
 
   return (
     <div className="room">
-      <RoomHeader roomId={room.roomId} snapshot={snapshot} voice={voice} onLeave={leave} />
+      <RoomHeader
+        roomId={room.roomId}
+        snapshot={snapshot}
+        voice={voice}
+        onLeave={leave}
+        onSaveAndLeave={isOwner && snapshot.phase === 'playing' ? saveAndLeave : undefined}
+        saving={saving}
+      />
       {reconnecting && <div className="banner">Conexão caiu — reconectando…</div>}
+      {saveError && <div className="banner">Não deu para salvar agora. Tente de novo.</div>}
       <div className="board-area">
         {image?.image ? (
           <Board room={room} image={image.image} phase={snapshot.phase} />
@@ -117,9 +151,17 @@ function LobbyPanel({ snapshot, isHost, onStart }: LobbyPanelProps) {
         </p>
         {isHost ? (
           <>
-            <p>
-              Mande o convite e comece quando todo mundo tiver chegado. O tempo conta a partir daí.
-            </p>
+            {snapshot.elapsedMs > 0 ? (
+              <p>
+                Partida retomada com {formatDuration(snapshot.elapsedMs)} de jogo. Chame quem estava
+                e comece: o tempo continua de onde parou.
+              </p>
+            ) : (
+              <p>
+                Mande o convite e comece quando todo mundo tiver chegado. O tempo conta a partir
+                daí.
+              </p>
+            )}
             <button type="button" className="btn btn-primary btn-lg" onClick={onStart}>
               Começar
             </button>
