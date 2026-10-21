@@ -104,6 +104,10 @@ desligada). Sem LiveKit o jogo funciona normalmente e o ícone do microfone apar
 Opcional: sem ele todo mundo joga como convidado. Com ele, a conta guarda amigos, partidas salvas e
 favoritos em qualquer aparelho.
 
+**Amigos:** cada conta tem um código (ex.: `K7QF-2M9D`) e um link (`/?amigo=K7QF-2M9D`). Com a
+amizade aceita, a página **Amigos** mostra quem está online ou jogando, e o **Convidar** da sala
+chama um amigo online: ele recebe um aviso com **Entrar**, em qualquer tela do site.
+
 1. No [Google Cloud Console](https://console.cloud.google.com), crie um projeto e vá em
    **APIs e serviços → Tela de permissão OAuth**: tipo **Externo**, nome do app, seu e-mail.
 2. **Credenciais → Criar credenciais → ID do cliente OAuth** → **Aplicativo da Web**, com estes
