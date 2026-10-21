@@ -206,6 +206,12 @@ Implementado depois do deploy (`apps/server/src/db/gameStore.ts`):
   1×). O ranking soma, no período, a melhor partida de cada equipe em cada foto e tamanho
   (repetir não acumula); empate, mais quebra-cabeças diferentes. Partidas de antes dos pontos
   ficaram com as peças (fator 1×).
+- **Resposta das rotas de ranking** (`RankingPage`): o topo (20), o `total` de equipes e `me`
+  (a melhor posição de quem pede, com quem está logo à frente). Quem pede é achado pela conta
+  (cookie) ou pelo convidado do navegador (cabeçalho `x-guest-id`). Cada linha traz `change`
+  (posições ganhas/perdidas desde o período anterior equivalente; null = estreou; ausente em
+  "sempre") e `streak` (dias seguidos jogando). Detalhes e o que falta em
+  `docs/RANKING-PENDENTE.md`.
 - **Escolher a foto do ranking por foto:** busca pelo título e as mais jogadas
   (`GET /api/ranking/popular?players=&period=`), em vez de listar todas as fotos.
 - Índice `games(team_size, finished_at)` para as duas consultas.
