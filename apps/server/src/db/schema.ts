@@ -161,3 +161,28 @@ export const favorites = pgTable(
   },
   (table) => [primaryKey({ columns: [table.userId, table.imageId] })],
 );
+
+/**
+ * Partidas salvas para continuar depois ("Em andamento"). Só o dono (quem criou a sala, logado)
+ * vê e retoma. `data` é o mesmo RoomSnapshot usado para sobreviver a reinícios; as colunas soltas
+ * servem só para listar sem abrir o JSON.
+ */
+export const savedGames = pgTable(
+  'saved_games',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    imageId: text('image_id').notNull(),
+    pieceCount: integer('piece_count').notNull(),
+    maxPlayers: integer('max_players').notNull(),
+    pieces: integer('pieces').notNull(),
+    placed: integer('placed').notNull(),
+    elapsedMs: integer('elapsed_ms').notNull(),
+    data: jsonb('data').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('saved_games_owner_idx').on(table.ownerUserId, table.updatedAt)],
+);
