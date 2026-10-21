@@ -35,6 +35,8 @@ export const PlayerSchema = schema(
      * jogadores dá peças − 1 no fim: é a "contribuição" de cada um no resultado.
      */
     snaps: t.uint16().default(0),
+    /** Lado na Batalha ('a' ou 'b'); vazio nos outros modos. */
+    team: t.string().default(''),
   },
   'PlayerSchema',
 );
@@ -52,8 +54,30 @@ export const GroupSchema = schema(
 );
 export type GroupSchema = SchemaType<typeof GroupSchema>;
 
+/**
+ * Um tabuleiro dos modos novos: o Bullet troca o tabuleiro a cada quebra-cabeça; a Batalha tem
+ * um por lado. (O clássico guarda o dele direto na raiz do RoomState.)
+ */
+export const BoardSchema = schema(
+  {
+    config: PuzzleConfigSchema,
+    /** Chave: id do grupo (em string, exigência do MapSchema). */
+    groups: t.map(GroupSchema),
+    /** pieceGroup[pieceId] = id do grupo da peça. */
+    pieceGroup: t.array('uint16'),
+    /** Montado por completo. */
+    done: t.boolean().default(false),
+    /** Tempo até montar (Batalha), medido no servidor. */
+    durationMs: t.uint32().default(0),
+  },
+  'BoardSchema',
+);
+export type BoardSchema = SchemaType<typeof BoardSchema>;
+
 export const RoomState = schema(
   {
+    /** GameMode: 'classic' | 'bullet' | 'battle'. */
+    mode: t.string().default('classic'),
     config: PuzzleConfigSchema,
     /** GamePhase: 'lobby' | 'playing' | 'completed'. */
     phase: t.string().default('lobby'),
@@ -82,6 +106,22 @@ export const RoomState = schema(
     groups: t.map(GroupSchema),
     /** pieceGroup[pieceId] = id do grupo da peça. */
     pieceGroup: t.array('uint16'),
+    /** Tabuleiros dos modos novos: 'main' no Bullet; 'a' e 'b' na Batalha. */
+    boards: t.map(BoardSchema),
+    /** Bullet: duração escolhida. */
+    timeLimitMs: t.uint32().default(0),
+    /** Bullet: tempo que falta, atualizado a cada segundo. */
+    remainingMs: t.uint32().default(0),
+    /** Bullet: quebra-cabeça da vez (sobe a cada um novo). */
+    round: t.uint16().default(0),
+    /** Bullet: quantos quebra-cabeças a equipe já montou. */
+    solved: t.uint16().default(0),
+    /** Bullet: peças encaixadas no quebra-cabeça que ficou pela metade quando o tempo acabou. */
+    partial: t.uint16().default(0),
+    /** Batalha: lado vencedor ('a' | 'b'); vazio até alguém terminar. */
+    winner: t.string().default(''),
+    /** Batalha: o vencedor ganhou porque o outro lado saiu todo. */
+    walkover: t.boolean().default(false),
   },
   'RoomState',
 );
