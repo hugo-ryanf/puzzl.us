@@ -1,5 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+// Fontes do modelo embutidas no app (sem depender do Google Fonts nem expor quem visita).
+import '@fontsource-variable/figtree';
+import '@fontsource-variable/bricolage-grotesque';
 import { App } from './App';
 import './styles.css';
 
