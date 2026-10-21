@@ -67,6 +67,12 @@ antes de enviar; o servidor reprocessa tudo (confere que é imagem, apaga EXIF/G
 e guarda no banco com um id aleatório. Partidas com foto própria **ficam fora do ranking**, e a
 foto é apagada depois de **7 dias sem uso**. Precisa do banco configurado (`DATABASE_URL`).
 
+Quem enviou a foto logado pode **publicá-la** no fim da partida (título, autor e a confirmação de
+que tem direito de compartilhar). A foto publicada aparece no Explorar com o selo "Comunidade",
+ganha ranking próprio e não expira. Qualquer conta pode **denunciar**; com 3 denúncias a foto sai
+do ar até o admin (`ADMIN_EMAILS`) decidir entre voltar ao ar e remover. O autor também remove a
+sua.
+
 ## Banco de dados (ranking)
 
 O ranking usa Postgres no [Neon](https://neon.tech) (plano gratuito). Sem banco o jogo funciona
