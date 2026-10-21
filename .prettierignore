@@ -1,3 +1,5 @@
 dist/
 coverage/
 pnpm-lock.yaml
+# Gerados pelo drizzle-kit (pnpm db:generate): formatá-los só cria diff à toa.
+apps/server/drizzle/
