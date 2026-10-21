@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { eq, lt } from 'drizzle-orm';
+import { and, eq, lt, notExists, sql } from 'drizzle-orm';
+import { UPLOAD_PREFIX } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
-import { uploads } from '../db/schema';
+import { savedGames, uploads } from '../db/schema';
 import type { ProcessedUpload } from './processUpload';
 
 /** Fotos sem uso por mais que isso são apagadas. */
@@ -48,7 +49,18 @@ export function createUploadStore(db: AppDatabase): UploadStore {
     async deleteUnusedSince(before) {
       const deleted = await db
         .delete(uploads)
-        .where(lt(uploads.lastUsedAt, before))
+        .where(
+          and(
+            lt(uploads.lastUsedAt, before),
+            // Foto de partida salva fica, por mais tempo que a pessoa demore para voltar.
+            notExists(
+              db
+                .select({ id: savedGames.id })
+                .from(savedGames)
+                .where(eq(savedGames.imageId, sql`${UPLOAD_PREFIX} || ${uploads.id}`)),
+            ),
+          ),
+        )
         .returning({ id: uploads.id });
       return deleted.length;
     },
