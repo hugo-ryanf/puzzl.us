@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { MAX_PLAYERS, PIECE_COUNT_PRESETS, RANDOM_IMAGE, gridForPieceCount } from '@puzzle/shared';
-import { createRoom, type PuzzleRoom } from '../../net/connection';
+import { createBattleRoom, createRoom, type PuzzleRoom } from '../../net/connection';
 import { friendlyError, savePlayerName } from '../../net/playerName';
 import { uploadImage, type UploadedImage } from '../../net/uploads';
 import { DIFFICULTY_NAMES, Pips, difficultyOf } from '../../ui/difficulty';
@@ -11,6 +11,7 @@ import {
   CheckIcon,
   CloseIcon,
   ShuffleIcon,
+  SwordsIcon,
   UserIcon,
   UsersIcon,
 } from '../../ui/icons';
@@ -35,9 +36,12 @@ interface CreateRoomDialogProps {
   onNameChange: (name: string) => void;
   onClose: () => void;
   onCreated: (room: PuzzleRoom) => void;
+  /** Abrir já num modo (o card "Batalha" da faixa de modos abre em 'battle'). */
+  initialMode?: Mode;
 }
 
-type Mode = 'solo' | 'multi';
+type Mode = 'solo' | 'multi' | 'battle';
+type BattleFormat = '1v1' | '2v2';
 const PLAYER_OPTIONS = Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2); // 2, 3, 4
 /** 1000 → "1.000", como no resto do site. */
 const formatCount = (count: number) => count.toLocaleString('pt-BR');
@@ -52,9 +56,11 @@ export function CreateRoomDialog({
   onNameChange,
   onClose,
   onCreated,
+  initialMode = 'solo',
 }: CreateRoomDialogProps) {
   const custom = source === 'custom';
-  const [mode, setMode] = useState<Mode>('solo');
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [format, setFormat] = useState<BattleFormat>('1v1');
   const [players, setPlayers] = useState(2);
   const [randomImage, setRandomImage] = useState(false);
   const [uploaded, setUploaded] = useState<UploadedImage>();
@@ -71,7 +77,9 @@ export function CreateRoomDialog({
     };
   }, [uploaded]);
 
-  const random = !custom && mode === 'multi' && randomImage;
+  /** Foto sorteada no servidor: escolhida assim no diálogo ou vinda do card "Batalha". */
+  const randomSource = typeof source === 'object' && source?.imageId === RANDOM_IMAGE;
+  const random = randomSource || (!custom && mode !== 'solo' && randomImage);
   /** Sala personalizada sem foto (ou com a foto ainda subindo): não dá para começar. */
   const missingPhoto = custom && !uploaded;
   const preview: PuzzleChoice | undefined = custom
@@ -94,6 +102,10 @@ export function CreateRoomDialog({
     setBusy(true);
     setError(undefined);
     try {
+      if (mode === 'battle') {
+        onCreated(await createBattleRoom({ name: trimmed, pieceCount, imageId, format }));
+        return;
+      }
       const maxPlayers = mode === 'solo' ? 1 : players;
       onCreated(await createRoom({ name: trimmed, pieceCount, imageId, maxPlayers }));
     } catch (e) {
@@ -106,7 +118,9 @@ export function CreateRoomDialog({
     ? 'Envie uma foto sua e escolha como jogar.'
     : mode === 'solo'
       ? 'Escolha o tamanho e comece quando quiser.'
-      : 'Escolha o tamanho e chame seus amigos pelo link da sala.';
+      : mode === 'battle'
+        ? 'Dois lados montam o mesmo quebra-cabeça: quem terminar primeiro ganha.'
+        : 'Escolha o tamanho e chame seus amigos pelo link da sala.';
 
   return (
     <Dialog
@@ -138,7 +152,7 @@ export function CreateRoomDialog({
             </header>
 
             {/* Rádios nativos escondidos: as setas do teclado trocam a opção, como em qualquer grupo. */}
-            <fieldset className="mode-options">
+            <fieldset className="mode-options three">
               <legend>Como jogar</legend>
               <label className="mode-option">
                 <input
@@ -164,7 +178,65 @@ export function CreateRoomDialog({
                 <strong>Multiplayer</strong>
                 <small>Monte com amigos, com chamada de voz.</small>
               </label>
+              <label className="mode-option">
+                <input
+                  type="radio"
+                  name="mode"
+                  className="sr-only"
+                  checked={mode === 'battle'}
+                  onChange={() => setMode('battle')}
+                />
+                <SwordsIcon size={20} />
+                <strong>Batalha</strong>
+                <small>Lado contra lado: quem montar primeiro ganha.</small>
+              </label>
             </fieldset>
+
+            {mode === 'battle' && (
+              <div className="choice-rows">
+                <fieldset className="choice-row">
+                  <legend>Formato</legend>
+                  {(['1v1', '2v2'] as const).map((value) => (
+                    <label key={value} className="radio-chip">
+                      <input
+                        type="radio"
+                        name="format"
+                        className="sr-only"
+                        checked={format === value}
+                        onChange={() => setFormat(value)}
+                      />
+                      {value}
+                    </label>
+                  ))}
+                </fieldset>
+                {!custom && !randomSource && (
+                  <fieldset className="choice-row">
+                    <legend>Foto</legend>
+                    <label className="radio-chip">
+                      <input
+                        type="radio"
+                        name="battle-image"
+                        className="sr-only"
+                        checked={!randomImage}
+                        onChange={() => setRandomImage(false)}
+                      />
+                      Esta foto
+                    </label>
+                    <label className="radio-chip">
+                      <input
+                        type="radio"
+                        name="battle-image"
+                        className="sr-only"
+                        checked={randomImage}
+                        onChange={() => setRandomImage(true)}
+                      />
+                      <ShuffleIcon size={16} />
+                      Aleatória
+                    </label>
+                  </fieldset>
+                )}
+              </div>
+            )}
 
             {mode === 'multi' && (
               <div className="choice-rows">
@@ -183,7 +255,7 @@ export function CreateRoomDialog({
                     </label>
                   ))}
                 </fieldset>
-                {!custom && (
+                {!custom && !randomSource && (
                   <fieldset className="choice-row">
                     <legend>Foto</legend>
                     <label className="radio-chip">
