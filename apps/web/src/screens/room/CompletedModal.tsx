@@ -6,11 +6,14 @@ import { fetchRanking } from '../../net/ranking';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
 import { CloseIcon, ImageIcon, PartyIcon, TrophyIcon } from '../../ui/icons';
+import { PublishSection, type Publisher } from './PublishSection';
 
 interface CompletedModalProps {
   snapshot: RoomSnapshot;
   onShowRanking: (query: RankingQuery) => void;
   onLeave: () => void;
+  /** Foto própria ainda não publicada, e quem vê é quem a enviou: pode publicar. */
+  publisher?: Publisher;
 }
 
 /** Espera a foto montada aparecer (as linhas sumirem) antes de cobrir a mesa com o resultado. */
@@ -22,7 +25,12 @@ const RANKING_PREVIEW = 5;
  * Resultado da partida: tempo, métricas, quanto cada um encaixou (em grupo), o ranking da
  * categoria e o crédito da foto. Pode ser fechado para admirar a imagem e reaberto depois.
  */
-export function CompletedModal({ snapshot, onShowRanking, onLeave }: CompletedModalProps) {
+export function CompletedModal({
+  snapshot,
+  onShowRanking,
+  onLeave,
+  publisher,
+}: CompletedModalProps) {
   const [open, setOpen] = useState(false);
   const [ranking, setRanking] = useState<RankingEntry[]>();
   const dialogRef = useRef<HTMLElement>(null);
@@ -179,7 +187,9 @@ export function CompletedModal({ snapshot, onShowRanking, onLeave }: CompletedMo
             <p className="result-note">O ranking está indisponível neste servidor.</p>
           )}
           {rankStatus === 'unranked' && (
-            <p className="result-note">Foto própria: fica fora do ranking (cada foto é única).</p>
+            <p className="result-note">
+              Foto própria: fica fora do ranking enquanto não for publicada.
+            </p>
           )}
           {rankStatus === 'saved' && (
             <>
@@ -205,6 +215,8 @@ export function CompletedModal({ snapshot, onShowRanking, onLeave }: CompletedMo
             </>
           )}
         </section>
+
+        {rankStatus === 'unranked' && publisher && <PublishSection {...publisher} />}
 
         <div className="result-actions">
           {rankStatus === 'saved' && (
