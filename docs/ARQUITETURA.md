@@ -238,7 +238,7 @@ Implementado na fase D (`apps/server/src/library/library.ts`), só para quem tem
   para o login.
 - Rotas: `GET /api/me/library` (`{ records, favorites }`) e `PUT`/`DELETE
 /api/me/favorites/:imageId`, todas exigindo sessão (401 sem login).
-- Partidas com foto própria ficam fora do ranking e, por isso, fora dos records.
+- Partidas com foto própria não publicada ficam fora do ranking e, por isso, fora dos records.
 
 ## Partidas salvas ("Em andamento")
 
@@ -302,7 +302,30 @@ A interface `UploadStore` isola isso: trocar por R2 depois não muda rotas nem s
 "upload:<id>"`. `GET /api/uploads/:id` serve com CORS (o WebGL exige para textura de outra
    origem; o cliente usa `crossOrigin = 'anonymous'`) e cache imutável.
 4. Criar sala com a foto renova `last_used_at`; uma limpeza a cada 6 h apaga fotos sem uso há 7
-   dias. Partidas com foto própria terminam com `rankStatus = 'unranked'` (fora do ranking).
+   dias. Partidas com foto própria terminam com `rankStatus = 'unranked'` (fora do ranking),
+   a não ser que a foto tenha sido publicada (abaixo).
+5. Enviada com sessão, a foto guarda a conta em `uploads.owner_user_id`: só ela pode publicar.
+
+## Quebra-cabeças da comunidade
+
+Implementado na fase F (`apps/server/src/community/`):
+
+1. **Publicar:** no resultado de uma sala com foto própria, quem criou a sala (logado) vê
+   "Publicar": título, autor (padrão: nome da conta) e a confirmação "a foto é minha / tenho
+   direito de compartilhar". `POST /api/puzzles` confere que a foto é da conta (403 se não),
+   gera a miniatura (WebP 480 px, em `community_puzzles.mini`) e publica na hora. Cada foto se
+   publica uma vez só (409), mesmo depois de removida.
+2. **Explorar:** `GET /api/puzzles` lista as publicadas; o site junta catálogo + comunidade (selo
+   "Comunidade", "por Autor", busca também pelo autor). O `imageId` continua `upload:<id>`, então
+   salas, favoritos, partidas salvas e records funcionam sem mudança.
+3. **Ranking:** na hora do fim, a sala pergunta se a foto está publicada; se está, grava como uma
+   do catálogo. `RankingQuery` aceita `upload:<id>` e o Ranking lista as publicadas nos filtros.
+4. **Moderação:** `POST /api/puzzles/:id/report` (uma denúncia por conta; o autor não denuncia a
+   própria). Com `COMMUNITY_HIDE_REPORTS` (3) a foto vira `hidden`: some para todos menos o admin,
+   que vê o número de denúncias e escolhe **Voltar ao ar** (`/restore`, zera as denúncias) ou
+   **Remover** (`DELETE`, `removed`). O autor também remove a sua.
+5. **Limpeza:** foto publicada (não removida) fica fora da limpeza de 7 dias; removida volta a
+   expirar normalmente.
 
 ## Snapshot da sala
 
