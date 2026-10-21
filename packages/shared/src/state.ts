@@ -59,6 +59,11 @@ export const RoomState = schema(
     phase: t.string().default('lobby'),
     /** sessionId de quem pode clicar em "Começar" (o primeiro a entrar; passa adiante se sair). */
     hostId: t.string().default(''),
+    /**
+     * sessionId do dono da sala (quem criou, logado) enquanto ele estiver nela: só ele vê
+     * "Salvar e sair" e pode retomar depois. "" = sem dono presente (ou criada por convidado).
+     */
+    ownerId: t.string().default(''),
     /** Tempo de jogo, atualizado pelo servidor a cada segundo; o cliente interpola entre updates. */
     elapsedMs: t.uint32().default(0),
     /** Tempo final, medido no servidor quando a última peça encaixa. */
