@@ -197,6 +197,11 @@ export function CompletedModal({
                 <TrophyIcon size={18} />
                 <strong>{rank}º lugar</strong> na categoria
                 {rankToday > 0 && <span className="result-rank-today">· {rankToday}º hoje</span>}
+                {snapshot.points > 0 && (
+                  <span className="result-points">
+                    +{snapshot.points.toLocaleString('pt-BR')} pts
+                  </span>
+                )}
               </p>
               {rows.length > 0 && (
                 <ol className="result-ranking">
