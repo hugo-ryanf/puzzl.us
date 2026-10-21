@@ -16,6 +16,7 @@ import {
   type EdgePath,
   type Point,
   type Puzzle,
+  type RoomState,
 } from '@puzzle/shared';
 import type { PuzzleRoom } from '../net/connection';
 import { throttle } from '../net/throttle';
@@ -45,6 +46,19 @@ interface Bounds {
   bottom: number;
 }
 
+/** O tabuleiro desenhado: a raiz do estado (clássico) ou um BoardSchema (Bullet, Batalha). */
+export type BoardSource = Pick<RoomState, 'config' | 'groups' | 'pieceGroup'> & { done?: boolean };
+/** Chave do tabuleiro nas mensagens dos modos novos; ausente no clássico. */
+export type BoardKey = 'main' | 'a' | 'b';
+
+export interface AttachOptions {
+  /** Padrão: a raiz do estado (modo clássico). */
+  source?: BoardSource;
+  boardKey?: BoardKey;
+  /** Só assistir (o lado do adversário na Batalha): sem arrastar e sem mandar cursor. */
+  readOnly?: boolean;
+}
+
 interface PieceSprite {
   graphics: Graphics;
   path: EdgePath;
@@ -62,6 +76,9 @@ export class BoardScene {
   private readonly cursors = new RemoteCursors();
 
   private room?: PuzzleRoom;
+  private source?: BoardSource;
+  private boardKey?: BoardKey;
+  private readOnly = false;
   private puzzle?: Puzzle;
   private texture?: Texture;
   /** Foto inteira por cima do puzzle montado: esconde as linhas de corte entre as peças. */
@@ -90,10 +107,10 @@ export class BoardScene {
   private readonly unsubscribers: Array<() => void> = [];
 
   private readonly sendMove = throttle(SEND_INTERVAL_MS, (groupId: number, x: number, y: number) =>
-    this.room?.send('move', { groupId, x, y }),
+    this.room?.send('move', this.withBoard({ groupId, x, y })),
   );
   private readonly sendCursor = throttle(SEND_INTERVAL_MS, (x: number, y: number) =>
-    this.room?.send('cursor', { x, y }),
+    this.room?.send('cursor', this.withBoard({ x, y })),
   );
 
   private constructor(
@@ -126,11 +143,14 @@ export class BoardScene {
   }
 
   /** Liga a cena a uma sala. Idempotente: o StrictMode chama efeitos duas vezes em dev. */
-  attach(room: PuzzleRoom, image: HTMLImageElement): void {
+  attach(room: PuzzleRoom, image: HTMLImageElement, options: AttachOptions = {}): void {
     if (this.room === room) return;
     this.room = room;
+    this.source = options.source ?? room.state;
+    this.boardKey = options.boardKey;
+    this.readOnly = options.readOnly ?? false;
 
-    const { config } = room.state;
+    const { config } = this.source;
     const puzzle = generatePuzzle({
       seed: config.seed,
       rows: config.rows,
@@ -150,7 +170,7 @@ export class BoardScene {
       };
       this.drawPiece(sprite);
       sprite.graphics.eventMode = 'static';
-      sprite.graphics.cursor = 'grab';
+      sprite.graphics.cursor = this.readOnly ? 'default' : 'grab';
       sprite.graphics.on('pointerdown', (event) => this.handlePieceDown(piece.id, event));
       this.world.addChild(sprite.graphics);
       return sprite;
@@ -203,9 +223,15 @@ export class BoardScene {
   private subscribe(room: PuzzleRoom): void {
     const callbacks = Callbacks.get(room);
     const me = room.sessionId;
+    const source = this.source!;
+    // Hora da recompensa: a câmera mostra a imagem montada (também ao voltar para a sala).
+    const reveal = () => {
+      this.focusCompletedPuzzle();
+      this.revealFinishedImage();
+    };
 
     this.unsubscribers.push(
-      callbacks.onAdd('groups', (group, key) => {
+      callbacks.onAdd(source, 'groups', (group, key) => {
         const groupId = Number(key);
         this.unsubscribers.push(
           callbacks.onChange(group, () => this.handleGroupMoved(groupId)),
@@ -214,9 +240,9 @@ export class BoardScene {
           }),
         );
       }),
-      callbacks.onRemove('groups', (_group, key) => this.animating.delete(Number(key))),
+      callbacks.onRemove(source, 'groups', (_group, key) => this.animating.delete(Number(key))),
       // Encaixe no servidor = peças mudando de grupo.
-      callbacks.onChange('pieceGroup', (_pieceId, groupId) => {
+      callbacks.onChange(source, 'pieceGroup', (_pieceId, groupId) => {
         this.membersDirty = true;
         this.handleGroupMoved(groupId);
       }),
@@ -230,15 +256,16 @@ export class BoardScene {
         );
       }),
       callbacks.onRemove('players', (_player, sessionId) => this.cursors.remove(sessionId)),
-      // Hora da recompensa: a câmera mostra a imagem montada (também ao voltar para a sala).
-      callbacks.listen('phase', (phase) => {
-        if (phase !== 'completed') return;
-        this.focusCompletedPuzzle();
-        this.revealFinishedImage();
+      // Clássico: acaba com a sala; modos novos: cada tabuleiro avisa quando foi montado.
+      source === room.state
+        ? callbacks.listen('phase', (phase) => phase === 'completed' && reveal())
+        : callbacks.listen(source as BoardSource & { done: boolean }, 'done', (done) => {
+            if (done) reveal();
+          }),
+      // Só os cursores deste tabuleiro (na Batalha, o adversário mexe no dele).
+      room.onMessage('cursor', ({ sessionId, x, y, board }: CursorBroadcast) => {
+        if (board === this.boardKey) this.cursors.setTarget(sessionId, x, y);
       }),
-      room.onMessage('cursor', ({ sessionId, x, y }: CursorBroadcast) =>
-        this.cursors.setTarget(sessionId, x, y),
-      ),
     );
   }
 
@@ -276,8 +303,9 @@ export class BoardScene {
   private handlePieceDown(pieceId: number, event: FederatedPointerEvent): void {
     const room = this.room;
     // Peças só se mexem com o relógio correndo (no lobby e depois do fim ficam travadas).
-    if (!room || room.state.phase !== 'playing' || event.button !== 0) return;
-    const groupId = room.state.pieceGroup[pieceId]!;
+    if (!room || this.readOnly || room.state.phase !== 'playing' || event.button !== 0) return;
+    if (this.source!.done) return;
+    const groupId = this.source!.pieceGroup[pieceId]!;
     const heldBy = this.serverGroup(groupId)?.heldBy;
     if (heldBy === undefined || (heldBy !== '' && heldBy !== room.sessionId)) return;
 
@@ -294,7 +322,7 @@ export class BoardScene {
     this.animating.delete(groupId);
     this.awaitingRelease.delete(groupId);
     this.bringToFront(groupId);
-    room.send('grab', { groupId });
+    room.send('grab', this.withBoard({ groupId }));
   }
 
   private handleBackgroundDown = (event: FederatedPointerEvent): void => {
@@ -305,7 +333,7 @@ export class BoardScene {
 
   private handlePointerMove = (event: FederatedPointerEvent): void => {
     const pointer = this.world.toLocal(event.global);
-    if (this.room) this.sendCursor.call(pointer.x, pointer.y);
+    if (this.room && !this.readOnly) this.sendCursor.call(pointer.x, pointer.y);
 
     if (this.drag) {
       const { groupId, grabOffset } = this.drag;
@@ -325,7 +353,7 @@ export class BoardScene {
     if (this.drag && this.room) {
       const { groupId, x, y } = this.drag;
       this.sendMove.cancel(); // o drop já leva a posição final
-      this.room.send('drop', { groupId, x, y });
+      this.room.send('drop', this.withBoard({ groupId, x, y }));
       this.awaitingRelease.set(groupId, performance.now() + RELEASE_TIMEOUT_MS);
     }
     this.drag = undefined;
@@ -463,7 +491,12 @@ export class BoardScene {
   // ── Auxiliares ─────────────────────────────────────────────────────────────
 
   private serverGroup(groupId: number) {
-    return this.room?.state.groups.get(String(groupId));
+    return this.source?.groups.get(String(groupId));
+  }
+
+  /** Nos modos novos, toda mensagem diz de qual tabuleiro é. */
+  private withBoard<T extends object>(payload: T): T & { board?: BoardKey } {
+    return this.boardKey ? { ...payload, board: this.boardKey } : payload;
   }
 
   /** Posiciona o grupo na hora (sem animação), no deslocamento dado ou no do servidor. */
@@ -477,7 +510,7 @@ export class BoardScene {
 
   private rebuildMembers(): void {
     this.members.clear();
-    this.room!.state.pieceGroup.forEach((groupId, pieceId) => {
+    this.source!.pieceGroup.forEach((groupId, pieceId) => {
       const list = this.members.get(groupId);
       if (list) list.push(pieceId);
       else this.members.set(groupId, [pieceId]);
@@ -511,7 +544,7 @@ export class BoardScene {
 
   /** Puzzle montado: mostra a imagem inteira (onde quer que tenha ficado na mesa). */
   private focusCompletedPuzzle(): void {
-    const [group] = this.room!.state.groups.values();
+    const [group] = this.source!.groups.values();
     if (!group) return;
     const { width, height } = this.puzzle!;
     const center = { x: group.x + width / 2, y: group.y + height / 2 };
@@ -524,7 +557,7 @@ export class BoardScene {
    * arrastar continua movendo a câmera.
    */
   private revealFinishedImage(): void {
-    const [group] = this.room!.state.groups.values();
+    const [group] = this.source!.groups.values();
     if (!group || this.finishedImage) return;
     const { width, height } = this.puzzle!;
     const sprite = new Sprite(this.texture!);
