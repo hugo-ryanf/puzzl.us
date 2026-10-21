@@ -262,6 +262,30 @@ snapshot da sala (`RoomSnapshot`):
    não é apagada pela limpeza de 7 dias.
 6. Rotas: `GET /api/me/saved` e `DELETE /api/me/saved/:id` (só apaga se for da conta).
 
+## Modos Bullet e Batalha
+
+Implementados na fase H. Cada modo é um tipo de sala no Colyseus (`puzzle`, `bullet`, `battle`),
+todos herdando de `BaseGameRoom` (`apps/server/src/rooms/BaseGameRoom.ts`): jogadores e cores,
+conta pelo cookie, anfitrião, reconexão, voz, cursores, presença e relógio. A lógica de um
+tabuleiro (pegar/mover/soltar/espalhar) fica em `BoardRuntime` (`rooms/board.ts`) e serve tanto
+para a raiz do estado (clássico) quanto para um `BoardSchema` (modos novos, em `state.boards`).
+No cliente, o `BoardScene` desenha qualquer um desses tabuleiros (`source`), manda a chave dele
+nas mensagens (`board`) e pode ficar só assistindo (`readOnly`). O `state.mode` diz qual tela
+mostrar; entrar pelo código funciona para qualquer modo.
+
+- **Bullet** (`BulletRoom`): 3, 5 ou 10 min; quebra-cabeças de 12 ou 24 peças, fotos sorteadas
+  de um baralho do catálogo (sem repetir até acabar). Montou um, `solved` sobe e ~0,9 s depois
+  entra um tabuleiro novo em `boards.main` (`round` sobe e o cliente remonta a mesa). No fim do
+  tempo vale `solved`; empate, `partial` (peças encaixadas no que ficou pela metade). Grava em
+  `bullet_runs` e o ranking (`GET /api/ranking/bullet`) usa a melhor corrida de cada equipe.
+- **Batalha** (`BattleRoom`): 1v1 ou 2v2. Um puzzle só, espalhado uma vez; o lado B recebe as
+  mesmas posições do A. Cada um só mexe na mesa do seu lado (`boards.a`/`boards.b`); o primeiro
+  a montar ganha (`winner`); um lado que sai inteiro perde por W.O. O anfitrião pede revanche
+  (mesas novas, mesmos lados). Sem ranking. Na tela, o seu lado à esquerda e o do adversário à
+  direita (só assistir); no celular, abas.
+- Os modos novos não têm snapshot nem "Salvar e sair": se o servidor reiniciar no meio, a
+  partida acaba.
+
 ## Amigos, presença e convites
 
 Implementado na fase G (`apps/server/src/friends/`):
