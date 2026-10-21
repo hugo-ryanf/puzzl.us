@@ -2549,6 +2549,98 @@ a.btn {
   }
 }
 
+/* ── Comunidade (fotos publicadas) ─────────────────────────────────────── */
+
+.card-badge.community {
+  background: var(--accent);
+}
+
+.card-badge.warning {
+  background: var(--danger);
+}
+
+/* Oculta por denúncias: só o admin vê, apagada até ele decidir. */
+.card.hidden-puzzle .card-thumb img {
+  opacity: 0.45;
+}
+
+.card-meta .credit {
+  flex: 1;
+}
+
+.card-meta .card-more {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* No card o menu abre para cima: embaixo dele costuma acabar a página. */
+.card-meta .popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.card-meta .popover::before {
+  inset: auto 0 -10px;
+}
+
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-list .btn {
+  justify-content: flex-start;
+}
+
+.popover-note.error {
+  color: var(--danger);
+}
+
+.publish-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.publish-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--accent);
+}
+
+.publish-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .publish-intro {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ── Em andamento (partidas salvas) ────────────────────────────────────── */
 
 .saved-list li {
