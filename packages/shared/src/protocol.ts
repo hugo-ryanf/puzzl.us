@@ -153,6 +153,30 @@ export interface MeResponse {
   googleLogin: boolean;
 }
 
+/**
+ * Melhor marca da pessoa numa categoria (foto + peças + modalidade). Ter um record numa foto =
+ * já montou aquele quebra-cabeça (o selo "✓ Montado" do card).
+ */
+export interface PuzzleRecord {
+  imageId: string;
+  pieceCount: number;
+  teamSize: number;
+  bestMs: number;
+  /** Quantas vezes completou nessa categoria. */
+  plays: number;
+  /** ISO 8601 da última vez. */
+  lastPlayedAt: string;
+}
+
+/** GET /api/me/library — o que é só da conta: records (concluídos) e favoritos. */
+export interface LibraryResponse {
+  records: PuzzleRecord[];
+  favorites: string[];
+}
+
+/** PUT/DELETE /api/me/favorites/:imageId — foto do catálogo ou enviada. */
+export const FavoriteImageId = imageId;
+
 /** POST /api/me/link-guest — passa para a conta o histórico do convidado deste navegador. */
 export const LinkGuestRequest = z.object({ guestId: z.uuid() });
 export type LinkGuestRequest = z.infer<typeof LinkGuestRequest>;
