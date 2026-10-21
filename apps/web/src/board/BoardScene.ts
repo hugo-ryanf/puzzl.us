@@ -3,6 +3,7 @@ import {
   Container,
   Graphics,
   Matrix,
+  Sprite,
   Texture,
   type FederatedPointerEvent,
   type Ticker,
@@ -20,7 +21,8 @@ import type { PuzzleRoom } from '../net/connection';
 import { throttle } from '../net/throttle';
 import { RemoteCursors } from './RemoteCursors';
 
-const MIN_ZOOM = 0.05;
+/** Zoom out vai até metade do "100%" (a mesa inteira na tela): mais longe que isso é só vazio. */
+const MIN_ZOOM_RATIO = 0.5;
 const MAX_ZOOM = 8;
 /** 20 envios/s: igual à taxa de patch do servidor; mais que isso só gasta banda. */
 const SEND_INTERVAL_MS = 50;
@@ -28,8 +30,20 @@ const SEND_INTERVAL_MS = 50;
 const SMOOTHING = 15;
 /** Se a confirmação do drop não chegar nesse tempo, voltamos a seguir o servidor mesmo assim. */
 const RELEASE_TIMEOUT_MS = 1000;
-/** Altura (px) reservada no topo para o painel de fim, para ele não cobrir a imagem montada. */
-const COMPLETED_PANEL_SPACE = 210;
+/** Ao completar: espera a última peça assentar e então a foto inteira aparece aos poucos. */
+const REVEAL_DELAY_MS = 300;
+const REVEAL_DURATION_MS = 900;
+/** Altura (px) livre no rodapé para a barra de ferramentas não cobrir peças ao enquadrar. */
+const TOOLBAR_SPACE = 64;
+/** Pontos do fundo nunca ficam mais juntos que isso (px na tela); mais longe, viram ruído. */
+const MIN_DOT_SPACING = 14;
+
+interface Bounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 
 interface PieceSprite {
   graphics: Graphics;
@@ -50,8 +64,18 @@ export class BoardScene {
   private room?: PuzzleRoom;
   private puzzle?: Puzzle;
   private texture?: Texture;
+  /** Foto inteira por cima do puzzle montado: esconde as linhas de corte entre as peças. */
+  private finishedImage?: Sprite;
+  private revealStartedAt = 0;
   private pieces: PieceSprite[] = [];
   private strokeWidth = 1;
+  /** Câmera da última vez que os pontos do fundo foram alinhados (evita mexer no DOM à toa). */
+  private dotsCamera = '';
+  /** Zoom em que a mesa inteira cabe na tela: vale "100%" na barra de ferramentas. */
+  private baseScale = 0; // definido em fitCamera(), quando a mesa é enquadrada pela primeira vez
+  private lastZoomPercent = 0;
+
+  private zoomListener?: (percent: number) => void;
 
   /** grupo → peças, derivado de state.pieceGroup; recalculado quando há encaixe. */
   private members = new Map<number, number[]>();
@@ -72,7 +96,10 @@ export class BoardScene {
     this.room?.send('cursor', { x, y }),
   );
 
-  private constructor(private readonly app: Application) {
+  private constructor(
+    private readonly app: Application,
+    private readonly host: HTMLElement,
+  ) {
     app.stage.addChild(this.world, this.cursors.layer);
     app.stage.eventMode = 'static';
     app.stage.hitArea = app.screen;
@@ -88,13 +115,14 @@ export class BoardScene {
     const app = new Application();
     await app.init({
       resizeTo: host,
-      background: '#1e1f24',
+      // Transparente: o fundo (cor + pontos) é CSS no host, alinhado à câmera em syncDots().
+      backgroundAlpha: 0,
       antialias: true,
       autoDensity: true,
       resolution: window.devicePixelRatio,
     });
     host.appendChild(app.canvas);
-    return new BoardScene(app);
+    return new BoardScene(app, host);
   }
 
   /** Liga a cena a uma sala. Idempotente: o StrictMode chama efeitos duas vezes em dev. */
@@ -142,6 +170,36 @@ export class BoardScene {
     this.app.destroy(true, { children: true, texture: true, textureSource: true });
   }
 
+  // ── Ferramentas da mesa (barra de baixo) ───────────────────────────────────
+
+  /** Aproxima (> 1) ou afasta (< 1) mantendo fixo o centro da tela. */
+  zoomBy(factor: number): void {
+    const { width, height } = this.app.screen;
+    this.zoomAt({ x: width / 2, y: height / 2 }, factor);
+  }
+
+  /** Enquadra todas as peças, onde quer que estejam (útil depois de se perder no pan/zoom). */
+  centerView(): void {
+    if (!this.puzzle) return;
+    const { pieceWidth, pieceHeight } = this.puzzle;
+    const { left, top, right, bottom } = this.piecesBounds();
+    const margin = Math.min(pieceWidth, pieceHeight);
+    this.frame(
+      { x: (left + right) / 2, y: (top + bottom) / 2 },
+      right - left + margin * 2,
+      bottom - top + margin * 2,
+    );
+  }
+
+  /** Avisa quando o zoom muda (em %, relativo à mesa inteira na tela). Devolve o "desligar". */
+  onZoom(listener: (percent: number) => void): () => void {
+    this.zoomListener = listener;
+    listener(this.lastZoomPercent || 100);
+    return () => {
+      if (this.zoomListener === listener) this.zoomListener = undefined;
+    };
+  }
+
   private subscribe(room: PuzzleRoom): void {
     const callbacks = Callbacks.get(room);
     const me = room.sessionId;
@@ -174,7 +232,9 @@ export class BoardScene {
       callbacks.onRemove('players', (_player, sessionId) => this.cursors.remove(sessionId)),
       // Hora da recompensa: a câmera mostra a imagem montada (também ao voltar para a sala).
       callbacks.listen('phase', (phase) => {
-        if (phase === 'completed') this.focusCompletedPuzzle();
+        if (phase !== 'completed') return;
+        this.focusCompletedPuzzle();
+        this.revealFinishedImage();
       }),
       room.onMessage('cursor', ({ sessionId, x, y }: CursorBroadcast) =>
         this.cursors.setTarget(sessionId, x, y),
@@ -257,6 +317,7 @@ export class BoardScene {
       this.world.position.x += event.global.x - this.pan.last.x;
       this.world.position.y += event.global.y - this.pan.last.y;
       this.pan.last = { x: event.global.x, y: event.global.y };
+      this.clampCamera();
     }
   };
 
@@ -274,12 +335,56 @@ export class BoardScene {
   /** Zoom pela roda do mouse mantendo fixo o ponto sob o cursor. */
   private handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    const cursor = { x: event.offsetX, y: event.offsetY };
-    const before = this.world.toLocal(cursor);
-    const scale = clamp(this.world.scale.x * Math.exp(-event.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM);
-    this.world.scale.set(scale);
-    this.world.position.set(cursor.x - before.x * scale, cursor.y - before.y * scale);
+    this.zoomAt({ x: event.offsetX, y: event.offsetY }, Math.exp(-event.deltaY * 0.0015));
   };
+
+  private zoomAt(screenPoint: Point, factor: number): void {
+    const before = this.world.toLocal(screenPoint);
+    const scale = clamp(this.world.scale.x * factor, this.minScale, MAX_ZOOM);
+    this.world.scale.set(scale);
+    this.world.position.set(screenPoint.x - before.x * scale, screenPoint.y - before.y * scale);
+    this.clampCamera();
+  }
+
+  private get minScale(): number {
+    return this.baseScale * MIN_ZOOM_RATIO;
+  }
+
+  /**
+   * Não deixa a câmera se perder: o centro da tela fica sempre dentro da mesa (a área onde as
+   * peças foram espalhadas) ou de onde houver peças fora dela — toda peça continua alcançável.
+   */
+  private clampCamera(): void {
+    if (!this.puzzle) return;
+    const { width, height } = this.puzzle;
+    const pieces = this.piecesBounds();
+    const left = Math.min(-width / 2, pieces.left);
+    const top = Math.min(-height / 2, pieces.top);
+    const right = Math.max(width * 1.5, pieces.right);
+    const bottom = Math.max(height * 1.5, pieces.bottom);
+
+    const screen = this.app.screen;
+    const scale = this.world.scale.x;
+    const centerX = clamp((screen.width / 2 - this.world.x) / scale, left, right);
+    const centerY = clamp((screen.height / 2 - this.world.y) / scale, top, bottom);
+    this.world.position.set(
+      screen.width / 2 - centerX * scale,
+      screen.height / 2 - centerY * scale,
+    );
+  }
+
+  /** Retângulo (na mesa) que envolve todas as peças, onde estiverem agora. */
+  private piecesBounds(): Bounds {
+    const { pieceWidth, pieceHeight } = this.puzzle!;
+    const bounds = { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity };
+    for (const { graphics } of this.pieces) {
+      bounds.left = Math.min(bounds.left, graphics.x);
+      bounds.top = Math.min(bounds.top, graphics.y);
+      bounds.right = Math.max(bounds.right, graphics.x + pieceWidth);
+      bounds.bottom = Math.max(bounds.bottom, graphics.y + pieceHeight);
+    }
+    return bounds;
+  }
 
   // ── Quadro a quadro ────────────────────────────────────────────────────────
 
@@ -303,7 +408,39 @@ export class BoardScene {
     }
 
     this.cursors.update(smoothing, (p) => this.world.toGlobal(p));
+    this.syncDots();
+
+    if (this.finishedImage && this.finishedImage.alpha < 1) {
+      const elapsed = now - this.revealStartedAt - REVEAL_DELAY_MS;
+      this.finishedImage.alpha = clamp(elapsed / REVEAL_DURATION_MS, 0, 1);
+    }
+
+    const percent = Math.round((this.world.scale.x / this.baseScale) * 100);
+    if (percent !== this.lastZoomPercent) {
+      this.lastZoomPercent = percent;
+      this.zoomListener?.(percent);
+    }
   };
+
+  /**
+   * Os pontos do fundo se movem e escalam junto com a mesa: dão noção de quanto se andou no pan
+   * e no zoom. Espaçamento = meia peça, dobrando enquanto ficaria apertado demais na tela.
+   */
+  private syncDots(): void {
+    const { x, y } = this.world.position;
+    const scale = this.world.scale.x;
+    const camera = `${x}:${y}:${scale}`;
+    if (camera === this.dotsCamera) return;
+    this.dotsCamera = camera;
+
+    let spacing = (Math.min(this.puzzle!.pieceWidth, this.puzzle!.pieceHeight) / 2) * scale;
+    while (spacing < MIN_DOT_SPACING) spacing *= 2;
+    // O ponto fica no centro de cada ladrilho; o -spacing/2 põe os pontos nos múltiplos da
+    // grade, então ao dobrar o espaçamento metade dos pontos some e o resto fica no lugar.
+    const offset = (value: number) => (((value - spacing / 2) % spacing) + spacing) % spacing;
+    this.host.style.backgroundSize = `${spacing}px ${spacing}px`;
+    this.host.style.backgroundPosition = `${offset(x)}px ${offset(y)}px`;
+  }
 
   /** Aproxima as peças do grupo da posição do servidor. Devolve true quando chegaram. */
   private slideGroup(groupId: number, offset: Point, smoothing: number): boolean {
@@ -360,7 +497,8 @@ export class BoardScene {
       .stroke(
         heldColor
           ? { width: this.strokeWidth * 3, color: heldColor }
-          : { width: this.strokeWidth, color: 0x000000, alpha: 0.35 },
+          : // Mais forte que no tema escuro: no fundo claro, peças de céu claro sumiriam.
+            { width: this.strokeWidth * 1.4, color: 0x15171c, alpha: 0.6 },
       );
   }
 
@@ -368,6 +506,7 @@ export class BoardScene {
   private fitCamera(): void {
     const { width, height } = this.puzzle!;
     this.frame({ x: width / 2, y: height / 2 }, width * 2.1, height * 2.1);
+    this.baseScale = this.world.scale.x;
   }
 
   /** Puzzle montado: mostra a imagem inteira (onde quer que tenha ficado na mesa). */
@@ -376,19 +515,38 @@ export class BoardScene {
     if (!group) return;
     const { width, height } = this.puzzle!;
     const center = { x: group.x + width / 2, y: group.y + height / 2 };
-    this.frame(center, width * 1.15, height * 1.15, COMPLETED_PANEL_SPACE);
+    this.frame(center, width * 1.15, height * 1.15);
   }
 
-  /** Ajusta zoom e posição para caber `width × height` (do tabuleiro) abaixo de `topInset` px. */
-  private frame(center: Point, width: number, height: number, topInset = 0): void {
+  /**
+   * As peças montadas formam a foto, mas com as linhas de corte à vista. Uma cópia da foto
+   * inteira, no mesmo lugar e por cima, vai aparecendo e "apaga" as linhas. Não recebe clique:
+   * arrastar continua movendo a câmera.
+   */
+  private revealFinishedImage(): void {
+    const [group] = this.room!.state.groups.values();
+    if (!group || this.finishedImage) return;
+    const { width, height } = this.puzzle!;
+    const sprite = new Sprite(this.texture!);
+    sprite.position.set(group.x, group.y); // posição da peça = posição na foto + deslocamento
+    sprite.setSize(width, height);
+    sprite.alpha = 0;
+    this.world.addChild(sprite);
+    this.finishedImage = sprite;
+    this.revealStartedAt = performance.now();
+  }
+
+  /** Ajusta zoom e posição para caber `width × height` (do tabuleiro) acima da barra de ferramentas. */
+  private frame(center: Point, width: number, height: number): void {
     const screen = this.app.screen;
-    const available = screen.height - topInset;
-    const scale = clamp(Math.min(screen.width / width, available / height), MIN_ZOOM, MAX_ZOOM);
-    this.world.scale.set(scale);
-    this.world.position.set(
-      screen.width / 2 - center.x * scale,
-      topInset + available / 2 - center.y * scale,
+    const available = screen.height - TOOLBAR_SPACE;
+    const scale = clamp(
+      Math.min(screen.width / width, available / height),
+      this.minScale,
+      MAX_ZOOM,
     );
+    this.world.scale.set(scale);
+    this.world.position.set(screen.width / 2 - center.x * scale, available / 2 - center.y * scale);
   }
 
   /** Re-adicionar ao container move a peça para o fim da lista, ou seja, para cima de todas. */
