@@ -3,6 +3,9 @@ import { Server } from '@colyseus/core';
 import express from 'express';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import {
+  BATTLE_ROOM,
+  BULLET_ROOM,
+  BulletRankingQuery,
   GeneralRankingQuery,
   PIECE_COUNT_PRESETS,
   PRESENCE_ROOM,
@@ -16,7 +19,10 @@ import { registerCommunityRoutes } from './community/routes';
 import { PresenceRoom } from './friends/PresenceRoom';
 import { createPresenceHub } from './friends/presence';
 import { registerFriendRoutes } from './friends/routes';
+import type { BulletStore } from './db/bulletStore';
 import type { GameStore } from './db/gameStore';
+import { BattleRoom } from './rooms/BattleRoom';
+import { BulletRoom } from './rooms/BulletRoom';
 import { PuzzleRoom } from './rooms/PuzzleRoom';
 import type { SnapshotStore } from './rooms/snapshots';
 import { registerUploadRoutes } from './uploads/routes';
@@ -34,6 +40,8 @@ export interface GameServerOptions {
   snapshots?: SnapshotStore;
   /** Quebra-cabeças publicados pelos jogadores. Sem banco, o Explorar mostra só o catálogo. */
   community?: CommunityStore;
+  /** Ranking do Bullet. Sem banco, a corrida termina sem posição. */
+  bullet?: BulletStore;
   /**
    * Contas (login com Google). Sem banco fica undefined: todo mundo joga como convidado e o
    * /api/me responde que não há login.
@@ -61,6 +69,7 @@ export function createGameServer({
   voice,
   snapshots,
   community,
+  bullet,
   auth,
   webDist,
   trustProxy = false,
@@ -143,6 +152,20 @@ export function createGameServer({
         res.json(await store.generalLeaderboard(query.data));
       });
 
+      // Ranking do Bullet: quantos quebra-cabeças em X minutos, por tamanho e modalidade.
+      app.get('/api/ranking/bullet', async (req, res) => {
+        const query = BulletRankingQuery.safeParse(req.query);
+        if (!query.success) {
+          res.status(400).json({ error: 'parâmetros inválidos', issues: query.error.issues });
+          return;
+        }
+        if (!bullet) {
+          res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
+          return;
+        }
+        res.json(await bullet.leaderboard(query.data));
+      });
+
       if (webDist) serveWebApp(app, webDist);
     },
   });
@@ -166,6 +189,26 @@ export function createGameServer({
       },
     )
     .filterBy(['restore']);
+  server.define(
+    BULLET_ROOM,
+    class extends BulletRoom {
+      protected override bullet = bullet;
+      protected override voice = voice;
+      protected override snapshots = snapshots;
+      protected override accounts = accounts;
+      protected override onlineHub = presence;
+    },
+  );
+  server.define(
+    BATTLE_ROOM,
+    class extends BattleRoom {
+      protected override uploads = uploads;
+      protected override voice = voice;
+      protected override snapshots = snapshots;
+      protected override accounts = accounts;
+      protected override onlineHub = presence;
+    },
+  );
   server.define(
     PRESENCE_ROOM,
     class extends PresenceRoom {
