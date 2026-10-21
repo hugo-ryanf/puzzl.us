@@ -1,4 +1,4 @@
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, TrackSource } from 'livekit-server-sdk';
 
 export interface VoiceConfig {
   /** wss://<projeto>.livekit.cloud — vai para o cliente junto com o token. */
@@ -22,11 +22,13 @@ export function createVoiceTokenIssuer({ url, apiKey, apiSecret }: VoiceConfig):
   return {
     async issue({ roomId, identity, name }) {
       const token = new AccessToken(apiKey, apiSecret, { identity, name, ttl: TOKEN_TTL });
-      // Permissões mínimas: entrar só na chamada desta sala, falar e ouvir. Sem canal de dados.
+      // Permissões mínimas: entrar só na chamada desta sala, com microfone e câmera (sem
+      // compartilhar tela) e sem canal de dados.
       token.addGrant({
         roomJoin: true,
         room: voiceRoomName(roomId),
         canPublish: true,
+        canPublishSources: [TrackSource.MICROPHONE, TrackSource.CAMERA],
         canSubscribe: true,
         canPublishData: false,
       });
