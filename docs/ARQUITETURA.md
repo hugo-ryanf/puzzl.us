@@ -207,7 +207,7 @@ Implementado depois do deploy (`apps/server/src/db/gameStore.ts`):
 ## Contas (login com Google)
 
 Implementado na fase C (`apps/server/src/auth/`). Quem não entra continua jogando como
-convidado; a conta é o que permite amigos, salvos, favoritos e publicar fotos.
+convidado; a conta é o que permite amigos, partidas salvas, favoritos e publicar fotos.
 
 1. **Fluxo:** `/auth/google` gera `state` e o verificador PKCE (cookies httpOnly de 10 min) e vai
    para o Google (lib `arctic`, escopos `openid profile email`). O Google devolve em
@@ -239,6 +239,28 @@ Implementado na fase D (`apps/server/src/library/library.ts`), só para quem tem
 - Rotas: `GET /api/me/library` (`{ records, favorites }`) e `PUT`/`DELETE
 /api/me/favorites/:imageId`, todas exigindo sessão (401 sem login).
 - Partidas com foto própria ficam fora do ranking e, por isso, fora dos records.
+
+## Partidas salvas ("Em andamento")
+
+Implementado na fase E (`apps/server/src/rooms/savedGames.ts`), reaproveitando o formato do
+snapshot da sala (`RoomSnapshot`):
+
+1. **Dono:** quem cria a sala logado (o primeiro a entrar numa sala nova). Sala criada por
+   convidado não tem dono e não salva. O estado leva `ownerId` (o `sessionId` do dono enquanto
+   ele está na sala) para o site mostrar o botão só para ele.
+2. **Salvar e sair** (mensagem `saveAndLeave`, só o dono, durante a partida): grava em
+   `saved_games` (snapshot em jsonb + foto, tamanho, vagas, peças encaixadas e tempo para a
+   lista), avisa todo mundo (`saved`) e fecha a sala.
+3. **Autosave:** se a sala esvazia no meio da partida, ou o servidor desliga
+   (`onBeforeShutdown`), a partida também vai para o "Em andamento" do dono.
+4. **Retomar:** `client.create('puzzle', { resume: id })`. O `onAuth` só deixa entrar a conta
+   que salvou. A sala nasce com **outro código**, no lobby, com a mesa e os encaixes de antes;
+   o relógio mostra o tempo acumulado e continua dele no "Começar" (solo começa sozinho). A
+   mesma entrada é atualizada se salvar de novo; ao completar, ela é apagada e o ranking recebe
+   o tempo total.
+5. **Limites:** até 20 por conta (a mais antiga sai). Foto enviada usada por uma partida salva
+   não é apagada pela limpeza de 7 dias.
+6. Rotas: `GET /api/me/saved` e `DELETE /api/me/saved/:id` (só apaga se for da conta).
 
 ## Áudio
 
