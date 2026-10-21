@@ -43,6 +43,7 @@ import type { UploadStore } from '../uploads/uploadStore';
 import type { VoiceTokenIssuer } from '../voice';
 import { uniqueRoomCode } from './roomCode';
 import type { CommunityStore } from '../community/community';
+import type { PresenceHub } from '../friends/presence';
 import type { SavedGameStore } from './savedGames';
 import { SNAPSHOT_VERSION, type RoomSnapshot, type SnapshotStore } from './snapshots';
 
@@ -88,6 +89,8 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   protected savedGames?: SavedGameStore;
   /** Fotos publicadas (entram no ranking); injetado por createGameServer. Sem banco, undefined. */
   protected community?: CommunityStore;
+  /** Quem está jogando onde (status "jogando" e convites); injetado por createGameServer. */
+  protected onlineHub?: PresenceHub;
 
   private engine!: PuzzleEngine;
   /**
@@ -296,6 +299,12 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
       this.awaitingCreator = false;
       this.ownerUserId = identity.userId; // criada por convidado: sem dono (não dá para salvar)
     }
+    if (identity.userId) {
+      this.onlineHub?.enterRoom(identity.userId, `${this.roomId}:${client.sessionId}`, {
+        roomCode: this.roomId,
+        imageId: this.state.config.imageId,
+      });
+    }
     if (identity.userId && identity.userId === this.ownerUserId) {
       this.awaitingOwner = false;
       this.state.ownerId = client.sessionId;
@@ -321,6 +330,8 @@ export class PuzzleRoom extends Room<{ state: RoomState }> {
   onLeave(client: Client) {
     this.releaseHeldBy(client.sessionId);
     this.state.players.delete(client.sessionId);
+    const userId = this.identities.get(client.sessionId)?.userId;
+    if (userId) this.onlineHub?.leaveRoom(userId, `${this.roomId}:${client.sessionId}`);
     this.identities.delete(client.sessionId);
     if (this.state.ownerId === client.sessionId) this.state.ownerId = '';
     this.dirty = true;
