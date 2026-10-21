@@ -1,5 +1,6 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
+  PRESENCE_ROOM,
   ROOM_NAME,
   RoomState,
   type CreateRoomOptions,
@@ -139,6 +140,11 @@ export function resumeRoom(code: string): Promise<PuzzleRoom | null> {
     }
   })();
   return resuming;
+}
+
+/** Sala de presença (só logado): mantém a pessoa "online" e entrega convites e avisos. */
+export function joinPresence(): Promise<Room> {
+  return client.joinOrCreate(PRESENCE_ROOM);
 }
 
 export function leaveRoom(room: PuzzleRoom): void {
