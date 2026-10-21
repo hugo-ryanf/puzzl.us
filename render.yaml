@@ -1,0 +1,28 @@
+# Blueprint do Render: um único serviço web gratuito entrega o site, a API e o WebSocket do jogo.
+# Render → New → Blueprint → escolha este repositório. Os segredos (sync: false) são pedidos
+# na criação e ficam só no painel do Render, nunca no git.
+services:
+  - type: web
+    name: quebra-cabeca
+    runtime: node
+    plan: free
+    # Mesma região do banco no Neon (us-east-2): cada consulta ao ranking fica rápida.
+    region: ohio
+    # pnpm na versão exata do package.json, sem depender do corepack da máquina de build.
+    buildCommand: npx --yes pnpm@10.34.7 install --frozen-lockfile && npx --yes pnpm@10.34.7 run build:deploy
+    startCommand: node apps/server/dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # Atrás do proxy do Render: o limite de envio de fotos usa o IP real do visitante.
+      - key: TRUST_PROXY
+        value: '1'
+      - key: DATABASE_URL
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
