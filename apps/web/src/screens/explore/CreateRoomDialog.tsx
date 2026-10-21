@@ -78,7 +78,7 @@ export function CreateRoomDialog({
     ? uploaded && {
         imageId: uploaded.imageId,
         title: 'Sua foto',
-        subtitle: 'Sala personalizada · fora do ranking',
+        subtitle: 'Sala personalizada · publique no fim para entrar no ranking',
         thumbUrl: uploaded.previewUrl,
       }
     : (source ?? undefined);
