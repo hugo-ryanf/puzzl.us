@@ -258,3 +258,32 @@ export const friendships = pgTable(
     index('friendships_high_idx').on(table.userHigh),
   ],
 );
+
+/**
+ * Uma corrida de Bullet terminada: quantos quebra-cabeças a equipe montou no tempo. O ranking
+ * compara corridas da mesma categoria (minutos + peças + equipe); `team_key` como em `games`.
+ */
+export const bulletRuns = pgTable(
+  'bullet_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    roomCode: text('room_code').notNull(),
+    minutes: integer('minutes').notNull(),
+    pieceCount: integer('piece_count').notNull(),
+    teamSize: integer('team_size').notNull(),
+    teamKey: text('team_key').notNull(),
+    solved: integer('solved').notNull(),
+    /** Peças encaixadas no quebra-cabeça que ficou pela metade (desempate). */
+    partial: integer('partial').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index('bullet_runs_category_idx').on(
+      table.minutes,
+      table.pieceCount,
+      table.teamSize,
+      table.finishedAt,
+    ),
+  ],
+);
