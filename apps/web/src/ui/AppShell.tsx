@@ -4,6 +4,7 @@ import type { Account } from '../net/account';
 import {
   BookmarkIcon,
   CompassIcon,
+  HourglassIcon,
   LogInIcon,
   PlusIcon,
   SettingsIcon,
@@ -12,7 +13,7 @@ import {
   UsersIcon,
 } from './icons';
 
-export type Section = 'explore' | 'ranking';
+export type Section = 'explore' | 'favorites' | 'records' | 'ranking';
 
 interface AppShellProps {
   active: Section;
@@ -79,8 +80,25 @@ export function AppShell({
             Explorar
           </button>
           <SoonLink icon={<UsersIcon />} label="Amigos" />
-          <SoonLink icon={<TimerIcon />} label="Meus records" />
-          <SoonLink icon={<BookmarkIcon />} label="Salvos" />
+          <SoonLink icon={<HourglassIcon />} label="Em andamento" />
+          <button
+            type="button"
+            className="nav-link"
+            aria-current={current('favorites')}
+            onClick={() => onNavigate('favorites')}
+          >
+            <BookmarkIcon />
+            Favoritos
+          </button>
+          <button
+            type="button"
+            className="nav-link"
+            aria-current={current('records')}
+            onClick={() => onNavigate('records')}
+          >
+            <TimerIcon />
+            Meus records
+          </button>
           <button
             type="button"
             className="nav-link"
