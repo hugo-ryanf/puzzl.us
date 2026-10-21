@@ -78,6 +78,13 @@
       "when": 1792610017760,
       "tag": "0010_bullet",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792622724118,
+      "tag": "0011_pontos",
+      "breakpoints": true
     }
   ]
 }
