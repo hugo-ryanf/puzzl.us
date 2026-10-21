@@ -5,6 +5,7 @@ import { createGameServer } from './app';
 import { createAccountStore } from './auth/accounts';
 import { createGoogleAuth, googleConfigFromEnv } from './auth/google';
 import type { AuthOptions } from './auth/routes';
+import { createLibraryStore } from './library/library';
 import { connectDatabase } from './db/database';
 import { createGameStore, type GameStore } from './db/gameStore';
 import {
@@ -49,6 +50,7 @@ if (databaseUrl) {
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
     secureCookies: publicUrl.startsWith('https://'),
+    library: createLibraryStore(db),
   };
   console.log('[server] banco conectado, migrações em dia');
   if (auth.google) console.log(`[server] login com Google ligado (volta para ${publicUrl})`);
