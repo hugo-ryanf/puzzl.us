@@ -108,7 +108,14 @@ describe('Amigos', () => {
     const anaView = await list(ana);
     expect(anaView.friendCode).toBe(ana.account.friendCode);
     expect(anaView.friends).toEqual([
-      { id: bia.account.id, name: 'Bia', avatarUrl: null, status: 'offline' },
+      {
+        id: bia.account.id,
+        name: 'Bia',
+        avatarUrl: null,
+        avatarColor: null,
+        friendCode: bia.account.friendCode,
+        status: 'offline',
+      },
     ]);
     expect((await list(bia)).friends.map((p) => p.name)).toEqual(['Ana']);
   });
@@ -161,6 +168,31 @@ describe('Amigos', () => {
     await anaPresence.leave();
     expect(await until(() => changed === 4)).toBe(true);
     expect((await list(bia)).friends[0]!.status).toBe('offline');
+    await biaPresence.leave();
+  });
+
+  it('pedido, aceite e remoção avisam as duas pessoas na hora (sem recarregar)', async () => {
+    const ana = await login('Ana');
+    const bia = await login('Bia');
+    const count = { ana: 0, bia: 0 };
+    const anaPresence = await ana.sdk.joinOrCreate(PRESENCE_ROOM);
+    anaPresence.onMessage('friendsChanged', () => count.ana++);
+    const biaPresence = await bia.sdk.joinOrCreate(PRESENCE_ROOM);
+    biaPresence.onMessage('friendsChanged', () => count.bia++);
+    await new Promise((r) => setTimeout(r, 50)); // nada chega antes: ainda não são amigas
+    Object.assign(count, { ana: 0, bia: 0 });
+
+    await call(ana, 'POST', 'friends', { code: (await list(bia)).friendCode });
+    expect(await until(() => count.ana === 1 && count.bia === 1)).toBe(true);
+    expect((await list(bia)).incoming).toHaveLength(1);
+
+    await call(bia, 'POST', `friends/${ana.account.id}/accept`);
+    expect(await until(() => count.ana >= 2 && count.bia >= 2)).toBe(true);
+
+    const before = { ...count };
+    await call(ana, 'DELETE', `friends/${bia.account.id}`);
+    expect(await until(() => count.ana > before.ana && count.bia > before.bia)).toBe(true);
+    await anaPresence.leave();
     await biaPresence.leave();
   });
 
