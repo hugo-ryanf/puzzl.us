@@ -1,4 +1,4 @@
-import { and, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
   RANKING_TIME_ZONE,
@@ -7,7 +7,8 @@ import {
   type RankingRowBase,
 } from '@puzzle/shared';
 import type { AppDatabase } from './database';
-import { bulletRuns, games, players } from './schema';
+import { profileName } from '../auth/accounts';
+import { bulletRuns, games, players, users } from './schema';
 
 const PERIOD_UNIT = { day: 'day', week: 'week', month: 'month' } as const;
 /** A sequência de dias só olha para trás até aqui (ninguém vai ter uma maior que isso). */
@@ -70,42 +71,55 @@ async function streaks(
     set.add(row.day);
     days.set(row.teamKey, set);
   }
-  for (const [teamKey, set] of days) {
-    let offset = set.has(localDay(0)) ? 0 : 1;
-    let count = 0;
-    while (set.has(localDay(offset))) {
-      count++;
-      offset++;
-    }
-    result.set(teamKey, count);
-  }
+  for (const [teamKey, set] of days) result.set(teamKey, streakOf(set));
   return result;
 }
 
-/** Nome de cada equipe pela team_key: os apelidos mais recentes, em ordem alfabética. */
-export async function teamNames(
+/** Dias seguidos ("2026-10-21") até hoje, ou até ontem se ainda não jogou hoje. */
+export function streakOf(days: ReadonlySet<string>): number {
+  let offset = days.has(localDay(0)) ? 0 : 1;
+  let count = 0;
+  while (days.has(localDay(offset))) {
+    count++;
+    offset++;
+  }
+  return count;
+}
+
+/**
+ * Quem é cada equipe pela team_key: o nome de cada jogador (com conta, o nickname atual do
+ * perfil; convidado, o apelido mais recente) e o código de amigo (null para convidado), em ordem
+ * alfabética.
+ */
+export async function teamMembers(
   db: AppDatabase,
   teamKeys: string[],
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, { players: string[]; profiles: Array<string | null> }>> {
   const ids = [...new Set(teamKeys.flatMap((key) => key.split(',')))];
-  const names = new Map(
+  const rows =
     ids.length === 0
       ? []
-      : (
-          await db
-            .select({ id: players.id, nickname: players.nickname })
-            .from(players)
-            .where(inArray(players.id, ids))
-        ).map((p) => [p.id, p.nickname]),
-  );
+      : await db
+          .select({
+            id: players.id,
+            name: sql<string>`coalesce(${profileName}, ${players.nickname})`,
+            code: users.friendCode,
+          })
+          .from(players)
+          .leftJoin(users, eq(users.id, players.userId))
+          .where(inArray(players.id, ids));
+  const byId = new Map(rows.map((row) => [row.id, row]));
   return new Map(
-    teamKeys.map((key) => [
-      key,
-      key
+    teamKeys.map((key) => {
+      const members = key
         .split(',')
-        .map((id) => names.get(id) ?? '?')
-        .sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    ]),
+        .map((id) => byId.get(id) ?? { name: '?', code: null })
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      return [
+        key,
+        { players: members.map((m) => m.name), profiles: members.map((m) => m.code ?? null) },
+      ];
+    }),
   );
 }
 
@@ -137,14 +151,14 @@ export async function rankingPage<R extends { teamKey: string }, E>(
     keys.add(rows[meIndex]!.teamKey);
     if (meIndex > 0) keys.add(rows[meIndex - 1]!.teamKey);
   }
-  const names = await teamNames(db, [...keys]);
+  const members = await teamMembers(db, [...keys]);
   const streak = await streaks(db, streakSource, [...keys]);
 
   const entry = (row: R, index: number): RankingRowBase & E => {
     const was = before?.get(row.teamKey);
     return {
       position: index + 1,
-      players: names.get(row.teamKey)!,
+      ...members.get(row.teamKey)!,
       ...(before ? { change: was ? was - (index + 1) : null } : {}),
       streak: streak.get(row.teamKey) ?? 0,
       ...toEntry(row),
