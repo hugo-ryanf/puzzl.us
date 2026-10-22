@@ -239,6 +239,7 @@ export function ExploreScreen({
         source={dialogSource}
         name={name}
         onNameChange={onNameChange}
+        nameLocked={signedIn}
         onClose={() => {
           setChoice(null);
           onCloseCreate();
@@ -251,6 +252,7 @@ export function ExploreScreen({
         initialCode={initialCode}
         name={name}
         onNameChange={onNameChange}
+        nameLocked={signedIn}
         onClose={onCloseJoin}
         onJoined={onEnter}
       />
