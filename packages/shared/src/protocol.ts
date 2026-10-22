@@ -160,6 +160,8 @@ export interface AccountView {
   /** Cor do avatar com iniciais (null: a cor automática pelo nome). */
   avatarColor: string | null;
   avatarStyle: AvatarStyle;
+  /** Camaleão escolhido (vale quando `avatarStyle` é 'preset'). */
+  avatarPreset: AvatarPreset | null;
   bio: string | null;
   /** Nome e foto como estão no Google (para voltar a eles no perfil). */
   googleName: string;
@@ -171,9 +173,24 @@ export interface AccountView {
 
 // ── Perfil ──────────────────────────────────────────────────────────────────
 
-/** Foto do Google ou avatar com iniciais. */
-export const AVATAR_STYLES = ['google', 'initials'] as const;
+/** Foto do Google, avatar com iniciais ou um dos camaleões do site. */
+export const AVATAR_STYLES = ['google', 'initials', 'preset'] as const;
 export type AvatarStyle = (typeof AVATAR_STYLES)[number];
+
+/** Os camaleões (medalhões do logo em cores), em `apps/web/public/avatars/<id>.webp`. */
+export const AVATAR_PRESETS = [
+  'petroleo',
+  'gelo',
+  'verde',
+  'ouro',
+  'ambar',
+  'cobre',
+  'rosa',
+  'roxo',
+] as const;
+export type AvatarPreset = (typeof AVATAR_PRESETS)[number];
+
+export const avatarPresetUrl = (preset: AvatarPreset) => `/avatars/${preset}.webp`;
 
 /** Cores para o avatar com iniciais (o texto é branco: todas com contraste). */
 export const AVATAR_COLORS = [
@@ -199,8 +216,13 @@ export const ProfileUpdate = z
       .nullable(),
     avatarStyle: z.enum(AVATAR_STYLES),
     avatarColor: z.enum(AVATAR_COLORS).nullable(),
+    avatarPreset: z.enum(AVATAR_PRESETS).nullable(),
   })
-  .partial();
+  .partial()
+  .refine((update) => update.avatarStyle !== 'preset' || !!update.avatarPreset, {
+    message: 'Escolha um camaleão',
+    path: ['avatarPreset'],
+  });
 export type ProfileUpdate = z.infer<typeof ProfileUpdate>;
 
 /** Números do perfil (das partidas da conta). */
@@ -216,6 +238,12 @@ export interface ProfileStats {
   pointsAll: number;
   /** Dias seguidos jogando (até hoje ou ontem). */
   streak: number;
+  /** Já jogou hoje (a sequência de hoje está garantida). */
+  playedToday: boolean;
+  /** A maior sequência de dias seguidos (no último ano). */
+  bestStreak: number;
+  /** Quebra-cabeças montados em equipe (dupla ou mais). */
+  teamPuzzles: number;
   /** Mais quebra-cabeças numa corrida de Bullet (qualquer tempo e tamanho). */
   bulletBest: number;
   friends: number;
