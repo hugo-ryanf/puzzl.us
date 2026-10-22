@@ -86,7 +86,7 @@ async function setup({ started = true } = {}) {
    */
   const send = async (
     client: typeof ana,
-    type: 'start' | 'grab' | 'move' | 'drop' | 'scatter',
+    type: 'start' | 'grab' | 'move' | 'drop' | 'scatter' | 'playAgain',
     payload?: unknown,
   ) => {
     client.send(type, payload as GrabMessage);
@@ -347,6 +347,32 @@ describe('PuzzleRoom — fim e ranking', () => {
     expect(state.rankStatus).toBe('saved');
     expect(state.rank).toBe(1);
     expect(state.rankToday).toBe(1);
+  });
+
+  it('jogar novamente: só o anfitrião, mesa nova na mesma sala, com a mesma foto', async () => {
+    const game = await setup();
+    await solve(game);
+    const { room, state, ana, bia, send } = game;
+    await waitForRankStatus(room, state);
+    const { seed, round } = { seed: state.config.seed, round: state.round };
+
+    await send(bia, 'playAgain');
+    expect(state.phase).toBe('completed');
+
+    ana.send('playAgain');
+    for (let i = 0; i < 50 && state.phase !== 'lobby'; i++) await room.waitForNextPatch();
+    expect(state.phase).toBe('lobby');
+    expect(state.round).toBe(round + 1);
+    expect(state.config.imageId).toBe(IMAGE.id);
+    expect(state.config.seed).not.toBe(seed);
+    expect(state.groups.size).toBe(state.pieceGroup.length); // uma peça por grupo de novo
+    expect(state.players.get(ana.sessionId)?.snaps).toBe(0);
+    expect([state.rankStatus, state.rank, state.points, state.durationMs]).toEqual(['', 0, 0, 0]);
+    expect(state.players.size).toBe(2); // ninguém saiu da sala
+    expect(room.locked).toBe(false);
+
+    await send(ana, 'start');
+    expect(state.phase).toBe('playing');
   });
 
   it('o tempo gravado aparece na API de ranking da categoria', async () => {
