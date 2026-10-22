@@ -4,6 +4,7 @@ import { matchMaker, type Server } from '@colyseus/core';
 import { ColyseusSDK, type Room as ClientRoom } from '@colyseus/sdk';
 import { BATTLE_ROOM, CATALOG, RoomState, type BoardSchema } from '@puzzle/shared';
 import { createGameServer } from '../app';
+import { COUNTDOWN } from './BaseGameRoom';
 import type { BattleRoom } from './BattleRoom';
 
 const PORT = 2575;
@@ -11,6 +12,7 @@ const sdk = new ColyseusSDK(`ws://127.0.0.1:${PORT}`);
 
 let server: Server;
 beforeAll(async () => {
+  COUNTDOWN.seconds = 0; // sem o "3, 2, 1" (tem teste próprio)
   server = createGameServer();
   await server.listen(PORT);
 });
@@ -197,6 +199,28 @@ describe('BattleRoom', () => {
       expect(state.winner).toBe('draw');
       await ana.leave();
       await bia.leave();
+    });
+
+    it('"3, 2, 1" antes de valer; o lado que sai na contagem perde por W.O.', async () => {
+      COUNTDOWN.seconds = 1;
+      try {
+        const { ana, bia, state, board } = await setup('1v1', [], 3);
+        ana.send('start');
+        await until(() => state.phase === 'playing');
+        expect(state.countdown).toBe(1);
+        const groupId = board('a').pieceGroup[1]!;
+        ana.send('grab', { groupId, board: 'a' });
+        await wait(100);
+        expect(board('a').groups.get(String(groupId))!.heldBy).toBe('');
+
+        await bia.leave();
+        expect(await until(() => state.phase === 'completed')).toBe(true);
+        expect(state.winner).toBe('a');
+        expect(state.countdown).toBe(0);
+        await ana.leave();
+      } finally {
+        COUNTDOWN.seconds = 0;
+      }
     });
 
     it('recusa tamanho fora dos do Bullet', async () => {
