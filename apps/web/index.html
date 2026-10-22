@@ -8,10 +8,14 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#3a9aad" />
     <script>
-      // Tema salvo na barra lateral, aplicado antes de desenhar (ver src/ui/theme.ts).
+      // Tema e cor de destaque salvos no menu da conta, aplicados antes de desenhar
+      // (ver src/ui/theme.ts e src/ui/accent.ts).
       try {
         var tema = localStorage.getItem('quebra-cabeca:tema');
         if (tema === 'light' || tema === 'dark') document.documentElement.dataset.theme = tema;
+        var destaque = localStorage.getItem('quebra-cabeca:destaque');
+        if (destaque && /^[a-z]+$/.test(destaque))
+          document.documentElement.dataset.accent = destaque;
       } catch (e) {}
     </script>
     <meta
