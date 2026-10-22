@@ -134,7 +134,8 @@ export function RoomScreen({
         ) : snapshot.mode === 'battle' ? (
           <BattleBoards room={room} snapshot={snapshot} />
         ) : image?.image ? (
-          <Board room={room} image={image.image} phase={snapshot.phase} />
+          // "Jogar novamente" troca a mesa: remonta a cena do zero.
+          <Board key={snapshot.round} room={room} image={image.image} phase={snapshot.phase} />
         ) : (
           <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>
         )}
@@ -151,7 +152,7 @@ export function RoomScreen({
         )}
         {snapshot.phase === 'completed' && snapshot.mode === 'battle' && (
           <BattleResult
-            // Cada partida (revanche) abre o resultado de novo.
+            // Cada partida ("Jogar novamente") abre o resultado de novo.
             key={snapshot.round}
             room={room}
             snapshot={snapshot}
@@ -167,6 +168,8 @@ export function RoomScreen({
         )}
         {snapshot.phase === 'completed' && snapshot.mode === 'bullet' && (
           <BulletResult
+            key={snapshot.round}
+            room={room}
             snapshot={snapshot}
             onShowRanking={(bullet) => onShowRanking({ bullet })}
             onLeave={leave}
@@ -174,6 +177,8 @@ export function RoomScreen({
         )}
         {snapshot.phase === 'completed' && snapshot.mode === 'classic' && (
           <CompletedModal
+            key={snapshot.round}
+            room={room}
             snapshot={snapshot}
             onShowRanking={onShowRanking}
             onLeave={leave}
