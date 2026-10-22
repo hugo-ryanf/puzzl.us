@@ -295,6 +295,11 @@ mostrar; entrar pelo código funciona para qualquer modo.
   a montar ganha (`winner`); um lado que sai inteiro perde por W.O. O anfitrião pede revanche
   (mesas novas, mesmos lados). Sem ranking. Na tela, o seu lado à esquerda e o do adversário à
   direita (só assistir); no celular, abas.
+  - **Por tempo** (`minutes` nas opções; 3/5/10 min, 12 ou 24 peças, como o Bullet): os dois lados
+    recebem a mesma sequência de fotos sorteadas, com as mesmas posições (`rounds`, gerada conforme
+    o lado mais rápido avança). Montou um, `solved` da mesa sobe e ~0,9 s depois entra o próximo
+    (cada lado no seu ritmo; o cliente remonta a mesa pela `seed`). No fim do tempo ganha quem
+    montou mais; empate, mais peças encaixadas no que ficou pela metade; senão `winner = 'draw'`.
 - Os modos novos não têm snapshot nem "Salvar e sair": se o servidor reiniciar no meio, a
   partida acaba.
 - **Jogar novamente** (mensagem `playAgain`, só o anfitrião, depois do fim e com o resultado já
@@ -308,15 +313,14 @@ mostrar; entrar pelo código funciona para qualquer modo.
 - **Dados** (em `users`): `nickname` (null = o primeiro nome do Google), `bio` (até 120),
   `avatar_style` (`google`, `initials` ou `preset`), `avatar_color` (paleta `AVATAR_COLORS`;
   null = cor automática pelo nome) e `avatar_preset` (um dos camaleões de `AVATAR_PRESETS`,
-  servidos de `apps/web/public/avatars/<id>.webp`, 256 px com fundo transparente).
-- **Cor de destaque** (independente do avatar): no menu "⋯" da conta, junto do tema (convidado:
-  no rodapé da barra), oito cores com os nomes dos camaleões. Guardada no navegador
-  (`ui/accent.ts`; o `index.html` aplica antes de desenhar) como `data-accent` no `<html>`, troca
-  só `--accent`, `--accent-soft` e `--track`, no claro e no escuro. Petróleo é o teal padrão. Com um
-  camaleão no avatar, a **cor de destaque** do site vira a dele: `data-accent` no `<html>`
-  (`ui/accent.ts`, guardado no navegador para o `index.html` aplicar antes de desenhar) troca só
-  `--accent`, `--accent-soft` e `--track`, no claro e no escuro; Petróleo é o teal padrão. O login com Google atualiza só o nome e a foto _do Google_
-  (`display_name`, `avatar_url`), nunca o que a pessoa escolheu no perfil.
+  servidos de `apps/web/public/avatars/<id>.webp`, 256 px com fundo transparente). O login com
+  Google atualiza só o nome e a foto _do Google_ (`display_name`, `avatar_url`), nunca o que a
+  pessoa escolheu no perfil.
+- **Cor de destaque** (independente do avatar): em "Editar perfil", oito cores com os nomes dos
+  camaleões; aparece no site enquanto escolhe e fica com "Salvar perfil" ("Cancelar" volta a de
+  antes). Guardada no navegador (`ui/accent.ts`; o `index.html` aplica antes de desenhar) como
+  `data-accent` no `<html>`, troca só `--accent`, `--accent-soft` e `--track`, no claro e no
+  escuro. Petróleo é o teal padrão.
 - **Nome e foto mostrados** saem de `profileName`/`profileAvatar` (`auth/accounts.ts`), os mesmos
   na conta, nos amigos e no ranking (que mostra o nickname atual de quem tem conta).
 - **Nas salas**, quem está logado entra com o nickname do perfil: o `onAuth` devolve o nome e o
