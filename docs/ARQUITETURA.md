@@ -306,8 +306,9 @@ mostrar; entrar pelo código funciona para qualquer modo.
 ## Perfil
 
 - **Dados** (em `users`): `nickname` (null = o primeiro nome do Google), `bio` (até 120),
-  `avatar_style` (`google` ou `initials`) e `avatar_color` (paleta `AVATAR_COLORS`; null = cor
-  automática pelo nome). O login com Google atualiza só o nome e a foto _do Google_
+  `avatar_style` (`google`, `initials` ou `preset`), `avatar_color` (paleta `AVATAR_COLORS`;
+  null = cor automática pelo nome) e `avatar_preset` (um dos camaleões de `AVATAR_PRESETS`,
+  servidos de `apps/web/public/avatars/<id>.webp`, 256 px com fundo transparente). O login com Google atualiza só o nome e a foto _do Google_
   (`display_name`, `avatar_url`), nunca o que a pessoa escolheu no perfil.
 - **Nome e foto mostrados** saem de `profileName`/`profileAvatar` (`auth/accounts.ts`), os mesmos
   na conta, nos amigos e no ranking (que mostra o nickname atual de quem tem conta).
