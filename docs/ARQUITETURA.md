@@ -308,7 +308,14 @@ mostrar; entrar pelo código funciona para qualquer modo.
 - **Dados** (em `users`): `nickname` (null = o primeiro nome do Google), `bio` (até 120),
   `avatar_style` (`google`, `initials` ou `preset`), `avatar_color` (paleta `AVATAR_COLORS`;
   null = cor automática pelo nome) e `avatar_preset` (um dos camaleões de `AVATAR_PRESETS`,
-  servidos de `apps/web/public/avatars/<id>.webp`, 256 px com fundo transparente). O login com Google atualiza só o nome e a foto _do Google_
+  servidos de `apps/web/public/avatars/<id>.webp`, 256 px com fundo transparente).
+- **Cor de destaque** (independente do avatar): no menu "⋯" da conta, junto do tema (convidado:
+  no rodapé da barra), oito cores com os nomes dos camaleões. Guardada no navegador
+  (`ui/accent.ts`; o `index.html` aplica antes de desenhar) como `data-accent` no `<html>`, troca
+  só `--accent`, `--accent-soft` e `--track`, no claro e no escuro. Petróleo é o teal padrão. Com um
+  camaleão no avatar, a **cor de destaque** do site vira a dele: `data-accent` no `<html>`
+  (`ui/accent.ts`, guardado no navegador para o `index.html` aplicar antes de desenhar) troca só
+  `--accent`, `--accent-soft` e `--track`, no claro e no escuro; Petróleo é o teal padrão. O login com Google atualiza só o nome e a foto _do Google_
   (`display_name`, `avatar_url`), nunca o que a pessoa escolheu no perfil.
 - **Nome e foto mostrados** saem de `profileName`/`profileAvatar` (`auth/accounts.ts`), os mesmos
   na conta, nos amigos e no ranking (que mostra o nickname atual de quem tem conta).
