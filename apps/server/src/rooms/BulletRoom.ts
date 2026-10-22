@@ -56,6 +56,7 @@ export class BulletRoom extends BaseGameRoom {
     scatter: () => {
       if (this.canPlay(BOARD)) this.board.scatter();
     },
+    playAgain: (client: Client) => void this.playAgain(client),
   };
 
   async onCreate(rawOptions: unknown) {
@@ -102,6 +103,28 @@ export class BulletRoom extends BaseGameRoom {
       this.state.remainingMs = Math.max(0, limit - this.elapsed());
     });
     this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
+  }
+
+  /** "Jogar novamente" (anfitrião, depois do fim): placar e relógio zerados, na mesma sala. */
+  private async playAgain(client: Client) {
+    if (client.sessionId !== this.state.hostId || this.phase !== 'completed') return;
+    if (this.state.rankStatus === 'saving') return; // o resultado ainda vai chegar nesta partida
+    Object.assign(this.state, {
+      phase: 'lobby' satisfies GamePhase,
+      remainingMs: this.state.timeLimitMs,
+      elapsedMs: 0,
+      durationMs: 0,
+      solved: 0,
+      partial: 0,
+      rankStatus: '' satisfies RankStatus,
+      rank: 0,
+      rankToday: 0,
+      teamSize: 0,
+    });
+    for (const player of this.state.players.values()) player.snaps = 0;
+    this.nextRound();
+    await this.unlock();
+    if (this.options.maxPlayers === 1) this.startPlaying();
   }
 
   /** Próxima foto do baralho; acabou, embaralha de novo (sem repetir a última). */
