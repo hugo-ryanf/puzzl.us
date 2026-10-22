@@ -20,7 +20,8 @@ const INVITE_COOLDOWN_MS = 15_000;
  * POST   /api/me/friends/:id/accept → aceita um pedido recebido
  * DELETE /api/me/friends/:id        → recusa, cancela ou desfaz a amizade
  * POST   /api/me/invites            → { friendId, roomCode } chama um amigo online para a sala
- * Tudo exige login. Cada mudança avisa a outra pessoa pela sala de presença ('friendsChanged').
+ * Tudo exige login. Cada mudança avisa as duas pessoas pela sala de presença ('friendsChanged'):
+ * a outra e as outras abas/aparelhos de quem fez a mudança.
  */
 export function registerFriendRoutes(
   app: Application,
@@ -42,7 +43,10 @@ export function registerFriendRoutes(
     next();
   });
   const me = (res: express.Response) => res.locals.account as Account;
-  const notify = (userId: string) => presence.send(userId, 'friendsChanged', {});
+  const notify = (res: express.Response, otherId: string) => {
+    presence.send(otherId, 'friendsChanged', {});
+    presence.send(me(res).id, 'friendsChanged', {});
+  };
 
   const withId: RequestHandler = (req, res, next) => {
     const id = FriendId.safeParse(req.params.id);
@@ -81,7 +85,7 @@ export function registerFriendRoutes(
       res.status(400).json({ error: 'Esse é o seu próprio código.' });
       return;
     }
-    notify(added.friendId);
+    notify(res, added.friendId);
     res.status(added.result === 'requested' ? 201 : 200).json({ result: added.result });
   });
 
@@ -91,13 +95,13 @@ export function registerFriendRoutes(
       res.status(404).json({ error: 'Pedido não encontrado.' });
       return;
     }
-    notify(otherId);
+    notify(res, otherId);
     res.sendStatus(204);
   });
 
   router.delete('/friends/:id', withId, async (_req, res) => {
     const otherId = res.locals.otherId as string;
-    if (await friends.remove(me(res).id, otherId)) notify(otherId);
+    if (await friends.remove(me(res).id, otherId)) notify(res, otherId);
     res.sendStatus(204);
   });
 
