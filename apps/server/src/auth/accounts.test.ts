@@ -46,7 +46,8 @@ describe('AccountStore — contas e sessões', () => {
     expect(first.friendCode).toMatch(/^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
 
     const again = await accounts.signInWithGoogle(google('g-1', 'Hugo R.'), true);
-    expect(again).toEqual({ ...first, name: 'Hugo R.', isAdmin: true }); // mesmo id e código
+    // Mesmo id e código; o nome do Google muda (sem nickname, o perfil mostra o primeiro nome).
+    expect(again).toEqual({ ...first, name: 'Hugo', googleName: 'Hugo R.', isAdmin: true });
   });
 
   it('a sessão vale pelo token; no banco fica só o hash; sair apaga', async () => {
