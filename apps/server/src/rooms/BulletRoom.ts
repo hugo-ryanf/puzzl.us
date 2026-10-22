@@ -86,23 +86,27 @@ export class BulletRoom extends BaseGameRoom {
   }
 
   onDispose() {
+    this.countdownTimer?.clear();
     this.clockTimer?.clear();
     this.endTimer?.clear();
     this.nextRoundTimer?.clear();
   }
 
   private canPlay(board: string | undefined): boolean {
-    return this.phase === 'playing' && board === BOARD && !this.state.boards.get(BOARD)?.done;
+    if (this.phase !== 'playing' || this.state.countdown > 0 || board !== BOARD) return false;
+    return !this.state.boards.get(BOARD)?.done;
   }
 
   private startPlaying() {
     if (this.phase !== 'lobby') return;
     this.state.phase = 'playing' satisfies GamePhase;
-    const limit = this.state.timeLimitMs;
-    this.startClock(Date.now(), 0, () => {
-      this.state.remainingMs = Math.max(0, limit - this.elapsed());
+    this.startAfterCountdown(() => {
+      const limit = this.state.timeLimitMs;
+      this.startClock(Date.now(), 0, () => {
+        this.state.remainingMs = Math.max(0, limit - this.elapsed());
+      });
+      this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
     });
-    this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
   }
 
   /** "Jogar novamente" (anfitrião, depois do fim): placar e relógio zerados, na mesma sala. */
