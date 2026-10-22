@@ -4,6 +4,7 @@ import { formatDuration } from '../../format';
 import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { ImageIcon, PartyIcon, SwordsIcon } from '../../ui/icons';
+import { PlayAgainButton } from '../room/PlayAgainButton';
 
 const TEAM_NAMES: Record<BattleTeam, string> = { a: 'Lado A', b: 'Lado B' };
 
@@ -101,7 +102,6 @@ export function BattleResult({
     loserBoard && loserBoard.pieces > 0
       ? Math.round((loserBoard.placed / loserBoard.pieces) * 100)
       : 0;
-  const isHost = snapshot.hostId === room.sessionId;
 
   if (!open) {
     return (
@@ -144,14 +144,7 @@ export function BattleResult({
             <ImageIcon size={18} />
             Ver as mesas
           </button>
-          {isHost ? (
-            <button type="button" className="btn" onClick={() => room.send('rematch')}>
-              <SwordsIcon size={18} />
-              Revanche
-            </button>
-          ) : (
-            <span className="result-note">O anfitrião pode pedir revanche.</span>
-          )}
+          <PlayAgainButton room={room} snapshot={snapshot} />
           <button type="button" className="btn btn-primary" onClick={onLeave}>
             Voltar ao início
           </button>
