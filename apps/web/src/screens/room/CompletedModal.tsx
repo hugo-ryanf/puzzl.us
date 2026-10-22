@@ -2,13 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { RankingEntry, RankingQuery } from '@puzzle/shared';
 import { puzzleImageInfo } from '../../board/images';
 import { formatDuration } from '../../format';
+import type { PuzzleRoom } from '../../net/connection';
 import { fetchRanking } from '../../net/ranking';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
 import { CloseIcon, ImageIcon, PartyIcon, TrophyIcon } from '../../ui/icons';
+import { PlayAgainButton } from './PlayAgainButton';
 import { PublishSection, type Publisher } from './PublishSection';
 
 interface CompletedModalProps {
+  room: PuzzleRoom;
   snapshot: RoomSnapshot;
   onShowRanking: (query: RankingQuery) => void;
   onLeave: () => void;
@@ -26,6 +29,7 @@ const RANKING_PREVIEW = 5;
  * categoria e o crédito da foto. Pode ser fechado para admirar a imagem e reaberto depois.
  */
 export function CompletedModal({
+  room,
   snapshot,
   onShowRanking,
   onLeave,
@@ -234,6 +238,7 @@ export function CompletedModal({
             <ImageIcon size={18} />
             Ver a imagem
           </button>
+          <PlayAgainButton room={room} snapshot={snapshot} />
           <button type="button" className="btn btn-primary" onClick={onLeave}>
             Voltar ao início
           </button>
