@@ -37,7 +37,7 @@ export function finishedInPeriod(
 }
 
 /** "2026-10-21" de hoje e de ontem no horário de Brasília. */
-function localDay(offsetDays = 0): string {
+export function localDay(offsetDays = 0): string {
   const date = new Date(Date.now() - offsetDays * 24 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat('en-CA', { timeZone: RANKING_TIME_ZONE }).format(date);
 }
@@ -111,6 +111,18 @@ export async function allTimePoints(
 }
 
 type Members = Pick<RankingRowBase, 'players' | 'profiles' | 'avatars' | 'levels'>;
+
+/** A maior sequência de dias seguidos ("2026-10-21") em qualquer época. */
+export function longestStreak(days: ReadonlySet<string>): number {
+  const sorted = [...days].map((day) => Date.parse(`${day}T00:00:00Z`)).sort((a, b) => a - b);
+  let best = 0;
+  let run = 0;
+  sorted.forEach((time, index) => {
+    run = index > 0 && time - sorted[index - 1]! === 24 * 60 * 60 * 1000 ? run + 1 : 1;
+    best = Math.max(best, run);
+  });
+  return best;
+}
 
 /**
  * Quem é cada equipe pela team_key, em ordem alfabética: o nome de cada jogador (com conta, o
