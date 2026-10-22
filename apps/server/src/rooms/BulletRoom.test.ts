@@ -128,6 +128,25 @@ describe('BulletRoom', () => {
     await game.client.leave();
   });
 
+  it('jogar novamente: placar e relógio zerados, foto nova, na mesma sala', async () => {
+    const game = await create();
+    await solve(game);
+    await until(() => game.state.round === 2);
+    (game.room as unknown as { timeUp(): void }).timeUp();
+    for (let i = 0; i < 50 && game.state.rankStatus === 'saving'; i++) await wait(20);
+    const imageId = game.state.config.imageId;
+
+    game.client.send('playAgain');
+    expect(await until(() => game.state.round === 3)).toBe(true);
+    expect(game.state.phase).toBe('playing'); // solo já começa
+    expect(game.state.solved).toBe(0);
+    expect(game.state.partial).toBe(0);
+    expect(game.state.remainingMs).toBeGreaterThan(game.state.timeLimitMs - 2000);
+    expect(game.state.config.imageId).not.toBe(imageId);
+    expect(game.board().done).toBe(false);
+    await game.client.leave();
+  });
+
   it('no lobby ninguém mexe; mensagem sem o tabuleiro certo é ignorada', async () => {
     const { state, board, client } = await create({ maxPlayers: 2 });
     expect(state.phase).toBe('lobby');
