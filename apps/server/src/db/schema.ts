@@ -32,6 +32,15 @@ export const users = pgTable('users', {
   avatarUrl: text('avatar_url'),
   friendCode: text('friend_code').notNull().unique(),
   isAdmin: boolean('is_admin').notNull().default(false),
+  /** Nickname escolhido no perfil (null: o primeiro nome do Google). */
+  nickname: text('nickname'),
+  bio: text('bio'),
+  /** 'google' (a foto do Google) ou 'initials' (iniciais na cor escolhida). */
+  avatarStyle: text('avatar_style', { enum: ['google', 'initials'] })
+    .notNull()
+    .default('google'),
+  /** Cor das iniciais (null: automática pelo nome). */
+  avatarColor: text('avatar_color'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
