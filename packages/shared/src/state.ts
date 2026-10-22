@@ -116,6 +116,11 @@ export const RoomState = schema(
     timeLimitMs: t.uint32().default(0),
     /** Bullet: tempo que falta, atualizado a cada segundo. */
     remainingMs: t.uint32().default(0),
+    /**
+     * Bullet e batalha por tempo: "3, 2, 1" antes de valer. A fase já é 'playing', mas as peças
+     * ficam travadas e o relógio só começa quando chega a 0.
+     */
+    countdown: t.uint8().default(0),
     /** Bullet: quebra-cabeça da vez (sobe a cada um novo). */
     round: t.uint16().default(0),
     /** Bullet: quantos quebra-cabeças a equipe já montou. */
