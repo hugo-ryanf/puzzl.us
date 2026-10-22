@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
-import { and, eq, gt, lt } from 'drizzle-orm';
+import { and, eq, gt, lt, sql } from 'drizzle-orm';
+import type { AvatarStyle, ProfileUpdate } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
 import { gamePlayers, games, players, sessions, users } from '../db/schema';
 
@@ -13,11 +14,25 @@ const FRIEND_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 /** O que o resto do servidor (e o /api/me) sabe de uma conta. */
 export interface Account {
   id: string;
+  /** Nickname do perfil (ou o primeiro nome do Google). */
   name: string;
+  /** Foto mostrada (null quando o perfil usa iniciais). */
   avatarUrl: string | null;
+  avatarColor: string | null;
+  avatarStyle: AvatarStyle;
+  bio: string | null;
+  googleName: string;
+  googleAvatarUrl: string | null;
   friendCode: string;
   isAdmin: boolean;
 }
+
+/** Nome mostrado: o nickname do perfil ou, sem ele, o primeiro nome do Google. */
+export const profileName = sql<string>`coalesce(${users.nickname}, split_part(${users.displayName}, ' ', 1))`;
+/** Foto mostrada: a do Google, a menos que o perfil use iniciais. */
+export const profileAvatar = sql<
+  string | null
+>`case when ${users.avatarStyle} = 'initials' then null else ${users.avatarUrl} end`;
 
 /** O que o login com Google entrega (claims do id_token). */
 export interface GoogleProfile {
@@ -41,6 +56,8 @@ export interface AccountStore {
    */
   linkGuest(userId: string, guestId: string): Promise<void>;
   deleteExpiredSessions(): Promise<number>;
+  /** Muda nickname, bio e avatar; devolve a conta atualizada. */
+  updateProfile(userId: string, update: ProfileUpdate): Promise<Account>;
 }
 
 /** No banco vai só o hash: quem lê o banco não consegue se passar por ninguém. */
@@ -55,8 +72,13 @@ function newFriendCode(): string {
 
 const accountColumns = {
   id: users.id,
-  name: users.displayName,
-  avatarUrl: users.avatarUrl,
+  name: profileName,
+  avatarUrl: profileAvatar,
+  avatarColor: users.avatarColor,
+  avatarStyle: users.avatarStyle,
+  bio: users.bio,
+  googleName: users.displayName,
+  googleAvatarUrl: users.avatarUrl,
   friendCode: users.friendCode,
   isAdmin: users.isAdmin,
 };
@@ -90,6 +112,15 @@ export function createAccountStore(db: AppDatabase): AccountStore {
           if (attempt >= 3 || !String(error).includes('friend_code')) throw error;
         }
       }
+    },
+
+    async updateProfile(userId, update) {
+      const [account] = await db
+        .update(users)
+        .set(update)
+        .where(eq(users.id, userId))
+        .returning(accountColumns);
+      return account!;
     },
 
     async createSession(userId) {
