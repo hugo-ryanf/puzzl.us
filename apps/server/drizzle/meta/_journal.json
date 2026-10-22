@@ -85,6 +85,13 @@
       "when": 1792622724118,
       "tag": "0011_pontos",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792628266043,
+      "tag": "0012_perfil",
+      "breakpoints": true
     }
   ]
 }
