@@ -153,11 +153,86 @@ export type VoiceTokenResponse =
 /** A conta logada, como o site a vê. */
 export interface AccountView {
   id: string;
+  /** Nickname do perfil (sem nickname escolhido: o primeiro nome do Google). */
   name: string;
+  /** Foto mostrada: a do Google, ou null se o perfil usa iniciais. */
   avatarUrl: string | null;
+  /** Cor do avatar com iniciais (null: a cor automática pelo nome). */
+  avatarColor: string | null;
+  avatarStyle: AvatarStyle;
+  bio: string | null;
+  /** Nome e foto como estão no Google (para voltar a eles no perfil). */
+  googleName: string;
+  googleAvatarUrl: string | null;
   /** Código que um amigo digita para te adicionar. */
   friendCode: string;
   isAdmin: boolean;
+}
+
+// ── Perfil ──────────────────────────────────────────────────────────────────
+
+/** Foto do Google ou avatar com iniciais. */
+export const AVATAR_STYLES = ['google', 'initials'] as const;
+export type AvatarStyle = (typeof AVATAR_STYLES)[number];
+
+/** Cores para o avatar com iniciais (o texto é branco: todas com contraste). */
+export const AVATAR_COLORS = [
+  '#2B59FF',
+  '#0B7A5E',
+  '#B4235A',
+  '#8A5A00',
+  '#6B3FA0',
+  '#2C5866',
+  '#C2410C',
+  '#3F4451',
+] as const;
+
+/** PATCH /api/me/profile — só os campos enviados mudam. */
+export const ProfileUpdate = z
+  .object({
+    nickname: z.string().trim().min(2, 'O nickname precisa de pelo menos 2 letras').max(20),
+    bio: z
+      .string()
+      .trim()
+      .max(120, 'A bio tem no máximo 120 caracteres')
+      .transform((bio) => bio || null)
+      .nullable(),
+    avatarStyle: z.enum(AVATAR_STYLES),
+    avatarColor: z.enum(AVATAR_COLORS).nullable(),
+  })
+  .partial();
+export type ProfileUpdate = z.infer<typeof ProfileUpdate>;
+
+/** Números do perfil (das partidas da conta). */
+export interface ProfileStats {
+  /** Quebra-cabeças montados (partidas clássicas terminadas). */
+  puzzles: number;
+  /** Fotos diferentes montadas. */
+  images: number;
+  /** Peças somadas de todos os montados. */
+  pieces: number;
+  /** Pontos (a melhor partida de cada foto e tamanho) nesta semana e desde sempre. */
+  pointsWeek: number;
+  pointsAll: number;
+  /** Dias seguidos jogando (até hoje ou ontem). */
+  streak: number;
+  /** Mais quebra-cabeças numa corrida de Bullet (qualquer tempo e tamanho). */
+  bulletBest: number;
+  friends: number;
+}
+
+/** GET /api/profiles/:friendCode — o perfil público (o que qualquer um pode ver). */
+export interface PublicProfile {
+  friendCode: string;
+  name: string;
+  avatarUrl: string | null;
+  avatarColor: string | null;
+  bio: string | null;
+  /** ISO 8601 de quando a conta foi criada. */
+  memberSince: string;
+  stats: ProfileStats;
+  /** Relação com quem está vendo: o próprio, amigo, pedido pendente, nada ou convidado. */
+  relation: 'me' | 'friend' | 'pending' | 'none' | 'guest';
 }
 
 /** GET /api/me — `user: null` = convidado; `googleLogin: false` = servidor sem login. */
@@ -307,6 +382,8 @@ export function isTrending(image: PopularImage): boolean {
 export interface RankingRowBase {
   position: number;
   players: string[];
+  /** Código de amigo de cada jogador (na ordem de `players`): abre o perfil; null = convidado. */
+  profiles: Array<string | null>;
   /**
    * Posições ganhas (+) ou perdidas (−) em relação ao período anterior equivalente; null: não
    * estava no ranking de antes; ausente em "sempre".
@@ -400,6 +477,9 @@ export interface FriendView {
   id: string;
   name: string;
   avatarUrl: string | null;
+  avatarColor: string | null;
+  /** Para abrir o perfil público do amigo. */
+  friendCode: string;
   /** Só para amigos aceitos; pedidos pendentes vêm sempre 'offline'. */
   status: FriendStatus;
 }
