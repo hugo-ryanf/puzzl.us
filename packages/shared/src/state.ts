@@ -69,6 +69,8 @@ export const BoardSchema = schema(
     done: t.boolean().default(false),
     /** Tempo até montar (Batalha), medido no servidor. */
     durationMs: t.uint32().default(0),
+    /** Batalha por tempo: quantos quebra-cabeças este lado já montou (passa para a mesa seguinte). */
+    solved: t.uint16().default(0),
   },
   'BoardSchema',
 );
@@ -120,7 +122,7 @@ export const RoomState = schema(
     solved: t.uint16().default(0),
     /** Bullet: peças encaixadas no quebra-cabeça que ficou pela metade quando o tempo acabou. */
     partial: t.uint16().default(0),
-    /** Batalha: lado vencedor ('a' | 'b'); vazio até alguém terminar. */
+    /** Batalha: lado vencedor ('a' | 'b'), 'draw' (empate na batalha por tempo); vazio até o fim. */
     winner: t.string().default(''),
     /** Batalha: o vencedor ganhou porque o outro lado saiu todo. */
     walkover: t.boolean().default(false),
