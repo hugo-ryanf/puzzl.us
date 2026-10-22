@@ -4,6 +4,7 @@ import { Board } from '../../board/Board';
 import { usePuzzleImage } from '../../board/usePuzzleImage';
 import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
+import { FinalSeconds } from '../room/FinalSeconds';
 
 /** Abaixo disso a tela dividida não cabe: um tabuleiro por vez, com abas. */
 const NARROW_QUERY = '(max-width: 760px)';
@@ -132,6 +133,8 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
           </section>
         );
       })}
+      {/* Por tempo: nos últimos 10 s, o relógio grande em cima da linha do meio. */}
+      {snapshot.timeLimitMs > 0 && <FinalSeconds snapshot={snapshot} onDivider={!narrow} />}
     </div>
   );
 }
