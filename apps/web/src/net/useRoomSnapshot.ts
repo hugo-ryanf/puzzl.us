@@ -17,6 +17,10 @@ export interface PlayerView {
 /** Progresso de um tabuleiro dos modos novos ('main' no Bullet; 'a' e 'b' na Batalha). */
 export interface BoardView {
   imageId: string;
+  /** Muda a cada quebra-cabeça novo nesta mesa (Bullet e batalha por tempo). */
+  seed: string;
+  /** Batalha por tempo: quantos este lado já montou. */
+  solved: number;
   pieces: number;
   placed: number;
   done: boolean;
@@ -58,7 +62,8 @@ export interface RoomSnapshot {
   solved: number;
   partial: number;
   /** Batalha: lado vencedor ('' até alguém terminar) e se foi por W.O. */
-  winner: BattleTeam | '';
+  /** Batalha: o lado vencedor, ou 'draw' (empate na batalha por tempo). */
+  winner: BattleTeam | 'draw' | '';
   walkover: boolean;
 }
 
@@ -77,6 +82,8 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
   for (const [key, board] of state.boards ?? []) {
     boards[key] = {
       imageId: board.config.imageId,
+      seed: board.config.seed,
+      solved: board.solved,
       pieces: board.pieceGroup.length,
       placed: countPlaced(board.pieceGroup),
       done: board.done,
@@ -100,7 +107,8 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     hostId: state.hostId,
     ownerId: state.ownerId,
     phase: state.phase as GamePhase,
-    imageId: state.config.imageId,
+    // Batalha por tempo: cada lado pode estar numa foto; o título mostra a do meu lado.
+    imageId: main?.config.imageId ?? state.config.imageId,
     pieceCount: state.config.pieceCount,
     maxPlayers: state.config.maxPlayers,
     pieces: pieceGroup.length,
@@ -119,7 +127,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     round: state.round,
     solved: state.solved,
     partial: state.partial,
-    winner: state.winner as BattleTeam | '',
+    winner: state.winner as BattleTeam | 'draw' | '',
     walkover: state.walkover,
   };
 }
@@ -148,6 +156,7 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
         unsubscribers.push(
           callbacks.onRemove(board, 'groups', refresh),
           callbacks.listen(board, 'done', refresh),
+          callbacks.listen(board, 'solved', refresh),
         );
         refresh();
       }),
