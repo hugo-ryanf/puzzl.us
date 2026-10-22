@@ -21,6 +21,7 @@ import { registerCommunityRoutes } from './community/routes';
 import { PresenceRoom } from './friends/PresenceRoom';
 import { createPresenceHub } from './friends/presence';
 import { registerFriendRoutes } from './friends/routes';
+import { registerProfileRoutes } from './profile/routes';
 import type { BulletStore } from './db/bulletStore';
 import type { GameStore } from './db/gameStore';
 import { BattleRoom } from './rooms/BattleRoom';
@@ -120,6 +121,7 @@ export function createGameServer({
       registerUploadRoutes(app, uploads, accounts);
       registerCommunityRoutes(app, accounts, community);
       if (accounts && friends && presence) registerFriendRoutes(app, accounts, friends, presence);
+      if (accounts && auth?.profiles) registerProfileRoutes(app, accounts, auth.profiles);
 
       if (auth) registerAuthRoutes(app, auth);
       else {
