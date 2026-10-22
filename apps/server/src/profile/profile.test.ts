@@ -103,6 +103,24 @@ describe('Perfil', () => {
     expect(again).toMatchObject({ id: account.id, name: 'hugao', googleName: 'Hugo R.' });
   });
 
+  it('camaleão: vira o avatar em todo lugar; sem escolher qual, ou um que não existe, é recusado', async () => {
+    const { cookie } = await login('Hugo');
+    expect((await patch(cookie, { avatarStyle: 'preset' })).status).toBe(400);
+    expect((await patch(cookie, { avatarStyle: 'preset', avatarPreset: 'azul' })).status).toBe(400);
+
+    const response = await patch(cookie, { avatarStyle: 'preset', avatarPreset: 'verde' });
+    expect(response.status).toBe(200);
+    expect((await response.json()) as AccountView).toMatchObject({
+      avatarStyle: 'preset',
+      avatarPreset: 'verde',
+      avatarUrl: '/avatars/verde.webp',
+      googleAvatarUrl: 'https://foto.test/eu.jpg',
+    });
+    // Voltar para a foto do Google não precisa apagar o camaleão guardado.
+    const back = (await (await patch(cookie, { avatarStyle: 'google' })).json()) as AccountView;
+    expect(back.avatarUrl).toBe('https://foto.test/eu.jpg');
+  });
+
   it('recusa nickname curto, cor fora da paleta e quem não está logado', async () => {
     const { cookie } = await login('Hugo');
     expect((await patch(cookie, { nickname: 'H' })).status).toBe(400);
@@ -143,6 +161,9 @@ describe('Perfil', () => {
       pointsAll: 72,
       pointsWeek: 72,
       streak: 1,
+      playedToday: true,
+      bestStreak: 1,
+      teamPuzzles: 0,
       bulletBest: 0,
       friends: 0,
     });
