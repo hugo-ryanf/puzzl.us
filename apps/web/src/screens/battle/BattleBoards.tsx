@@ -34,17 +34,60 @@ function SideHeader({
   const board = snapshot.boards[team];
   const names = snapshot.players.filter((p) => p.team === team).map((p) => p.name);
   const percent = board && board.pieces > 0 ? Math.round((board.placed / board.pieces) * 100) : 0;
+  const timed = snapshot.timeLimitMs > 0;
   return (
     <div className={mine ? 'battle-side-header mine' : 'battle-side-header'}>
       <span className="battle-side-names">
         <strong>{mine ? 'Seu lado' : 'Adversário'}</strong>
         <small>{names.join(' & ') || 'ninguém ainda'}</small>
       </span>
+      {timed && (
+        <span className="solved-pill" aria-label={`${board?.solved ?? 0} montados`}>
+          <strong>{board?.solved ?? 0}</strong> {board?.solved === 1 ? 'montado' : 'montados'}
+        </span>
+      )}
       <span className="progress-bar" aria-hidden="true">
         <span style={{ width: `${percent}%` }} />
       </span>
-      <strong className="battle-side-percent">{board?.done ? 'Montou!' : `${percent}%`}</strong>
+      <strong className="battle-side-percent">
+        {board?.done ? (timed ? '+1!' : 'Montou!') : `${percent}%`}
+      </strong>
     </div>
+  );
+}
+
+/**
+ * A mesa de um lado. Na batalha por tempo cada lado pode estar numa foto diferente, então cada
+ * metade carrega a sua; quebra-cabeça novo (seed nova) monta a cena do zero.
+ */
+function SideBoard({
+  room,
+  snapshot,
+  team,
+  mine,
+}: {
+  room: PuzzleRoom;
+  snapshot: RoomSnapshot;
+  team: BattleTeam;
+  mine: boolean;
+}) {
+  const view = snapshot.boards[team];
+  const image = usePuzzleImage(view?.imageId ?? snapshot.imageId);
+  const source = room.state.boards.get(team);
+  if (!image?.image || !source || !view) {
+    return <p className="board-loading">{image?.error ?? 'Carregando…'}</p>;
+  }
+  return (
+    <Board
+      // Revanche ou quebra-cabeça seguinte = mesa nova: a cena recomeça do zero.
+      key={`${snapshot.round}:${team}:${view.seed}`}
+      room={room}
+      image={image.image}
+      phase={snapshot.phase}
+      source={source}
+      boardKey={team}
+      readOnly={!mine}
+    />
   );
 }
 
@@ -53,7 +96,6 @@ function SideHeader({
  * do adversário (só assistir, ao vivo). No celular, abas para alternar entre os dois.
  */
 export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: RoomSnapshot }) {
-  const image = usePuzzleImage(snapshot.imageId);
   const narrow = useNarrow();
   const [peek, setPeek] = useState(false);
   const me = snapshot.players.find((p) => p.sessionId === room.sessionId);
@@ -62,9 +104,6 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
     ? [peek ? otherTeam(myTeam) : myTeam]
     : [myTeam, otherTeam(myTeam)];
 
-  if (!image?.image) {
-    return <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>;
-  }
   return (
     <div className={narrow ? 'battle-split narrow' : 'battle-split'}>
       {narrow && (
@@ -75,7 +114,7 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
             aria-pressed={!peek}
             onClick={() => setPeek(false)}
           >
-            Seu lado · {snapshot.boards[myTeam]?.done ? 'montou' : progressOf(snapshot, myTeam)}
+            Seu lado · {progressOf(snapshot, myTeam)}
           </button>
           <button type="button" className="chip" aria-pressed={peek} onClick={() => setPeek(true)}>
             Adversário · {progressOf(snapshot, otherTeam(myTeam))}
@@ -83,24 +122,12 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
         </div>
       )}
       {sides.map((team) => {
-        const source = room.state.boards.get(team);
         const mine = team === myTeam;
         return (
           <section key={team} className={mine ? 'battle-side mine' : 'battle-side'}>
             <SideHeader snapshot={snapshot} team={team} mine={mine} />
             <div className="battle-board">
-              {source && (
-                <Board
-                  // Revanche = mesas novas: as cenas recomeçam do zero.
-                  key={`${snapshot.round}:${team}`}
-                  room={room}
-                  image={image.image!}
-                  phase={snapshot.phase}
-                  source={source}
-                  boardKey={team}
-                  readOnly={!mine}
-                />
-              )}
+              <SideBoard room={room} snapshot={snapshot} team={team} mine={mine} />
             </div>
           </section>
         );
@@ -109,7 +136,12 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
   );
 }
 
+/** Para as abas do celular: montados (por tempo) ou a porcentagem da mesa. */
 function progressOf(snapshot: RoomSnapshot, team: BattleTeam): string {
   const board = snapshot.boards[team];
+  if (snapshot.timeLimitMs > 0) {
+    return `${board?.solved ?? 0} ${board?.solved === 1 ? 'montado' : 'montados'}`;
+  }
+  if (board?.done) return 'montou';
   return `${board && board.pieces > 0 ? Math.round((board.placed / board.pieces) * 100) : 0}%`;
 }
