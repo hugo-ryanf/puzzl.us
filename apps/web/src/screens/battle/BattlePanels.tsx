@@ -22,10 +22,18 @@ export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
         <h2>
           <SwordsIcon size={22} /> Batalha {perTeam}v{perTeam}
         </h2>
-        <p>
-          Os dois lados montam o mesmo quebra-cabeça ({snapshot.pieceCount} peças), cada um na sua
-          mesa. Quem terminar primeiro ganha.
-        </p>
+        {snapshot.timeLimitMs > 0 ? (
+          <p>
+            Por tempo: {snapshot.timeLimitMs / 60_000} min, quebra-cabeças de {snapshot.pieceCount}{' '}
+            peças. Os dois lados recebem as mesmas fotos, na mesma ordem; montou um, vem o próximo.
+            Quem montar mais quando o tempo acabar ganha.
+          </p>
+        ) : (
+          <p>
+            Os dois lados montam o mesmo quebra-cabeça ({snapshot.pieceCount} peças), cada um na sua
+            mesa. Quem terminar primeiro ganha.
+          </p>
+        )}
         <div className="battle-teams">
           {BATTLE_TEAMS.map((team) => {
             const members = snapshot.players.filter((p) => p.team === team);
@@ -88,10 +96,13 @@ export function BattleResult({
   onLeave: () => void;
 }) {
   const [open, setOpen] = useState(true);
-  const winner = snapshot.winner as BattleTeam;
+  const draw = snapshot.winner === 'draw';
+  const winner = (draw ? 'a' : snapshot.winner) as BattleTeam;
   const me = snapshot.players.find((p) => p.sessionId === room.sessionId);
-  const won = me?.team === winner;
+  const won = !draw && me?.team === winner;
   const loser: BattleTeam = winner === 'a' ? 'b' : 'a';
+  const timed = snapshot.timeLimitMs > 0;
+  const solvedBy = (team: BattleTeam) => snapshot.boards[team]?.solved ?? 0;
   const names = (team: BattleTeam) =>
     snapshot.players
       .filter((p) => p.team === team)
@@ -123,15 +134,25 @@ export function BattleResult({
           <span className="result-badge" aria-hidden="true">
             {won ? <PartyIcon size={26} /> : <SwordsIcon size={26} />}
           </span>
-          <h2 id="battle-title">{won ? 'Vitória!' : 'Não foi dessa vez'}</h2>
-          <p className="caption">
-            <strong>{names(winner) || TEAM_NAMES[winner]}</strong>{' '}
-            {snapshot.walkover
-              ? 'ganhou: o outro lado saiu.'
-              : `montou primeiro, em ${formatDuration(snapshot.durationMs)}.`}
-          </p>
+          <h2 id="battle-title">{draw ? 'Empate!' : won ? 'Vitória!' : 'Não foi dessa vez'}</h2>
+          {draw ? (
+            <p className="caption">
+              Os dois lados montaram {solvedBy('a')} e empataram também nas peças encaixadas.
+            </p>
+          ) : (
+            <p className="caption">
+              <strong>{names(winner) || TEAM_NAMES[winner]}</strong>{' '}
+              {snapshot.walkover
+                ? 'ganhou: o outro lado saiu.'
+                : timed
+                  ? solvedBy(winner) === solvedBy(loser)
+                    ? `ganhou no desempate: ${solvedBy(winner)} montados para cada lado, mais peças encaixadas no último.`
+                    : `montou mais: ${solvedBy(winner)} a ${solvedBy(loser)}.`
+                  : `montou primeiro, em ${formatDuration(snapshot.durationMs)}.`}
+            </p>
+          )}
         </header>
-        {!snapshot.walkover && (
+        {!snapshot.walkover && !timed && (
           <section className="result-section">
             <h3>Outro lado</h3>
             <p className="result-note">
