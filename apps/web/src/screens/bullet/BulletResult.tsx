@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { BulletRankingEntry, BulletRankingQuery } from '@puzzle/shared';
+import type { PuzzleRoom } from '../../net/connection';
 import { fetchBulletRanking } from '../../net/ranking';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { PartyIcon, TrophyIcon } from '../../ui/icons';
+import { PlayAgainButton } from '../room/PlayAgainButton';
 
 interface BulletResultProps {
+  room: PuzzleRoom;
   snapshot: RoomSnapshot;
   onShowRanking: (query: BulletRankingQuery) => void;
   onLeave: () => void;
@@ -14,7 +17,7 @@ interface BulletResultProps {
 const RANKING_PREVIEW = 5;
 
 /** Fim do Bullet: quantos foram montados, o que ficou pela metade e a posição no ranking. */
-export function BulletResult({ snapshot, onShowRanking, onLeave }: BulletResultProps) {
+export function BulletResult({ room, snapshot, onShowRanking, onLeave }: BulletResultProps) {
   const { solved, partial, pieceCount, timeLimitMs, teamSize, rankStatus, rank, rankToday } =
     snapshot;
   const query: BulletRankingQuery = {
@@ -104,6 +107,7 @@ export function BulletResult({ snapshot, onShowRanking, onLeave }: BulletResultP
               Ranking completo
             </button>
           )}
+          <PlayAgainButton room={room} snapshot={snapshot} />
           <button type="button" className="btn btn-primary" onClick={onLeave}>
             Voltar ao início
           </button>
