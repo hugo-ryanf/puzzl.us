@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, lt, ne, notExists, sql } from 'drizzle-orm';
+import { and, eq, lt, notExists, sql } from 'drizzle-orm';
 import { UPLOAD_PREFIX } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
-import { communityPuzzles, savedGames, uploads } from '../db/schema';
+import { savedGames, uploads } from '../db/schema';
 import type { ProcessedUpload } from './processUpload';
 
 /** Fotos sem uso por mais que isso são apagadas. */
@@ -19,7 +19,10 @@ export interface UploadStore {
   data(id: string): Promise<Buffer | undefined>;
   /** Marca que uma sala acabou de usar a foto (adia a expiração). */
   touch(id: string): Promise<void>;
-  /** Apaga fotos sem uso desde `before`; devolve quantas foram apagadas. */
+  /**
+   * Apaga fotos sem uso desde `before`, publicadas na comunidade ou não (a publicação vai junto);
+   * devolve quantas foram apagadas.
+   */
   deleteUnusedSince(before: Date): Promise<number>;
 }
 
@@ -61,18 +64,6 @@ export function createUploadStore(db: AppDatabase): UploadStore {
                 .select({ id: savedGames.id })
                 .from(savedGames)
                 .where(eq(savedGames.imageId, sql`${UPLOAD_PREFIX} || ${uploads.id}`)),
-            ),
-            // Publicada fica no ar enquanto não for removida.
-            notExists(
-              db
-                .select({ id: communityPuzzles.id })
-                .from(communityPuzzles)
-                .where(
-                  and(
-                    eq(communityPuzzles.uploadId, uploads.id),
-                    ne(communityPuzzles.status, 'removed'),
-                  ),
-                ),
             ),
           ),
         )
