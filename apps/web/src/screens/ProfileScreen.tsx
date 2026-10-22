@@ -1,5 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { AVATAR_COLORS, type AvatarStyle, type PublicProfile } from '@puzzle/shared';
+import {
+  AVATAR_COLORS,
+  levelOf,
+  levelStart,
+  type AvatarStyle,
+  type PublicProfile,
+} from '@puzzle/shared';
 import type { Account } from '../net/account';
 import type { Friends } from '../net/friends';
 import { Avatar } from '../ui/UserAvatar';
@@ -48,6 +54,9 @@ export function ProfileScreen({ code, account, friends }: ProfileScreenProps) {
 
   const isMe = profile.relation === 'me';
   const { stats } = profile;
+  const level = levelOf(stats.pointsAll);
+  const levelFrom = levelStart(level);
+  const levelTo = levelStart(level + 1);
 
   async function copyLink() {
     await navigator.clipboard.writeText(`${location.origin}/perfil/${profile!.friendCode}`);
@@ -75,12 +84,31 @@ export function ProfileScreen({ code, account, friends }: ProfileScreenProps) {
           className="profile-avatar"
         />
         <div className="profile-who">
-          <h1>{profile.name}</h1>
+          <h1>
+            {profile.name}
+            <span className="level-chip">Nv {level}</span>
+          </h1>
           {profile.bio && <p className="profile-bio">{profile.bio}</p>}
           <p className="profile-meta">
             Joga desde {dateFormat.format(new Date(profile.memberSince))} · código{' '}
             <span className="profile-code">{profile.friendCode}</span>
           </p>
+          <div className="profile-level">
+            <span className="profile-level-label">
+              <strong>Nível {level}</strong>
+              <span>
+                {(stats.pointsAll - levelFrom).toLocaleString('pt-BR')} /{' '}
+                {(levelTo - levelFrom).toLocaleString('pt-BR')} pts para o nível {level + 1}
+              </span>
+            </span>
+            <span className="profile-level-bar" aria-hidden="true">
+              <span
+                style={{
+                  width: `${((stats.pointsAll - levelFrom) / (levelTo - levelFrom)) * 100}%`,
+                }}
+              />
+            </span>
+          </div>
         </div>
         <div className="profile-actions">
           <button type="button" className="btn" onClick={() => void copyLink()}>
