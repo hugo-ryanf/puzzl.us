@@ -12,6 +12,7 @@ import {
 } from '@puzzle/shared';
 import type { Account } from '../net/account';
 import type { Friends } from '../net/friends';
+import { ACCENTS, applyAccent, loadAccent, saveAccent, type AccentChoice } from '../ui/accent';
 import { Avatar } from '../ui/UserAvatar';
 import {
   BoltIcon,
@@ -431,6 +432,11 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
   );
   const [color, setColor] = useState<string | null>(user.avatarColor);
   const [preset, setPreset] = useState<AvatarPreset>(user.avatarPreset ?? AVATAR_PRESETS[0]);
+  const [accent, setAccent] = useState<AccentChoice>(loadAccent);
+
+  // A cor aparece no site enquanto escolhe; sem salvar (Cancelar ou sair), volta a guardada.
+  useEffect(() => applyAccent(accent), [accent]);
+  useEffect(() => () => applyAccent(loadAccent()), []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -446,6 +452,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
         avatarColor: color as (typeof AVATAR_COLORS)[number] | null,
         avatarPreset: preset,
       });
+      saveAccent(accent);
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -544,6 +551,28 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
             ))}
           </div>
         )}
+      </fieldset>
+
+      <fieldset>
+        <legend>Cor de destaque</legend>
+        <div className="accent-options" role="radiogroup" aria-label="Cor de destaque">
+          {ACCENTS.map(({ value, label, swatch }) => (
+            <label key={value} className="color-swatch" title={label}>
+              <input
+                type="radio"
+                name="accent"
+                className="sr-only"
+                aria-label={`Destaque ${label}`}
+                checked={accent === value}
+                onChange={() => setAccent(value)}
+              />
+              <span style={{ background: swatch }} />
+            </label>
+          ))}
+        </div>
+        <small className="field-hint">
+          Muda só a cor de destaque do site (barras, selos, marcações), neste navegador.
+        </small>
       </fieldset>
 
       <label className="field profile-field">
