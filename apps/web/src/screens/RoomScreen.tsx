@@ -19,6 +19,7 @@ import type { RankingOpen } from './RankingScreen';
 import { CompletedModal } from './room/CompletedModal';
 import { PlayerAvatars } from './room/PlayerAvatars';
 import { RoomHeader } from './room/RoomHeader';
+import { StartCountdown } from './room/StartCountdown';
 
 interface RoomScreenProps {
   room: PuzzleRoom;
@@ -140,6 +141,7 @@ export function RoomScreen({
         ) : (
           <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>
         )}
+        <StartCountdown countdown={snapshot.countdown} />
         {!solo && (
           <PlayerAvatars
             players={snapshot.players}
