@@ -40,11 +40,13 @@ export function PublishSection({ defaultAuthor, publish }: Publisher) {
       {done ? (
         <p className="result-note">
           Publicado! Já está no Explorar, e as próximas partidas com esta foto entram no ranking.
+          Fica no ar enquanto for jogada: 7 dias sem nenhuma partida, ela sai.
         </p>
       ) : !open ? (
         <div className="publish-intro">
           <p className="result-note">
-            Gostou? Publique a foto para qualquer pessoa montar. Ela ganha ranking próprio.
+            Gostou? Publique a foto para qualquer pessoa montar. Ela ganha ranking próprio e fica no
+            ar enquanto alguém jogar (7 dias sem partidas, ela sai).
           </p>
           <button type="button" className="btn" onClick={() => setOpen(true)}>
             <GlobeIcon size={18} />
