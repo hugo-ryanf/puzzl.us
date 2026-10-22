@@ -95,6 +95,8 @@ export function createCommunityStore(db: AppDatabase): CommunityStore {
         .onConflictDoNothing()
         .returning({ id: communityPuzzles.id });
       if (!created) return { ok: false, reason: 'already-published' };
+      // Os 7 dias sem partidas contam a partir da publicação.
+      await db.update(uploads).set({ lastUsedAt: new Date() }).where(eq(uploads.id, uploadId));
 
       const [row] = await db
         .select(select)
