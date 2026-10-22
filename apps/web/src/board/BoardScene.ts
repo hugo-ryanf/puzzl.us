@@ -302,8 +302,9 @@ export class BoardScene {
 
   private handlePieceDown(pieceId: number, event: FederatedPointerEvent): void {
     const room = this.room;
-    // Peças só se mexem com o relógio correndo (no lobby e depois do fim ficam travadas).
+    // Peças só se mexem com o relógio correndo (no lobby, no "3, 2, 1" e depois do fim, travadas).
     if (!room || this.readOnly || room.state.phase !== 'playing' || event.button !== 0) return;
+    if (room.state.countdown > 0) return;
     if (this.source!.done) return;
     const groupId = this.source!.pieceGroup[pieceId]!;
     const heldBy = this.serverGroup(groupId)?.heldBy;
