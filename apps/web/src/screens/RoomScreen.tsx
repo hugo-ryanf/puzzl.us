@@ -114,6 +114,7 @@ export function RoomScreen({
     <div className="room">
       <RoomHeader
         roomId={room.roomId}
+        selfId={room.sessionId}
         snapshot={snapshot}
         voice={voice}
         onLeave={leave}
