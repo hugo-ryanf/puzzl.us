@@ -147,13 +147,15 @@ describe('Quebra-cabeças da comunidade', () => {
     expect(await list()).toEqual([]);
   });
 
-  it('a limpeza de 7 dias poupa fotos publicadas', async () => {
+  it('publicada também sai do ar depois de 7 dias sem ninguém jogar', async () => {
     const hugo = await login('Hugo');
-    const published = await upload(hugo);
-    await publish(hugo, published);
+    await publish(hugo, await upload(hugo));
     await upload(hugo); // não publicada
-    const future = new Date(Date.now() + 60_000);
-    expect(await uploads.deleteUnusedSince(future)).toBe(1);
     expect(await list()).toHaveLength(1);
+    // Ainda dentro do prazo: nada sai.
+    expect(await uploads.deleteUnusedSince(new Date(Date.now() - 60_000))).toBe(0);
+    // Passado o prazo sem partidas: as duas vão embora, e a publicação junto.
+    expect(await uploads.deleteUnusedSince(new Date(Date.now() + 60_000))).toBe(2);
+    expect(await list()).toEqual([]);
   });
 });
