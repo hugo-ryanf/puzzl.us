@@ -1,14 +1,15 @@
-import { and, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gte, inArray, lt, max, sql, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import {
+  levelOf,
   RANKING_TIME_ZONE,
   type RankingPage,
   type RankingPeriod,
   type RankingRowBase,
 } from '@puzzle/shared';
 import type { AppDatabase } from './database';
-import { profileName } from '../auth/accounts';
-import { bulletRuns, games, players, users } from './schema';
+import { profileAvatar, profileName } from '../auth/accounts';
+import { bulletRuns, gamePlayers, games, players, users } from './schema';
 
 const PERIOD_UNIT = { day: 'day', week: 'week', month: 'month' } as const;
 /** A sequência de dias só olha para trás até aqui (ninguém vai ter uma maior que isso). */
@@ -87,14 +88,39 @@ export function streakOf(days: ReadonlySet<string>): number {
 }
 
 /**
- * Quem é cada equipe pela team_key: o nome de cada jogador (com conta, o nickname atual do
- * perfil; convidado, o apelido mais recente) e o código de amigo (null para convidado), em ordem
- * alfabética.
+ * Pontos de sempre de cada jogador: a melhor partida de cada foto e tamanho, em qualquer
+ * modalidade (a mesma conta do perfil). É daqui que sai o nível.
+ */
+export async function allTimePoints(
+  db: AppDatabase,
+  playerIds: string[],
+): Promise<Map<string, number>> {
+  if (playerIds.length === 0) return new Map();
+  const best = db
+    .select({ playerId: gamePlayers.playerId, best: max(games.points).as('best') })
+    .from(games)
+    .innerJoin(gamePlayers, eq(gamePlayers.gameId, games.id))
+    .where(inArray(gamePlayers.playerId, playerIds))
+    .groupBy(gamePlayers.playerId, games.imageId, games.pieceCount)
+    .as('best_by_puzzle');
+  const rows = await db
+    .select({ playerId: best.playerId, total: sql<number>`sum(${best.best})::int` })
+    .from(best)
+    .groupBy(best.playerId);
+  return new Map(rows.map((row) => [row.playerId, row.total]));
+}
+
+type Members = Pick<RankingRowBase, 'players' | 'profiles' | 'avatars' | 'levels'>;
+
+/**
+ * Quem é cada equipe pela team_key, em ordem alfabética: o nome de cada jogador (com conta, o
+ * nickname atual do perfil; convidado, o apelido mais recente), o código de amigo e o avatar
+ * (null para convidado) e o nível.
  */
 export async function teamMembers(
   db: AppDatabase,
   teamKeys: string[],
-): Promise<Map<string, { players: string[]; profiles: Array<string | null> }>> {
+): Promise<Map<string, Members>> {
   const ids = [...new Set(teamKeys.flatMap((key) => key.split(',')))];
   const rows =
     ids.length === 0
@@ -104,20 +130,31 @@ export async function teamMembers(
             id: players.id,
             name: sql<string>`coalesce(${profileName}, ${players.nickname})`,
             code: users.friendCode,
+            url: profileAvatar,
+            color: users.avatarColor,
           })
           .from(players)
           .leftJoin(users, eq(users.id, players.userId))
           .where(inArray(players.id, ids));
+  const points = await allTimePoints(db, ids);
   const byId = new Map(rows.map((row) => [row.id, row]));
   return new Map(
     teamKeys.map((key) => {
       const members = key
         .split(',')
-        .map((id) => byId.get(id) ?? { name: '?', code: null })
+        .map((id) => ({
+          ...(byId.get(id) ?? { name: '?', code: null, url: null, color: null }),
+          level: levelOf(points.get(id) ?? 0),
+        }))
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
       return [
         key,
-        { players: members.map((m) => m.name), profiles: members.map((m) => m.code ?? null) },
+        {
+          players: members.map((m) => m.name),
+          profiles: members.map((m) => m.code ?? null),
+          avatars: members.map((m) => ({ url: m.url ?? null, color: m.color ?? null })),
+          levels: members.map((m) => m.level),
+        },
       ];
     }),
   );
