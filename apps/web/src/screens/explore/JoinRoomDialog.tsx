@@ -9,6 +9,8 @@ interface JoinRoomDialogProps {
   initialCode: string;
   name: string;
   onNameChange: (name: string) => void;
+  /** Logado: o nome é o nickname do perfil (só mostra, não edita). */
+  nameLocked?: boolean;
   onClose: () => void;
   onJoined: (room: PuzzleRoom) => void;
 }
@@ -18,6 +20,7 @@ export function JoinRoomDialog({
   initialCode,
   name,
   onNameChange,
+  nameLocked = false,
   onClose,
   onJoined,
 }: JoinRoomDialogProps) {
@@ -46,16 +49,22 @@ export function JoinRoomDialog({
     <Dialog open={open} onClose={onClose} labelledBy="join-title">
       <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
         <h2 id="join-title">Entrar com código</h2>
-        <label className="field">
-          Seu nome
-          <input
-            className="input"
-            value={name}
-            maxLength={20}
-            autoFocus={!name}
-            onChange={(e) => onNameChange(e.target.value)}
-          />
-        </label>
+        {nameLocked ? (
+          <p className="field-hint locked-name">
+            Você entra como <strong>{name}</strong>, o nickname do seu perfil.
+          </p>
+        ) : (
+          <label className="field">
+            Seu nome
+            <input
+              className="input"
+              value={name}
+              maxLength={20}
+              autoFocus={!name}
+              onChange={(e) => onNameChange(e.target.value)}
+            />
+          </label>
+        )}
         <label className="field">
           Código da sala
           <input
@@ -63,7 +72,7 @@ export function JoinRoomDialog({
             value={code}
             maxLength={5}
             placeholder="K7QF2"
-            autoFocus={!!name}
+            autoFocus={!!name || nameLocked}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
           />
         </label>
