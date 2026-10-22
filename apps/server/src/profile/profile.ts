@@ -2,7 +2,7 @@ import { and, count, countDistinct, eq, gte, max, or, sql } from 'drizzle-orm';
 import { RANKING_TIME_ZONE, type ProfileStats, type PublicProfile } from '@puzzle/shared';
 import { profileAvatar, profileName } from '../auth/accounts';
 import type { AppDatabase } from '../db/database';
-import { finishedInPeriod, streakOf } from '../db/rankingPage';
+import { allTimePoints, finishedInPeriod, streakOf } from '../db/rankingPage';
 import { bulletRuns, friendships, gamePlayers, games, players, users } from '../db/schema';
 
 /** A sequência só olha para trás até aqui. */
@@ -55,13 +55,14 @@ export function createProfileStore(db: AppDatabase): ProfileStore {
       .innerJoin(gamePlayers, eq(gamePlayers.gameId, games.id))
       .where(mine);
 
-    // Pontos: a melhor partida de cada foto e tamanho (como no ranking), em qualquer modalidade.
-    const points = async (week: boolean) => {
+    // Pontos da semana: a melhor partida de cada foto e tamanho (como no ranking), em qualquer
+    // modalidade. Os de sempre (que dão o nível) vêm de allTimePoints, a mesma conta do ranking.
+    const pointsWeek = async () => {
       const best = db
         .select({ best: max(games.points).as('best') })
         .from(games)
         .innerJoin(gamePlayers, eq(gamePlayers.gameId, games.id))
-        .where(and(mine, week ? finishedInPeriod(games.finishedAt, 'week') : undefined))
+        .where(and(mine, finishedInPeriod(games.finishedAt, 'week')))
         .groupBy(games.imageId, games.pieceCount)
         .as('best_by_puzzle');
       const [row] = await db
@@ -93,8 +94,8 @@ export function createProfileStore(db: AppDatabase): ProfileStore {
       puzzles: totals?.puzzles ?? 0,
       images: totals?.images ?? 0,
       pieces: totals?.pieces ?? 0,
-      pointsWeek: await points(true),
-      pointsAll: await points(false),
+      pointsWeek: await pointsWeek(),
+      pointsAll: (await allTimePoints(db, [player.id])).get(player.id) ?? 0,
       streak: streakOf(new Set([...gameDays, ...bulletDays].map((row) => row.day))),
       bulletBest: bullet?.best ?? 0,
       friends,
