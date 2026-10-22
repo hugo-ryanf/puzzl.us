@@ -332,6 +332,24 @@ export const POINTS_MIN_FACTOR = 0.5;
 export const POINTS_MAX_FACTOR = 2;
 export const POINTS_MIN_SAMPLES = 5;
 
+/**
+ * Nível do jogador: vem dos pontos de sempre (os mesmos do perfil — a melhor partida de cada
+ * foto e tamanho, então repetir o mesmo quebra-cabeça não sobe nível). O nível n começa em
+ * LEVEL_STEP × (n − 1)² pontos: 2 com 50, 5 com 800, 10 com 4 050, 20 com 18 050.
+ */
+export const LEVEL_STEP = 50;
+
+/** Pontos em que o nível começa. */
+export const levelStart = (level: number) => LEVEL_STEP * (level - 1) ** 2;
+
+export function levelOf(points: number): number {
+  let level = Math.floor(Math.sqrt(Math.max(0, points) / LEVEL_STEP)) + 1;
+  // A raiz em ponto flutuante pode errar por um bem na borda.
+  while (levelStart(level + 1) <= points) level++;
+  while (level > 1 && levelStart(level) > points) level--;
+  return level;
+}
+
 export function gamePoints(pieceCount: number, durationMs: number, typicalMs?: number): number {
   const factor =
     typicalMs && durationMs > 0
@@ -384,6 +402,13 @@ export interface RankingRowBase {
   players: string[];
   /** Código de amigo de cada jogador (na ordem de `players`): abre o perfil; null = convidado. */
   profiles: Array<string | null>;
+  /**
+   * Avatar de cada jogador (na ordem de `players`): a foto, ou a cor das iniciais escolhida no
+   * perfil (null = cor automática pelo nome). Convidado: os dois null.
+   */
+  avatars: Array<{ url: string | null; color: string | null }>;
+  /** Nível de cada jogador (na ordem de `players`), pelos pontos de sempre. */
+  levels: number[];
   /**
    * Posições ganhas (+) ou perdidas (−) em relação ao período anterior equivalente; null: não
    * estava no ranking de antes; ausente em "sempre".
