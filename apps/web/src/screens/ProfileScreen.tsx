@@ -47,7 +47,7 @@ const PRESET_NAMES: Record<AvatarPreset, string> = {
   verde: 'Verde',
   ouro: 'Ouro',
   ambar: 'Âmbar',
-  cobre: 'Cobre',
+  vermelho: 'Vermelho',
   rosa: 'Rosa',
   roxo: 'Roxo',
 };
