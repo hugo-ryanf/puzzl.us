@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import type { FriendStatus, FriendView } from '@puzzle/shared';
 import type { Friends } from '../net/friends';
 import { CheckIcon, LinkIcon, PlusIcon } from '../ui/icons';
+import { Avatar } from '../ui/UserAvatar';
 
 interface FriendsScreenProps {
   friends: Friends;
@@ -9,6 +10,8 @@ interface FriendsScreenProps {
   googleLogin: boolean;
   /** Código vindo de um link de amigo (/?amigo=K7QF-2M9D): já preenchido. */
   initialCode?: string;
+  /** Clicar no nome abre o perfil do amigo. */
+  onOpenProfile?: (code: string) => void;
 }
 
 const STATUS_LABELS: Record<FriendStatus, string> = {
@@ -19,7 +22,13 @@ const STATUS_LABELS: Record<FriendStatus, string> = {
 /** Quem está jogando ou online aparece primeiro. */
 const STATUS_ORDER: Record<FriendStatus, number> = { playing: 0, online: 1, offline: 2 };
 
-export function FriendsScreen({ friends, signedIn, googleLogin, initialCode }: FriendsScreenProps) {
+export function FriendsScreen({
+  friends,
+  signedIn,
+  googleLogin,
+  initialCode,
+  onOpenProfile,
+}: FriendsScreenProps) {
   const { data } = friends;
   const [code, setCode] = useState(initialCode ?? '');
   const [message, setMessage] = useState<{ text: string; error?: boolean }>();
@@ -132,7 +141,11 @@ export function FriendsScreen({ friends, signedIn, googleLogin, initialCode }: F
 
           <div className="friends-lists">
             {data.incoming.length > 0 && (
-              <FriendList title="Pedidos recebidos" people={data.incoming}>
+              <FriendList
+                title="Pedidos recebidos"
+                people={data.incoming}
+                onOpenProfile={onOpenProfile}
+              >
                 {(person) => (
                   <>
                     <button
@@ -154,7 +167,12 @@ export function FriendsScreen({ friends, signedIn, googleLogin, initialCode }: F
               </FriendList>
             )}
 
-            <FriendList title={`Amigos (${sorted.length})`} people={sorted} showStatus>
+            <FriendList
+              title={`Amigos (${sorted.length})`}
+              people={sorted}
+              showStatus
+              onOpenProfile={onOpenProfile}
+            >
               {(person) =>
                 removing === person.id ? (
                   <>
@@ -188,7 +206,11 @@ export function FriendsScreen({ friends, signedIn, googleLogin, initialCode }: F
             )}
 
             {data.outgoing.length > 0 && (
-              <FriendList title="Pedidos enviados" people={data.outgoing}>
+              <FriendList
+                title="Pedidos enviados"
+                people={data.outgoing}
+                onOpenProfile={onOpenProfile}
+              >
                 {(person) => (
                   <button
                     type="button"
@@ -211,10 +233,17 @@ interface FriendListProps {
   title: string;
   people: FriendView[];
   showStatus?: boolean;
+  onOpenProfile?: (code: string) => void;
   children: (person: FriendView) => ReactNode;
 }
 
-function FriendList({ title, people, showStatus = false, children }: FriendListProps) {
+function FriendList({
+  title,
+  people,
+  showStatus = false,
+  onOpenProfile,
+  children,
+}: FriendListProps) {
   if (people.length === 0 && !showStatus) return null;
   return (
     <section className="friends-section">
@@ -225,7 +254,17 @@ function FriendList({ title, people, showStatus = false, children }: FriendListP
             <li key={person.id}>
               <FriendAvatar person={person} showStatus={showStatus} />
               <span className="friend-name">
-                <strong>{person.name}</strong>
+                {onOpenProfile ? (
+                  <button
+                    type="button"
+                    className="rk-name-link friend-name-link"
+                    onClick={() => onOpenProfile(person.friendCode)}
+                  >
+                    {person.name}
+                  </button>
+                ) : (
+                  <strong>{person.name}</strong>
+                )}
                 {showStatus && <small>{STATUS_LABELS[person.status]}</small>}
               </span>
               <span className="friend-actions">{children(person)}</span>
@@ -247,11 +286,7 @@ export function FriendAvatar({
 }) {
   return (
     <span className="friend-avatar">
-      {person.avatarUrl ? (
-        <img src={person.avatarUrl} alt="" referrerPolicy="no-referrer" />
-      ) : (
-        <span>{person.name.charAt(0).toUpperCase()}</span>
-      )}
+      <Avatar name={person.name} url={person.avatarUrl} color={person.avatarColor} size={40} />
       {showStatus && (
         <span className={`status-dot ${person.status}`} aria-label={STATUS_LABELS[person.status]} />
       )}
