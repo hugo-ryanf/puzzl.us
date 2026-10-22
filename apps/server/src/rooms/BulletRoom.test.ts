@@ -13,6 +13,7 @@ import { createGameServer } from '../app';
 import { createBulletStore, type BulletStore } from '../db/bulletStore';
 import type { AppDatabase } from '../db/database';
 import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
+import { COUNTDOWN } from './BaseGameRoom';
 import type { BulletRoom } from './BulletRoom';
 
 const PORT = 2574;
@@ -22,6 +23,7 @@ let db: AppDatabase;
 let bullet: BulletStore;
 let server: Server;
 beforeAll(async () => {
+  COUNTDOWN.seconds = 0; // sem o "3, 2, 1" (tem teste próprio)
   db = await createMemoryDatabase();
   bullet = createBulletStore(db);
   server = createGameServer({ bullet });
@@ -164,6 +166,28 @@ describe('BulletRoom', () => {
     client.send('grab', { groupId, board: 'main' });
     expect(await until(() => heldBy() === client.sessionId)).toBe(true);
     await client.leave();
+  });
+
+  it('"3, 2, 1" antes de valer: peças travadas e relógio parado até o fim da contagem', async () => {
+    COUNTDOWN.seconds = 1;
+    try {
+      const { state, board, client } = await create();
+      expect(state.phase).toBe('playing');
+      expect(state.countdown).toBe(1);
+      const groupId = board().pieceGroup[1]!;
+      const heldBy = () => board().groups.get(String(groupId))!.heldBy;
+      client.send('grab', { groupId, board: 'main' });
+      await wait(100);
+      expect(heldBy()).toBe('');
+      expect(state.remainingMs).toBe(180_000);
+
+      expect(await until(() => state.countdown === 0)).toBe(true);
+      client.send('grab', { groupId, board: 'main' });
+      expect(await until(() => heldBy() === client.sessionId)).toBe(true);
+      await client.leave();
+    } finally {
+      COUNTDOWN.seconds = 0;
+    }
   });
 
   it('a API rejeita categoria fora das opções', async () => {
