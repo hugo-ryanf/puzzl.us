@@ -97,12 +97,19 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
    */
   async onAuth(_client: Client, _options: unknown, context: AuthContext) {
     const account = await accountFromCookieHeader(this.accounts, context.headers?.get('cookie'));
-    return account ? { userId: account.id } : true;
+    return account ? { userId: account.id, name: account.name } : true;
   }
 
   onJoin(client: Client, rawOptions: unknown) {
-    const { name, guestId } = JoinOptions.parse(rawOptions);
-    const identity: Identity = { guestId, userId: (client.auth as Partial<Identity>)?.userId };
+    const options = JoinOptions.parse(rawOptions);
+    const auth = client.auth as { userId?: string; name?: string } | true | undefined;
+    const { guestId } = options;
+    // Logado: o nickname do perfil (o mesmo em toda sala e no ranking); convidado: o digitado.
+    const name = (typeof auth === 'object' && auth.name) || options.name;
+    const identity: Identity = {
+      guestId,
+      userId: typeof auth === 'object' ? auth.userId : undefined,
+    };
     const saved = this.returningPlayer?.(identityKey(identity));
     const usedColors = new Set([...this.state.players.values()].map((p) => p.color));
     const color =
