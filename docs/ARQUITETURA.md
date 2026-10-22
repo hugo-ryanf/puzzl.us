@@ -401,8 +401,9 @@ Implementado na fase F (`apps/server/src/community/`):
    própria). Com `COMMUNITY_HIDE_REPORTS` (3) a foto vira `hidden`: some para todos menos o admin,
    que vê o número de denúncias e escolhe **Voltar ao ar** (`/restore`, zera as denúncias) ou
    **Remover** (`DELETE`, `removed`). O autor também remove a sua.
-5. **Limpeza:** foto publicada (não removida) fica fora da limpeza de 7 dias; removida volta a
-   expirar normalmente.
+5. **Limpeza:** foto publicada segue a mesma limpeza de 7 dias sem uso: ninguém abriu uma sala com
+   ela nesse tempo, a foto e a publicação são apagadas (o `community_puzzles` sai em cascata). O
+   prazo conta a partir da publicação ou da última sala. Só uma partida salva segura a foto.
 
 ## Snapshot da sala
 
