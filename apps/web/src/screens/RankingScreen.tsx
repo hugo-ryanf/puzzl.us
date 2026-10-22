@@ -27,7 +27,7 @@ import {
   fetchPopularImages,
   fetchRanking,
 } from '../net/ranking';
-import { avatarColor, initials } from '../ui/avatar';
+import { Avatar } from '../ui/UserAvatar';
 import {
   ChevronDownIcon,
   CloseIcon,
@@ -64,6 +64,8 @@ interface Row {
   players: string[];
   /** Código de amigo de cada jogador (null: convidado). */
   profiles: Array<string | null>;
+  avatars: RankingRowBase['avatars'];
+  levels: number[];
   value: string;
   sub: string;
   change?: number | null;
@@ -93,6 +95,8 @@ function toRows<T extends RankingRowBase>(
     position: entry.position,
     players: entry.players,
     profiles: entry.profiles,
+    avatars: entry.avatars,
+    levels: entry.levels,
     change: entry.change,
     streak: entry.streak,
     ...format(entry),
@@ -456,21 +460,31 @@ export function RankingScreen({
   );
 }
 
-/** Avatares quadrados com as iniciais, sobrepostos quando é uma equipe. */
-function Avatars({ players, size }: { players: string[]; size: number }) {
+/** Avatares (foto ou iniciais) com o nível de cada um, sobrepostos quando é uma equipe. */
+function Avatars({
+  row,
+  size,
+}: {
+  row: Pick<Row, 'players' | 'avatars' | 'levels'>;
+  size: number;
+}) {
   return (
     <span className="rk-avatars" aria-hidden="true">
-      {players.map((name, index) => (
+      {row.players.map((name, index) => (
         <span
           key={`${name}:${index}`}
-          style={{
-            width: size,
-            height: size,
-            marginLeft: index === 0 ? 0 : -Math.round(size * 0.3),
-            background: avatarColor(name),
-          }}
+          className="rk-avatar"
+          style={{ marginLeft: index === 0 ? 0 : -Math.round(size * 0.3) }}
         >
-          {initials(name)}
+          <Avatar
+            name={name}
+            url={row.avatars[index]?.url}
+            color={row.avatars[index]?.color}
+            size={size}
+          />
+          {row.levels[index] !== undefined && (
+            <span className="rk-level">Nv {row.levels[index]}</span>
+          )}
         </span>
       ))}
     </span>
@@ -558,7 +572,7 @@ function Board({
                 <CrownIcon size={28} />
               </span>
             )}
-            <Avatars players={row.players} size={row.position === 1 ? 60 : 52} />
+            <Avatars row={row} size={row.position === 1 ? 60 : 52} />
             <span className="rk-podium-name">
               <TeamName row={row} onOpen={onOpenProfile} />
             </span>
@@ -592,7 +606,7 @@ function Board({
                 </span>
                 <Change change={row.change} />
                 <span className="rk-player">
-                  <Avatars players={row.players} size={38} />
+                  <Avatars row={row} size={38} />
                   <span className="rk-player-text">
                     <strong>
                       <TeamName row={row} onOpen={onOpenProfile} />
@@ -650,7 +664,7 @@ function MyPosition({
         {me.position}º
       </span>
       <span className="rk-me-who">
-        <Avatars players={me.players} size={40} />
+        <Avatars row={me} size={40} />
         <span className="rk-player-text">
           <span className="rk-me-name">
             <strong>
