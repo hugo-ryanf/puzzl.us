@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AccountView, MeResponse } from '@puzzle/shared';
+import type { AccountView, MeResponse, ProfileUpdate } from '@puzzle/shared';
 import { guestId } from './connection';
 
 /** Marca, por conta, que o histórico de convidado deste navegador já foi passado para ela. */
@@ -20,6 +20,8 @@ export interface Account {
   /** Aviso da volta do login que deu errado, para mostrar uma vez. */
   loginNotice?: string;
   logout: () => Promise<void>;
+  /** Salva nickname, bio e avatar; a conta (e o resto do site) já passa a mostrar o novo. */
+  updateProfile: (update: ProfileUpdate) => Promise<void>;
 }
 
 async function fetchMe(): Promise<MeResponse> {
@@ -79,5 +81,22 @@ export function useAccount(): Account {
     setMe((previous) => previous && { ...previous, user: null });
   }, []);
 
-  return { user: me?.user, googleLogin: me?.googleLogin ?? false, loginNotice, logout };
+  const updateProfile = useCallback(async (update: ProfileUpdate) => {
+    const response = await fetch('/api/me/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(update),
+    });
+    const body = (await response.json().catch(() => ({}))) as AccountView & { error?: string };
+    if (!response.ok) throw new Error(body.error ?? `Erro ${response.status}.`);
+    setMe((previous) => previous && { ...previous, user: body });
+  }, []);
+
+  return {
+    user: me?.user,
+    googleLogin: me?.googleLogin ?? false,
+    loginNotice,
+    logout,
+    updateProfile,
+  };
 }
