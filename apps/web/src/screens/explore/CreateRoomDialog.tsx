@@ -47,6 +47,8 @@ interface CreateRoomDialogProps {
   source: CreateRoomSource;
   name: string;
   onNameChange: (name: string) => void;
+  /** Logado: o nome é o nickname do perfil (só mostra, não edita). */
+  nameLocked?: boolean;
   onClose: () => void;
   onCreated: (room: PuzzleRoom) => void;
 }
@@ -67,6 +69,7 @@ export function CreateRoomDialog({
   source,
   name,
   onNameChange,
+  nameLocked = false,
   onClose,
   onCreated,
 }: CreateRoomDialogProps) {
@@ -386,21 +389,27 @@ export function CreateRoomDialog({
 
             {!bullet && <SizeOptions pieceCount={pieceCount} onPieceCount={setPieceCount} />}
 
-            <label className="field">
-              Seu nome
-              <input
-                className="input"
-                value={name}
-                maxLength={20}
-                data-autofocus
-                onChange={(e) => onNameChange(e.target.value)}
-              />
-              <small className="field-hint">
-                {mode === 'solo' || bullet
-                  ? 'É o nome que aparece no ranking.'
-                  : 'É assim que seus amigos vão te ver na sala.'}
-              </small>
-            </label>
+            {nameLocked ? (
+              <p className="field-hint locked-name">
+                Você entra como <strong>{name}</strong>, o nickname do seu perfil.
+              </p>
+            ) : (
+              <label className="field">
+                Seu nome
+                <input
+                  className="input"
+                  value={name}
+                  maxLength={20}
+                  data-autofocus
+                  onChange={(e) => onNameChange(e.target.value)}
+                />
+                <small className="field-hint">
+                  {mode === 'solo' || bullet
+                    ? 'É o nome que aparece no ranking.'
+                    : 'É assim que seus amigos vão te ver na sala.'}
+                </small>
+              </label>
+            )}
 
             {error && <p className="error">{error}</p>}
 
