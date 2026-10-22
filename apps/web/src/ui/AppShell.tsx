@@ -156,7 +156,8 @@ export function AppShell({
 
         <div className="sidebar-footer">
           <AccountBox account={account} onFriends={() => onNavigate('friends')} />
-          <ThemeSwitch />
+          {/* Logado, o tema fica no menu "⋯" da conta; convidado não tem menu, então fica aqui. */}
+          {!account.user && <ThemeSwitch />}
           <p className="credits">
             Feito por{' '}
             <a href="https://github.com/hugo-ryanf" target="_blank" rel="noreferrer">
@@ -303,6 +304,8 @@ function AccountBox({ account, onFriends }: { account: Account; onFriends: () =>
         align="end"
       >
         <div className="menu-list">
+          <p className="popover-note">Tema</p>
+          <ThemeSwitch />
           <button type="button" className="btn" onClick={onFriends}>
             <UsersIcon size={16} />
             Amigos e código
