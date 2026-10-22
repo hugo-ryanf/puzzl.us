@@ -297,6 +297,28 @@ mostrar; entrar pelo código funciona para qualquer modo.
   direita (só assistir); no celular, abas.
 - Os modos novos não têm snapshot nem "Salvar e sair": se o servidor reiniciar no meio, a
   partida acaba.
+- **Jogar novamente** (mensagem `playAgain`, só o anfitrião, depois do fim e com o resultado já
+  gravado): começa outra partida na mesma sala, então ninguém sai e a chamada continua. No
+  clássico, mesa nova com a mesma foto e o mesmo tamanho (outra foto se a sala era aleatória),
+  de volta ao lobby. No Bullet, placar e relógio zerados com foto nova. Na Batalha, é a revanche.
+  `round` sobe e o cliente remonta a mesa e o resultado; solo começa sozinho.
+
+## Perfil
+
+- **Dados** (em `users`): `nickname` (null = o primeiro nome do Google), `bio` (até 120),
+  `avatar_style` (`google` ou `initials`) e `avatar_color` (paleta `AVATAR_COLORS`; null = cor
+  automática pelo nome). O login com Google atualiza só o nome e a foto _do Google_
+  (`display_name`, `avatar_url`), nunca o que a pessoa escolheu no perfil.
+- **Nome e foto mostrados** saem de `profileName`/`profileAvatar` (`auth/accounts.ts`), os mesmos
+  na conta, nos amigos e no ranking (que mostra o nickname atual de quem tem conta).
+- **Nas salas**, quem está logado entra com o nickname do perfil: o `onAuth` devolve o nome e o
+  `onJoin` usa ele em vez do digitado (o site nem mostra o campo "Seu nome").
+- `PATCH /api/me/profile` edita; `GET /api/profiles/:codigo-de-amigo` é o perfil público
+  (`/perfil/K7QF-2M9D` no site): nickname, avatar, bio, desde quando joga, estatísticas
+  (montados, fotos, peças, pontos da semana e de sempre, sequência, melhor Bullet, amigos) e a
+  relação com quem vê (próprio, amigo, pedido pendente, nenhuma, convidado).
+- O ranking devolve, junto dos nomes, o código de amigo de cada jogador com conta: o nome vira
+  link para o perfil.
 
 ## Amigos, presença e convites
 
