@@ -12,6 +12,8 @@ import { InviteMenu } from './InviteMenu';
 
 interface RoomHeaderProps {
   roomId: string;
+  /** Minha sessão: na batalha por tempo, os montados mostrados são os do meu lado. */
+  selfId: string;
   snapshot: RoomSnapshot;
   voice: VoiceChat;
   onLeave: () => void;
@@ -26,6 +28,7 @@ interface RoomHeaderProps {
 /** Barra da sala: foto e sala à esquerda, tempo e progresso no meio, convite/som/sair à direita. */
 export function RoomHeader({
   roomId,
+  selfId,
   snapshot,
   voice,
   onLeave,
@@ -37,6 +40,14 @@ export function RoomHeader({
   const { imageId, pieceCount, pieces, placed, phase, elapsedMs, durationMs, maxPlayers, mode } =
     snapshot;
   const bullet = mode === 'bullet';
+  /** Batalha por tempo: relógio regressivo e montados, como no Bullet (os do meu lado). */
+  const timedBattle = mode === 'battle' && snapshot.timeLimitMs > 0;
+  const myTeam = snapshot.players.find((p) => p.sessionId === selfId)?.team;
+  const solved = timedBattle
+    ? myTeam
+      ? (snapshot.boards[myTeam]?.solved ?? 0)
+      : 0
+    : snapshot.solved;
   const solo = maxPlayers === 1;
   const title = puzzleImageInfo(imageId)?.title ?? 'Quebra-cabeça';
   const difficulty = DIFFICULTY_NAMES[difficultyOf(pieceCount) - 1];
@@ -68,7 +79,8 @@ export function RoomHeader({
               </>
             ) : mode === 'battle' ? (
               <>
-                · Batalha {maxPlayers / 2}v{maxPlayers / 2} · {pieces} peças
+                · Batalha {maxPlayers / 2}v{maxPlayers / 2}
+                {timedBattle && <> · {snapshot.timeLimitMs / 60_000} min</>} · {pieces} peças
               </>
             ) : (
               <>
@@ -85,12 +97,12 @@ export function RoomHeader({
             phase={phase}
             elapsedMs={elapsedMs}
             durationMs={durationMs}
-            limitMs={bullet ? snapshot.timeLimitMs : undefined}
+            limitMs={bullet || timedBattle ? snapshot.timeLimitMs : undefined}
           />
         </span>
-        {bullet && (
-          <span className="solved-pill" aria-label={`${snapshot.solved} montados`}>
-            <strong>{snapshot.solved}</strong> {snapshot.solved === 1 ? 'montado' : 'montados'}
+        {(bullet || timedBattle) && (
+          <span className="solved-pill" aria-label={`${solved} montados`}>
+            <strong>{solved}</strong> {solved === 1 ? 'montado' : 'montados'}
           </span>
         )}
         <div
