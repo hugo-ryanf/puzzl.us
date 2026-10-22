@@ -244,17 +244,21 @@ export class BattleRoom extends BaseGameRoom {
       this.startClock(Date.now(), 0);
       return;
     }
-    const limit = this.state.timeLimitMs;
-    this.startClock(Date.now(), 0, () => {
-      this.state.remainingMs = Math.max(0, limit - this.elapsed());
+    this.startAfterCountdown(() => {
+      const limit = this.state.timeLimitMs;
+      this.startClock(Date.now(), 0, () => {
+        this.state.remainingMs = Math.max(0, limit - this.elapsed());
+      });
+      this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
     });
-    this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
   }
 
   /** O tabuleiro só aceita quem é daquele lado, com a partida valendo e a mesa por montar. */
   private playable(client: Client, board: string | undefined): BoardRuntime | undefined {
     const team = this.state.players.get(client.sessionId)?.team as BattleTeam | '';
-    if (!team || board !== team || this.phase !== 'playing') return undefined;
+    if (!team || board !== team || this.phase !== 'playing' || this.state.countdown > 0) {
+      return undefined;
+    }
     if (this.state.boards.get(team)?.done) return undefined;
     return this.boards.get(team);
   }
@@ -314,6 +318,7 @@ export class BattleRoom extends BaseGameRoom {
   /** Fim: o primeiro lado a montar, o que montou mais (ou o que sobrou) ganha; as mesas param. */
   private finish(winner: BattleTeam | 'draw') {
     if (this.phase !== 'playing') return;
+    this.stopCountdown();
     this.clockTimer?.clear();
     this.endTimer?.clear();
     for (const timer of this.nextRoundTimers.values()) timer.clear();
@@ -340,6 +345,7 @@ export class BattleRoom extends BaseGameRoom {
   }
 
   onDispose() {
+    this.countdownTimer?.clear();
     this.clockTimer?.clear();
     this.endTimer?.clear();
     for (const timer of this.nextRoundTimers.values()) timer.clear();
