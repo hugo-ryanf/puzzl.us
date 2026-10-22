@@ -371,7 +371,8 @@ describe('PuzzleRoom — fim e ranking', () => {
     expect(state.players.size).toBe(2); // ninguém saiu da sala
     expect(room.locked).toBe(false);
 
-    await send(ana, 'start');
+    ana.send('start');
+    for (let i = 0; i < 50 && state.phase !== 'playing'; i++) await room.waitForNextPatch();
     expect(state.phase).toBe('playing');
   });
 
