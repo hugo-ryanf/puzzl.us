@@ -4,6 +4,8 @@ import type { Server } from '@colyseus/core';
 import { ColyseusSDK } from '@colyseus/sdk';
 import {
   CATALOG,
+  BATTLE_ROOM,
+  BULLET_ROOM,
   PRESENCE_ROOM,
   ROOM_NAME,
   type FriendsResponse,
@@ -238,6 +240,48 @@ describe('Convites', () => {
 
     await biaPresence.leave();
     await game.leave();
+  });
+
+  it('também chama para salas de Bullet e de Batalha', async () => {
+    const ana = await login('Ana');
+    const bia = await login('Bia');
+    const caio = await login('Caio');
+    await befriend(ana, bia);
+    await befriend(caio, bia);
+    const biaPresence = await bia.sdk.joinOrCreate(PRESENCE_ROOM);
+    const invites: InviteMessage[] = [];
+    biaPresence.onMessage('invite', (invite: InviteMessage) => invites.push(invite));
+    biaPresence.onMessage('friendsChanged', () => {});
+    const catalogIds = CATALOG.map((image) => image.id);
+
+    const bullet = await ana.sdk.create(BULLET_ROOM, {
+      name: 'Ana',
+      guestId: randomUUID(),
+      minutes: 3,
+      pieces: 12,
+      maxPlayers: 2,
+    });
+    const battle = await caio.sdk.create(BATTLE_ROOM, {
+      name: 'Caio',
+      guestId: randomUUID(),
+      pieceCount: 12,
+      imageId: 'random',
+      format: '1v1',
+      minutes: 3,
+    });
+    const invite = (who: Person, roomCode: string) =>
+      call(who, 'POST', 'invites', { friendId: bia.account.id, roomCode });
+
+    expect((await invite(ana, bullet.roomId)).status).toBe(204);
+    expect((await invite(caio, battle.roomId)).status).toBe(204);
+    expect(await until(() => invites.length === 2)).toBe(true);
+    expect(invites.map((i) => i.roomCode)).toEqual([bullet.roomId, battle.roomId]);
+    // A foto de verdade (não 'random'): o aviso mostra a miniatura dela.
+    for (const { imageId } of invites) expect(catalogIds).toContain(imageId);
+
+    await biaPresence.leave();
+    await bullet.leave();
+    await battle.leave();
   });
 
   it('amigo offline não recebe', async () => {
