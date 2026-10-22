@@ -52,6 +52,7 @@ export class BattleRoom extends BaseGameRoom {
     drop: validate(MoveMessage, (client, message) => this.drop(client, message)),
     scatter: validate(ScatterMessage, (client, { board }) => this.scatter(client, board)),
     rematch: (client: Client) => this.rematch(client),
+    playAgain: (client: Client) => this.rematch(client),
   };
 
   async onCreate(rawOptions: unknown) {
