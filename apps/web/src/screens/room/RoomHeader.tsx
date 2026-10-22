@@ -98,6 +98,7 @@ export function RoomHeader({
             elapsedMs={elapsedMs}
             durationMs={durationMs}
             limitMs={bullet || timedBattle ? snapshot.timeLimitMs : undefined}
+            paused={snapshot.countdown > 0}
           />
         </span>
         {(bullet || timedBattle) && (
