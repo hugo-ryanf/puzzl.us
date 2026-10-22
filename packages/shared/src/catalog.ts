@@ -144,6 +144,34 @@ export const CATALOG: readonly CatalogImage[] = [
     width: 2048,
     height: 1365,
   },
+  {
+    id: 'barcos-atracados',
+    title: 'Barcos atracados',
+    credit: '',
+    width: 2048,
+    height: 1536,
+  },
+  {
+    id: 'canal-com-barcos-no-meio-da-cidade',
+    title: 'Canal com barcos no meio da cidade',
+    credit: '',
+    width: 2048,
+    height: 1366,
+  },
+  {
+    id: 'entardecer-na-cidade',
+    title: 'Entardecer na cidade',
+    credit: '',
+    width: 2048,
+    height: 1365,
+  },
+  {
+    id: 'ponte-sobre-a-agua-na-cidade',
+    title: 'Ponte sobre a água na cidade',
+    credit: '',
+    width: 2048,
+    height: 1456,
+  },
 ];
 
 export function findCatalogImage(id: string): CatalogImage | undefined {
