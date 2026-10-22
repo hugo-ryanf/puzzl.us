@@ -58,11 +58,12 @@ export interface RoomSnapshot {
   /** Bullet: duração, tempo que falta, quebra-cabeça da vez, montados e o que ficou pela metade. */
   timeLimitMs: number;
   remainingMs: number;
+  /** "3, 2, 1" antes de valer (Bullet e batalha por tempo); 0 = valendo. */
+  countdown: number;
   round: number;
   solved: number;
   partial: number;
-  /** Batalha: lado vencedor ('' até alguém terminar) e se foi por W.O. */
-  /** Batalha: o lado vencedor, ou 'draw' (empate na batalha por tempo). */
+  /** Batalha: o lado vencedor ('' até acabar, 'draw' no empate por tempo) e se foi por W.O. */
   winner: BattleTeam | 'draw' | '';
   walkover: boolean;
 }
@@ -124,6 +125,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     boards,
     timeLimitMs: state.timeLimitMs,
     remainingMs: state.remainingMs,
+    countdown: state.countdown,
     round: state.round,
     solved: state.solved,
     partial: state.partial,
@@ -174,6 +176,7 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
           'points',
           'teamSize',
           'remainingMs',
+          'countdown',
           'round',
           'solved',
           'partial',
