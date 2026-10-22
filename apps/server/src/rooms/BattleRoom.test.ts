@@ -25,11 +25,16 @@ async function until(check: () => boolean) {
   return check();
 }
 
-/** Batalha com Ana (lado A, anfitriã) e Bia (lado B); `extra` entram depois. */
-async function setup(format: '1v1' | '2v2' = '1v1', extra: string[] = []) {
+/**
+ * Batalha com Ana (lado A, anfitriã) e Bia (lado B); `extra` entram depois. `minutes`: batalha
+ * por tempo (12 peças, fotos sorteadas).
+ */
+async function setup(format: '1v1' | '2v2' = '1v1', extra: string[] = [], minutes?: 3) {
   const ana = await sdk.create(
     BATTLE_ROOM,
-    { ...player('Ana'), pieceCount: 24, imageId: CATALOG[0]!.id, format },
+    minutes
+      ? { ...player('Ana'), pieceCount: 12, imageId: 'random', format, minutes }
+      : { ...player('Ana'), pieceCount: 24, imageId: CATALOG[0]!.id, format },
     RoomState,
   );
   const room = matchMaker.getLocalRoomById(ana.roomId) as unknown as BattleRoom;
@@ -140,5 +145,70 @@ describe('BattleRoom', () => {
     await expect(sdk.joinById(ana.roomId, player('Caio'), RoomState)).rejects.toThrow();
     await ana.leave();
     await bia.leave();
+  });
+
+  describe('por tempo', () => {
+    it('quem monta segue para o próximo da mesma sequência; o outro lado fica no dele', async () => {
+      const { ana, bia, state, board } = await setup('1v1', [], 3);
+      expect(state.timeLimitMs).toBe(3 * 60_000);
+      expect(board('a').config.seed).toBe(board('b').config.seed);
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      const first = board('a').config.seed;
+
+      await solve(ana, board('a'), 'a');
+      expect(await until(() => board('a').config.seed !== first)).toBe(true);
+      expect(board('a').solved).toBe(1);
+      expect(board('a').done).toBe(false);
+      expect(state.phase).toBe('playing'); // montar um não acaba a partida
+      expect(board('b').config.seed).toBe(first);
+
+      // Bia chega no segundo: é o mesmo que a Ana recebeu, nas mesmas posições.
+      const second = board('a').config.seed;
+      const layout = (key: 'a' | 'b') =>
+        [...board(key).groups.entries()].map(([id, g]) => [id, g.x, g.y]);
+      const secondLayout = layout('a');
+      await solve(bia, board('b'), 'b');
+      expect(await until(() => board('b').config.seed === second)).toBe(true);
+      expect(layout('b')).toEqual(secondLayout);
+      await ana.leave();
+      await bia.leave();
+    });
+
+    it('no fim do tempo ganha quem montou mais; empate vai para as peças encaixadas', async () => {
+      const { ana, bia, room, state, board } = await setup('1v1', [], 3);
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      await solve(bia, board('b'), 'b');
+      await until(() => board('b').solved === 1 && !board('b').done);
+      (room as unknown as { timeUp(): void }).timeUp();
+      expect(state.phase).toBe('completed');
+      expect(state.winner).toBe('b');
+      expect(state.remainingMs).toBe(0);
+
+      // Revanche zera tudo; de novo, ninguém monta nada: empate.
+      ana.send('rematch');
+      expect(await until(() => state.phase === 'lobby')).toBe(true);
+      expect([board('a').solved, board('b').solved]).toEqual([0, 0]);
+      expect(state.remainingMs).toBe(3 * 60_000);
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      (room as unknown as { timeUp(): void }).timeUp();
+      expect(state.winner).toBe('draw');
+      await ana.leave();
+      await bia.leave();
+    });
+
+    it('recusa tamanho fora dos do Bullet', async () => {
+      await expect(
+        sdk.create(BATTLE_ROOM, {
+          ...player('Ana'),
+          pieceCount: 48,
+          imageId: 'random',
+          format: '1v1',
+          minutes: 3,
+        }),
+      ).rejects.toThrow();
+    });
   });
 });
