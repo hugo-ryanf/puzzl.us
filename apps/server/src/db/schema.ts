@@ -129,7 +129,7 @@ export const gamePlayers = pgTable(
 /**
  * Fotos enviadas pelos jogadores, já reprocessadas (WebP ≤ 2048 px, sem metadados). O id é
  * aleatório e impossível de adivinhar: quem tem o id da sala tem a foto, e mais ninguém.
- * Apagadas depois de 7 dias sem nenhuma sala usar (last_used_at).
+ * Apagadas depois de 7 dias sem nenhuma sala usar (last_used_at), publicadas ou não.
  */
 export const uploads = pgTable(
   'uploads',
