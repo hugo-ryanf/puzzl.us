@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   BULLET_MINUTES,
   BULLET_PIECES,
@@ -48,6 +48,8 @@ interface RankingScreenProps {
   community: CommunityPuzzle[];
   /** "Criar sala" do pódio vazio (sem ele, o botão não aparece). */
   onCreateRoom?: () => void;
+  /** Clicar no nome de quem tem conta abre o perfil (sem ele, os nomes são só texto). */
+  onOpenProfile?: (code: string) => void;
 }
 
 /**
@@ -60,6 +62,8 @@ type Tab = 'general' | 'puzzle' | 'bullet';
 interface Row {
   position: number;
   players: string[];
+  /** Código de amigo de cada jogador (null: convidado). */
+  profiles: Array<string | null>;
   value: string;
   sub: string;
   change?: number | null;
@@ -88,6 +92,7 @@ function toRows<T extends RankingRowBase>(
   const row = (entry: T): Row => ({
     position: entry.position,
     players: entry.players,
+    profiles: entry.profiles,
     change: entry.change,
     streak: entry.streak,
     ...format(entry),
@@ -168,12 +173,12 @@ const normalize = (text: string) =>
     .toLowerCase()
     .trim();
 
-const teamName = (players: string[]) =>
-  players.length <= 1
-    ? (players[0] ?? '')
-    : `${players.slice(0, -1).join(', ')} & ${players[players.length - 1]}`;
-
-export function RankingScreen({ initial, community, onCreateRoom }: RankingScreenProps) {
+export function RankingScreen({
+  initial,
+  community,
+  onCreateRoom,
+  onOpenProfile,
+}: RankingScreenProps) {
   const images: ImageOption[] = [
     ...CATALOG.map((image) => ({
       id: image.id,
@@ -423,6 +428,7 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
         )}
         {!!rows?.length && (
           <Board
+            onOpenProfile={onOpenProfile}
             rows={rows}
             valueHeader={VALUE_HEADERS[tab]}
             more={(result?.total ?? rows.length) - rows.length}
@@ -431,6 +437,7 @@ export function RankingScreen({ initial, community, onCreateRoom }: RankingScree
         )}
         {result?.me && (
           <MyPosition
+            onOpenProfile={onOpenProfile}
             me={result.me}
             higherIsBetter={tab !== 'puzzle'}
             gapLabel={(ahead, me) =>
@@ -470,6 +477,36 @@ function Avatars({ players, size }: { players: string[]; size: number }) {
   );
 }
 
+/** Nomes da equipe ("Ana, Bia & Caio"); quem tem conta vira link para o perfil. */
+function TeamName({
+  row,
+  onOpen,
+}: {
+  row: Pick<Row, 'players' | 'profiles'>;
+  onOpen?: (code: string) => void;
+}) {
+  const last = row.players.length - 1;
+  return (
+    <>
+      {row.players.map((name, index) => {
+        const code = row.profiles[index];
+        return (
+          <Fragment key={`${name}:${index}`}>
+            {index === 0 ? '' : index === last ? ' & ' : ', '}
+            {code && onOpen ? (
+              <button type="button" className="rk-name-link" onClick={() => onOpen(code)}>
+                {name}
+              </button>
+            ) : (
+              name
+            )}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
 /** "▲ 2", "▼ 1", "=" ou "NOVO": quanto a equipe subiu ou caiu desde o período anterior. */
 function Change({ change }: { change?: number | null }) {
   if (change === undefined) return <span className="rk-change">—</span>;
@@ -501,7 +538,9 @@ function Board({
   valueHeader,
   more,
   noun,
+  onOpenProfile,
 }: {
+  onOpenProfile?: (code: string) => void;
   rows: Row[];
   valueHeader: string;
   more: number;
@@ -520,7 +559,9 @@ function Board({
               </span>
             )}
             <Avatars players={row.players} size={row.position === 1 ? 60 : 52} />
-            <span className="rk-podium-name">{teamName(row.players)}</span>
+            <span className="rk-podium-name">
+              <TeamName row={row} onOpen={onOpenProfile} />
+            </span>
             <span className="rk-podium-meta">
               <Streak days={row.streak} />
               <span className="rk-mono rk-podium-value">{row.value}</span>
@@ -553,7 +594,9 @@ function Board({
                 <span className="rk-player">
                   <Avatars players={row.players} size={38} />
                   <span className="rk-player-text">
-                    <strong>{teamName(row.players)}</strong>
+                    <strong>
+                      <TeamName row={row} onOpen={onOpenProfile} />
+                    </strong>
                     <small>{row.sub}</small>
                   </span>
                 </span>
@@ -580,10 +623,12 @@ function Board({
 
 /** "Sua posição": fixa no pé, com quanto falta para passar quem está logo à frente. */
 function MyPosition({
+  onOpenProfile,
   me,
   higherIsBetter,
   gapLabel,
 }: {
+  onOpenProfile?: (code: string) => void;
   me: Row & { ahead?: Row };
   higherIsBetter: boolean;
   gapLabel: (ahead: Row, me: Row) => string;
@@ -608,7 +653,9 @@ function MyPosition({
         <Avatars players={me.players} size={40} />
         <span className="rk-player-text">
           <span className="rk-me-name">
-            <strong>{teamName(me.players)}</strong>
+            <strong>
+              <TeamName row={me} onOpen={onOpenProfile} />
+            </strong>
             <span className="rk-me-you">Você</span>
           </span>
           <small>
