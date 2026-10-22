@@ -21,15 +21,15 @@
   --surface-2: #fafafb;
   /* Trilho de controles segmentados e de barras de progresso. */
   --segmented: #e9ebef;
-  --track: #d6e6ea;
+  --track: var(--theme-track, #d6e6ea);
   /* Painéis translúcidos por cima da mesa e véu dos diálogos sobre ela. */
   --glass: rgba(255, 255, 255, 0.72);
   --glass-strong: rgba(255, 255, 255, 0.85);
   --scrim: rgba(244, 245, 247, 0.6);
   /* Destaque só em ícones, marcas e indicadores: em texto branco não tem contraste suficiente. */
-  --accent: #3a9aad;
+  --accent: var(--theme-accent, #3a9aad);
   /* Fundo suave na cor de destaque (selo do resultado, linha da sua equipe no ranking). */
-  --accent-soft: #e3f3f6;
+  --accent-soft: var(--theme-accent-soft, #e3f3f6);
   /* As duas cores do nome "puzzl.us" ao lado do logo. */
   --brand-ink: #2c5866;
   --brand-ink-2: #2f7f91;
@@ -72,8 +72,8 @@
   --primary: #eceef2;
   --primary-hover: #ffffff;
   --on-primary: #15171c;
-  --accent: #4fb3c6;
-  --accent-soft: #1b3439;
+  --accent: var(--theme-accent-dark, #4fb3c6);
+  --accent-soft: var(--theme-accent-soft-dark, #1b3439);
   --brand-ink: #8fc9d6;
   --brand-ink-2: #5fb8ca;
   --pip-off: #3a3f4a;
@@ -84,7 +84,7 @@
   --board-dot: #343946;
   --speaking: #22c55e;
   --segmented: #23272f;
-  --track: #23383d;
+  --track: var(--theme-track-dark, #23383d);
   --glass: rgba(23, 26, 32, 0.8);
   --glass-strong: rgba(23, 26, 32, 0.9);
   --scrim: rgba(15, 17, 21, 0.6);
@@ -110,8 +110,8 @@
     --primary: #eceef2;
     --primary-hover: #ffffff;
     --on-primary: #15171c;
-    --accent: #4fb3c6;
-    --accent-soft: #1b3439;
+    --accent: var(--theme-accent-dark, #4fb3c6);
+    --accent-soft: var(--theme-accent-soft-dark, #1b3439);
     --brand-ink: #8fc9d6;
     --brand-ink-2: #5fb8ca;
     --pip-off: #3a3f4a;
@@ -122,13 +122,81 @@
     --board-dot: #343946;
     --speaking: #22c55e;
     --segmented: #23272f;
-    --track: #23383d;
+    --track: var(--theme-track-dark, #23383d);
     --glass: rgba(23, 26, 32, 0.8);
     --glass-strong: rgba(23, 26, 32, 0.9);
     --scrim: rgba(15, 17, 21, 0.6);
     --shadow-card: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
     --shadow-panel: 0 18px 48px -18px rgba(0, 0, 0, 0.7);
   }
+}
+
+/*
+ * Cor de destaque escolhida no menu (data-accent no <html>, ver src/ui/accent.ts): as cores dos
+ * camaleões. Muda só o destaque (--accent e os tons dele); o resto do tema fica igual. Sem
+ * data-accent (Petróleo), vale o teal de sempre.
+ */
+:root[data-accent='gelo'] {
+  --theme-accent: #4a93bd;
+  --theme-accent-soft: #e7f1f6;
+  --theme-track: #d0dde7;
+  --theme-accent-dark: #7cc0e2;
+  --theme-accent-soft-dark: #25343e;
+  --theme-track-dark: #2a3742;
+}
+
+:root[data-accent='verde'] {
+  --theme-accent: #3f9a46;
+  --theme-accent-soft: #e6f2e7;
+  --theme-track: #ceded4;
+  --theme-accent-dark: #66c26c;
+  --theme-accent-soft-dark: #203426;
+  --theme-track-dark: #26372f;
+}
+
+:root[data-accent='ouro'] {
+  --theme-accent: #c4930a;
+  --theme-accent-soft: #f7f1df;
+  --theme-track: #e3ddca;
+  --theme-accent-dark: #e8b931;
+  --theme-accent-soft-dark: #3a331b;
+  --theme-track-dark: #3b3625;
+}
+
+:root[data-accent='ambar'] {
+  --theme-accent: #d9741c;
+  --theme-accent-soft: #faede1;
+  --theme-track: #e6d8cd;
+  --theme-accent-dark: #f39a4d;
+  --theme-accent-soft-dark: #3d2c20;
+  --theme-track-dark: #3d312a;
+}
+
+:root[data-accent='vermelho'] {
+  --theme-accent: #d33f3f;
+  --theme-accent-soft: #f9e6e6;
+  --theme-track: #e5cfd3;
+  --theme-accent-dark: #f06a6a;
+  --theme-accent-soft-dark: #3c2326;
+  --theme-track-dark: #3c292e;
+}
+
+:root[data-accent='rosa'] {
+  --theme-accent: #c94f7c;
+  --theme-accent-soft: #f8e8ee;
+  --theme-track: #e4d2dd;
+  --theme-accent-dark: #e87fa6;
+  --theme-accent-soft-dark: #3a2732;
+  --theme-track-dark: #3b2d38;
+}
+
+:root[data-accent='roxo'] {
+  --theme-accent: #8350c8;
+  --theme-accent-soft: #efe8f8;
+  --theme-track: #d9d2e9;
+  --theme-accent-dark: #a787e8;
+  --theme-accent-soft-dark: #2d293f;
+  --theme-track-dark: #312e43;
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────── */
@@ -4321,7 +4389,7 @@ a.btn {
   gap: 14px 20px;
   padding: 14px 20px;
   border: 1px solid var(--accent);
-  background: linear-gradient(rgba(58, 154, 173, 0.09), rgba(58, 154, 173, 0.09)), var(--surface);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
   box-shadow: 0 16px 36px -20px rgba(21, 23, 28, 0.35);
 }
 
@@ -4449,6 +4517,35 @@ a.btn {
   box-shadow: 0 1px 3px rgba(21, 23, 28, 0.14);
   color: var(--text);
   font-weight: 600;
+}
+
+/* Cor de destaque: uma bolinha por cor; a escolhida ganha um anel. */
+.accent-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 2px 4px;
+}
+
+.accent-switch button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--surface);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.accent-switch button:hover {
+  transform: scale(1.1);
+}
+
+.accent-switch button[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--text);
 }
 
 /* ── Avatar (foto ou iniciais) e perfil ──────────────────────────────────── */
