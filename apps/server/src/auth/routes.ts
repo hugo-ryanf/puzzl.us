@@ -4,6 +4,7 @@ import type { AccountStore } from './accounts';
 import type { GoogleAuth } from './google';
 import { registerLibraryRoutes, type LibraryStore } from '../library/library';
 import type { FriendStore } from '../friends/friends';
+import type { ProfileStore } from '../profile/profile';
 import type { SavedGameStore } from '../rooms/savedGames';
 
 export const SESSION_COOKIE = 'sid';
@@ -28,6 +29,8 @@ export interface AuthOptions {
   savedGames?: SavedGameStore;
   /** Amizades (rotas /api/me/friends e /api/me/invites, mais a sala de presença). */
   friends?: FriendStore;
+  /** Perfil: edição (PATCH /api/me/profile) e perfil público (GET /api/profiles/:code). */
+  profiles?: ProfileStore;
 }
 
 /** "a=1; sid=abc" → { a: '1', sid: 'abc' }. Express não lê cookie sem o cookie-parser. */
