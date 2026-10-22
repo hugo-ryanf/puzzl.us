@@ -14,13 +14,15 @@ import {
   SunIcon,
   TimerIcon,
   TrophyIcon,
+  UserIcon,
   UsersIcon,
 } from './icons';
-import { avatarColor, initials } from './avatar';
+import { Avatar } from './UserAvatar';
 import { useTheme, type ThemeChoice } from './theme';
 import { Popover } from './Popover';
 
-export type Section = 'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking';
+export type Section =
+  'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking' | 'profile';
 
 interface AppShellProps {
   active: Section;
@@ -33,6 +35,8 @@ interface AppShellProps {
   friends?: FriendView[];
   /** Pedidos de amizade esperando resposta (número ao lado de "Ver todos"). */
   friendRequests?: number;
+  /** Abre o perfil público de alguém (pelo código de amigo). */
+  onOpenProfile: (code: string) => void;
   children: ReactNode;
 }
 
@@ -53,6 +57,7 @@ export function AppShell({
   account,
   friends,
   friendRequests = 0,
+  onOpenProfile,
   children,
 }: AppShellProps) {
   const current = (section: Section) => (section === active ? ('page' as const) : undefined);
@@ -65,8 +70,14 @@ export function AppShell({
     setCode('');
   }
 
-  const navLink = (section: Section, icon: ReactNode, label: string, extra?: ReactNode) => (
-    <li>
+  const navLink = (
+    section: Section,
+    icon: ReactNode,
+    label: string,
+    extra?: ReactNode,
+    className?: string,
+  ) => (
+    <li className={className}>
       <button
         type="button"
         className="nav-link"
@@ -129,6 +140,8 @@ export function AppShell({
             {navLink('favorites', <BookmarkIcon />, 'Favoritos')}
             {navLink('records', <TimerIcon />, 'Meus records')}
             {navLink('ranking', <TrophyIcon />, 'Ranking')}
+            {account.user &&
+              navLink('profile', <UserIcon />, 'Perfil', undefined, 'mobile-only nav-profile')}
             {/* No celular a seção de amigos não cabe: vira um item do menu. */}
             <li className="mobile-only">
               <button
@@ -151,11 +164,16 @@ export function AppShell({
             requests={friendRequests}
             active={active === 'friends'}
             onOpen={() => onNavigate('friends')}
+            onOpenProfile={onOpenProfile}
           />
         )}
 
         <div className="sidebar-footer">
-          <AccountBox account={account} onFriends={() => onNavigate('friends')} />
+          <AccountBox
+            account={account}
+            onFriends={() => onNavigate('friends')}
+            onProfile={() => onNavigate('profile')}
+          />
           {/* Logado, o tema fica no menu "⋯" da conta; convidado não tem menu, então fica aqui. */}
           {!account.user && <ThemeSwitch />}
           <p className="credits">
@@ -207,11 +225,13 @@ function SidebarFriends({
   requests,
   active,
   onOpen,
+  onOpenProfile,
 }: {
   friends?: FriendView[];
   requests: number;
   active: boolean;
   onOpen: () => void;
+  onOpenProfile: (code: string) => void;
 }) {
   const online = friends.filter((friend) => friend.status !== 'offline').length;
   const shown = [...friends]
@@ -245,15 +265,18 @@ function SidebarFriends({
         <ul>
           {shown.map((friend) => (
             <li key={friend.id}>
-              <button type="button" className="sidebar-friend" onClick={onOpen}>
+              <button
+                type="button"
+                className="sidebar-friend"
+                onClick={() => onOpenProfile(friend.friendCode)}
+              >
                 <span className="sidebar-friend-avatar" aria-hidden="true">
-                  {friend.avatarUrl ? (
-                    <img src={friend.avatarUrl} alt="" referrerPolicy="no-referrer" />
-                  ) : (
-                    <span style={{ background: avatarColor(friend.name) }}>
-                      {friend.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
+                  <Avatar
+                    name={friend.name}
+                    url={friend.avatarUrl}
+                    color={friend.avatarColor}
+                    size={34}
+                  />
                   <span className={`status-dot ${friend.status}`} />
                 </span>
                 <span className="sidebar-friend-text">
@@ -272,7 +295,15 @@ function SidebarFriends({
 }
 
 /** Conta no rodapé: entrar com Google (convidado) ou foto, nome e o menu "⋯" (logado). */
-function AccountBox({ account, onFriends }: { account: Account; onFriends: () => void }) {
+function AccountBox({
+  account,
+  onFriends,
+  onProfile,
+}: {
+  account: Account;
+  onFriends: () => void;
+  onProfile: () => void;
+}) {
   const { user, googleLogin, logout } = account;
   if (user === undefined) return <div className="sidebar-account" />; // carregando
   if (!user) {
@@ -290,13 +321,10 @@ function AccountBox({ account, onFriends }: { account: Account; onFriends: () =>
   }
   return (
     <div className="sidebar-account signed-in">
-      {user.avatarUrl ? (
-        // Foto do Google: sem enviar de qual site veio o pedido (o Google bloqueia com referrer).
-        <img className="account-avatar" src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
-      ) : (
-        <span className="account-avatar">{initials(user.name)}</span>
-      )}
-      <span className="account-name">{user.name}</span>
+      <button type="button" className="account-profile" onClick={onProfile}>
+        <Avatar name={user.name} url={user.avatarUrl} color={user.avatarColor} size={34} />
+        <span className="account-name">{user.name}</span>
+      </button>
       <Popover
         label="Menu da conta"
         triggerClassName="btn btn-ghost icon-only account-menu"
@@ -304,6 +332,10 @@ function AccountBox({ account, onFriends }: { account: Account; onFriends: () =>
         align="end"
       >
         <div className="menu-list">
+          <button type="button" className="btn" onClick={onProfile}>
+            <UserIcon size={16} />
+            Perfil
+          </button>
           <p className="popover-note">Tema</p>
           <ThemeSwitch />
           <button type="button" className="btn" onClick={onFriends}>
