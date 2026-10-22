@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { matchMaker, type Server } from '@colyseus/core';
 import { ColyseusSDK } from '@colyseus/sdk';
 import {
+  AVATAR_COLORS,
   CATALOG,
   ROOM_NAME,
   RoomState,
@@ -183,6 +184,34 @@ describe('Perfil', () => {
     expect(entries[0]).toMatchObject({
       players: ['Hugão', 'Visitante'],
       profiles: [hugo.account.friendCode, null],
+      avatars: [
+        { url: 'https://foto.test/eu.jpg', color: null },
+        { url: null, color: null },
+      ],
+      levels: [1, 1], // 24 pontos: ainda não chegou aos 50 do nível 2
+    });
+
+    // Avatar de iniciais com cor escolhida; outra foto soma pontos e sobe o nível de quem jogou.
+    await patch(hugo.cookie, { avatarStyle: 'initials', avatarColor: AVATAR_COLORS[2] });
+    await store.saveGame({
+      roomCode: 'TESTE',
+      imageId: 'farol',
+      pieceCount: 48,
+      rows: 6,
+      cols: 8,
+      seed: 'def',
+      startedAt: new Date(Date.now() - 60_000),
+      finishedAt: new Date(),
+      durationMs: 60_000,
+      players: [{ guestId, userId: hugo.account.id, nickname: 'Hugo' }],
+    });
+    const after = await store.leaderboard({ image: 'praia', pieces: 24, players: 2 });
+    expect(after.entries[0]).toMatchObject({
+      avatars: [
+        { url: null, color: AVATAR_COLORS[2] },
+        { url: null, color: null },
+      ],
+      levels: [2, 1],
     });
   });
 
