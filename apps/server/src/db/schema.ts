@@ -10,6 +10,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { AvatarPreset } from '@puzzle/shared';
 
 /**
  * Coluna binária do Postgres. O Drizzle 0.45 não tem `bytea` pronto; os drivers devolvem
@@ -36,11 +37,13 @@ export const users = pgTable('users', {
   nickname: text('nickname'),
   bio: text('bio'),
   /** 'google' (a foto do Google) ou 'initials' (iniciais na cor escolhida). */
-  avatarStyle: text('avatar_style', { enum: ['google', 'initials'] })
+  avatarStyle: text('avatar_style', { enum: ['google', 'initials', 'preset'] })
     .notNull()
     .default('google'),
   /** Cor das iniciais (null: automática pelo nome). */
   avatarColor: text('avatar_color'),
+  /** Camaleão escolhido (AVATAR_PRESETS), quando avatar_style = 'preset'. */
+  avatarPreset: text('avatar_preset').$type<AvatarPreset>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
