@@ -3977,20 +3977,39 @@ a.btn {
   flex: none;
 }
 
-.rk-avatars > span {
-  border-radius: 50%;
+.rk-avatar {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 50%;
   box-shadow: 0 0 0 2px var(--surface);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
 }
 
-.rk-podium .rk-avatars > span {
+.rk-podium .rk-avatar {
   box-shadow: 0 0 0 3px var(--surface-2);
-  font-size: 16px;
+}
+
+/* Nível no pé do avatar ("Nv 12"). */
+.rk-level {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 2px var(--surface);
+  color: var(--on-primary);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.rk-podium .rk-level {
+  bottom: -6px;
+  box-shadow: 0 0 0 2px var(--surface-2);
+  font-size: 11px;
+  line-height: 17px;
 }
 
 .rk-podium-name {
@@ -4697,4 +4716,53 @@ a.btn {
   .nav .mobile-only.nav-profile {
     display: block;
   }
+}
+
+/* ── Nível ───────────────────────────────────────────────────────────────── */
+
+.level-chip {
+  margin-left: 10px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+.profile-level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 360px;
+  margin-top: 4px;
+}
+
+.profile-level-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.profile-level-label strong {
+  color: var(--text);
+}
+
+.profile-level-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.profile-level-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
 }
