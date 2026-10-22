@@ -614,12 +614,24 @@ export type BattleTeam = (typeof BATTLE_TEAMS)[number];
 export const BATTLE_FORMATS = { '1v1': 2, '2v2': 4 } as const;
 export type BattleFormat = keyof typeof BATTLE_FORMATS;
 
-/** Criar sala de Batalha: os dois lados montam a mesma foto, do mesmo tamanho. */
+/**
+ * Criar sala de Batalha. Corrida (sem `minutes`): os dois lados montam a mesma foto, do mesmo
+ * tamanho, e quem terminar primeiro ganha. Por tempo (com `minutes`, como no Bullet): os dois
+ * lados recebem a mesma sequência de fotos sorteadas (12 ou 24 peças) e quem montar mais até o
+ * tempo acabar ganha; a foto escolhida não vale.
+ */
 export const CreateBattleOptions = JoinOptions.extend({
-  pieceCount,
+  pieceCount: z.number().int(),
   imageId: z.union([imageId, z.literal(RANDOM_IMAGE)]),
   format: z.enum(['1v1', '2v2']),
-});
+  minutes: bulletMinutes.optional(),
+}).refine(
+  ({ minutes, pieceCount }) =>
+    ((minutes === undefined ? PIECE_COUNT_PRESETS : BULLET_PIECES) as readonly number[]).includes(
+      pieceCount,
+    ),
+  { message: 'Tamanho inválido', path: ['pieceCount'] },
+);
 export type CreateBattleOptions = z.infer<typeof CreateBattleOptions>;
 
 /** Lobby da Batalha: trocar de lado. */
