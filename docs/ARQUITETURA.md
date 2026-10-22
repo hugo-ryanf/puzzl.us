@@ -300,6 +300,11 @@ mostrar; entrar pelo código funciona para qualquer modo.
     o lado mais rápido avança). Montou um, `solved` da mesa sobe e ~0,9 s depois entra o próximo
     (cada lado no seu ritmo; o cliente remonta a mesa pela `seed`). No fim do tempo ganha quem
     montou mais; empate, mais peças encaixadas no que ficou pela metade; senão `winner = 'draw'`.
+- **"3, 2, 1"** (Bullet e batalha por tempo): no "Começar" a fase já vira `playing`, mas
+  `countdown` conta 3 → 0 no servidor (`startAfterCountdown` na `BaseGameRoom`); até chegar a 0
+  as peças ficam travadas (servidor e cliente) e o relógio não anda. Nos últimos 10 s, o cliente
+  mostra o relógio grande em vermelho no meio da mesa (`FinalSeconds`; na batalha, em cima da
+  linha do meio).
 - Os modos novos não têm snapshot nem "Salvar e sair": se o servidor reiniciar no meio, a
   partida acaba.
 - **Jogar novamente** (mensagem `playAgain`, só o anfitrião, depois do fim e com o resultado já
