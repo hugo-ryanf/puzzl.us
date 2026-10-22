@@ -71,6 +71,8 @@ export class PuzzleRoom extends BaseGameRoom {
   private resumeClock?: { startedAt: number; elapsedMs: number };
   /** Salvou pelo botão: ao esvaziar, não precisa salvar de novo. */
   private savedOnPurpose = false;
+  /** A sala foi criada com "foto aleatória": jogar novamente sorteia outra. */
+  private randomImage = false;
 
   messages = {
     ...this.commonMessages(),
@@ -84,6 +86,7 @@ export class PuzzleRoom extends BaseGameRoom {
     drop: validate(MoveMessage, (client, message) => this.drop(client, message)),
     scatter: () => this.scatter(),
     saveAndLeave: (client: Client) => void this.saveAndLeave(client),
+    playAgain: (client: Client) => void this.playAgain(client),
   };
 
   async onCreate(rawOptions: unknown) {
@@ -103,6 +106,7 @@ export class PuzzleRoom extends BaseGameRoom {
 
   private async createNew(options: CreateRoomOptions) {
     const { pieceCount, maxPlayers } = options;
+    this.randomImage = options.imageId === RANDOM_IMAGE;
     // "Aleatória": o servidor sorteia, assim ninguém escolhe a foto pelo console do navegador.
     const imageId =
       options.imageId === RANDOM_IMAGE
@@ -185,6 +189,56 @@ export class PuzzleRoom extends BaseGameRoom {
     this.awaitingOwner = true;
     this.savedId = id;
     this.resumeClock = { startedAt: snapshot.startedAt, elapsedMs: snapshot.elapsedMs };
+  }
+
+  /**
+   * "Jogar novamente" (anfitrião, depois do fim): mesa nova na mesma sala — os jogadores e a
+   * chamada continuam. Mesma foto e tamanho (ou outra foto, se a sala era de foto aleatória).
+   */
+  private async playAgain(client: Client) {
+    if (client.sessionId !== this.state.hostId || this.phase !== 'completed') return;
+    if (this.state.rankStatus === 'saving') return; // o resultado ainda vai chegar nesta partida
+    const { config } = this.state;
+    const imageId = this.randomImage
+      ? CATALOG[Math.floor(Math.random() * CATALOG.length)]!.id
+      : config.imageId;
+    const { width, height } = await this.imageSize(imageId);
+    const { rows, cols } = gridForPieceCount(config.pieceCount, width / height);
+    const seed = randomUUID().slice(0, 8);
+
+    this.state.config = new PuzzleConfigSchema({
+      imageId,
+      seed,
+      rows,
+      cols,
+      width,
+      height,
+      pieceCount: config.pieceCount,
+      maxPlayers: config.maxPlayers,
+    });
+    this.state.groups.clear();
+    this.state.pieceGroup.clear();
+    this.setBoard(PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height })));
+    Object.assign(this.state, {
+      phase: 'lobby' satisfies GamePhase,
+      elapsedMs: 0,
+      durationMs: 0,
+      rankStatus: '' satisfies RankStatus,
+      rank: 0,
+      rankToday: 0,
+      points: 0,
+      teamSize: 0,
+    });
+    for (const player of this.state.players.values()) player.snaps = 0;
+    this.startedAt = 0;
+    this.resumeClock = undefined;
+    this.savedId = undefined;
+    this.state.round += 1; // o cliente remonta a mesa
+    this.dirty = true;
+    await this.unlock();
+    void this.saveSnapshot();
+    // Solo não tem sala de espera: já começa.
+    if (config.maxPlayers === 1) this.startPlaying();
   }
 
   /** O tabuleiro do clássico mora na raiz do estado. */
