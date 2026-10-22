@@ -92,6 +92,13 @@
       "when": 1792628266043,
       "tag": "0012_perfil",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792701299642,
+      "tag": "0013_avatares",
+      "breakpoints": true
     }
   ]
 }
