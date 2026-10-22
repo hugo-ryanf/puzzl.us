@@ -288,6 +288,13 @@ export const ImageIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const ReplayIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+  </Icon>
+);
+
 export const ShuffleIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22" />
