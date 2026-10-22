@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { and, eq, gt, lt, sql } from 'drizzle-orm';
-import type { AvatarStyle, ProfileUpdate } from '@puzzle/shared';
+import type { AvatarPreset, AvatarStyle, ProfileUpdate } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
 import { gamePlayers, games, players, sessions, users } from '../db/schema';
 
@@ -16,10 +16,11 @@ export interface Account {
   id: string;
   /** Nickname do perfil (ou o primeiro nome do Google). */
   name: string;
-  /** Foto mostrada (null quando o perfil usa iniciais). */
+  /** Imagem mostrada: foto do Google ou camaleão (null quando o perfil usa iniciais). */
   avatarUrl: string | null;
   avatarColor: string | null;
   avatarStyle: AvatarStyle;
+  avatarPreset: AvatarPreset | null;
   bio: string | null;
   googleName: string;
   googleAvatarUrl: string | null;
@@ -29,10 +30,11 @@ export interface Account {
 
 /** Nome mostrado: o nickname do perfil ou, sem ele, o primeiro nome do Google. */
 export const profileName = sql<string>`coalesce(${users.nickname}, split_part(${users.displayName}, ' ', 1))`;
-/** Foto mostrada: a do Google, a menos que o perfil use iniciais. */
-export const profileAvatar = sql<
-  string | null
->`case when ${users.avatarStyle} = 'initials' then null else ${users.avatarUrl} end`;
+/** Imagem mostrada: a foto do Google, o camaleão escolhido, ou nenhuma (iniciais). */
+export const profileAvatar = sql<string | null>`case ${users.avatarStyle}
+  when 'initials' then null
+  when 'preset' then '/avatars/' || ${users.avatarPreset} || '.webp'
+  else ${users.avatarUrl} end`;
 
 /** O que o login com Google entrega (claims do id_token). */
 export interface GoogleProfile {
@@ -76,6 +78,7 @@ const accountColumns = {
   avatarUrl: profileAvatar,
   avatarColor: users.avatarColor,
   avatarStyle: users.avatarStyle,
+  avatarPreset: users.avatarPreset,
   bio: users.bio,
   googleName: users.displayName,
   googleAvatarUrl: users.avatarUrl,
