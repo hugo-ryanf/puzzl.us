@@ -227,7 +227,19 @@ export function App() {
             onOpenProfile={openProfile}
           />
         ) : section === 'profile' && profileCode ? (
-          <ProfileScreen key={profileCode} code={profileCode} account={account} friends={friends} />
+          <ProfileScreen
+            key={profileCode}
+            code={profileCode}
+            account={account}
+            friends={friends}
+            onShowBulletRanking={() =>
+              setRanking({
+                ...DEFAULT_RANKING,
+                bullet: { minutes: 3, pieces: 12, players: 1, period: 'all' },
+              })
+            }
+            onOpenFriends={() => setSection('friends')}
+          />
         ) : section === 'friends' ? (
           <FriendsScreen
             friends={friends}
