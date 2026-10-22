@@ -184,7 +184,7 @@ export const AVATAR_PRESETS = [
   'verde',
   'ouro',
   'ambar',
-  'cobre',
+  'vermelho',
   'rosa',
   'roxo',
 ] as const;
