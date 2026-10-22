@@ -1,6 +1,7 @@
 import { and, eq, or } from 'drizzle-orm';
 import type { FriendView } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
+import { profileAvatar, profileName } from '../auth/accounts';
 import { friendships, users } from '../db/schema';
 
 /** Os dois ids em ordem: a amizade fica numa linha só, qualquer que seja o lado. */
@@ -101,8 +102,10 @@ export function createFriendStore(db: AppDatabase): FriendStore {
           status: friendships.status,
           requestedBy: friendships.requestedBy,
           id: users.id,
-          name: users.displayName,
-          avatarUrl: users.avatarUrl,
+          name: profileName,
+          avatarUrl: profileAvatar,
+          avatarColor: users.avatarColor,
+          friendCode: users.friendCode,
         })
         .from(friendships)
         .innerJoin(
@@ -122,7 +125,13 @@ export function createFriendStore(db: AppDatabase): FriendStore {
         outgoing: [],
       };
       for (const row of rows) {
-        const person = { id: row.id, name: row.name, avatarUrl: row.avatarUrl };
+        const person = {
+          id: row.id,
+          name: row.name,
+          avatarUrl: row.avatarUrl,
+          avatarColor: row.avatarColor,
+          friendCode: row.friendCode,
+        };
         if (row.status === 'accepted') list.friends.push(person);
         else if (row.requestedBy === userId) list.outgoing.push(person);
         else list.incoming.push(person);
