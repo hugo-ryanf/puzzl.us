@@ -26,6 +26,8 @@ import type { SnapshotStore } from './snapshots';
 const RECONNECT_SECONDS = 30;
 /** O cliente interpola entre atualizações; 1/s basta para o relógio não derivar. */
 export const CLOCK_UPDATE_MS = 1000;
+/** Segundos do "3, 2, 1" antes do Bullet e da batalha por tempo (os testes zeram). */
+export const COUNTDOWN = { seconds: 3 };
 
 /** Quem é a pessoa: a conta (vale em qualquer aparelho) ou, sem login, o convidado do navegador. */
 export interface Identity {
@@ -66,6 +68,7 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
   /** elapsed = agora − clockOrigin. */
   protected clockOrigin = 0;
   protected clockTimer?: Delayed;
+  protected countdownTimer?: Delayed;
 
   /** Mensagens que valem em qualquer modo; cada sala junta as dela. */
   protected commonMessages() {
@@ -172,6 +175,25 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
       this.state.elapsedMs = this.elapsed();
       onTick?.();
     }, CLOCK_UPDATE_MS);
+  }
+
+  /** Conta "3, 2, 1" no estado e então chama `go` (que liga o relógio de verdade). */
+  protected startAfterCountdown(go: () => void) {
+    this.countdownTimer?.clear();
+    this.state.countdown = COUNTDOWN.seconds;
+    if (this.state.countdown === 0) return go();
+    this.countdownTimer = this.clock.setInterval(() => {
+      this.state.countdown -= 1;
+      if (this.state.countdown > 0) return;
+      this.countdownTimer?.clear();
+      go();
+    }, 1000);
+  }
+
+  /** Partida acabou antes de a contagem terminar (W.O.): para a contagem. */
+  protected stopCountdown() {
+    this.countdownTimer?.clear();
+    this.state.countdown = 0;
   }
 
   protected elapsed(): number {
