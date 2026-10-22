@@ -18,6 +18,7 @@ import {
   UsersIcon,
 } from './icons';
 import { Avatar } from './UserAvatar';
+import { ACCENTS, useAccent } from './accent';
 import { useTheme, type ThemeChoice } from './theme';
 import { Popover } from './Popover';
 
@@ -174,8 +175,13 @@ export function AppShell({
             onFriends={() => onNavigate('friends')}
             onProfile={() => onNavigate('profile')}
           />
-          {/* Logado, o tema fica no menu "⋯" da conta; convidado não tem menu, então fica aqui. */}
-          {!account.user && <ThemeSwitch />}
+          {/* Logado, tema e cor ficam no menu "⋯" da conta; convidado não tem menu: ficam aqui. */}
+          {!account.user && (
+            <>
+              <ThemeSwitch />
+              <AccentSwitch />
+            </>
+          )}
           <p className="credits">
             Feito por{' '}
             <a href="https://github.com/hugo-ryanf" target="_blank" rel="noreferrer">
@@ -214,6 +220,26 @@ function ThemeSwitch() {
           {icon}
           {label}
         </button>
+      ))}
+    </div>
+  );
+}
+
+/** Cor de destaque do site (guardada neste navegador): as cores dos camaleões. */
+function AccentSwitch() {
+  const [accent, setAccent] = useAccent();
+  return (
+    <div className="accent-switch" role="group" aria-label="Cor de destaque">
+      {ACCENTS.map(({ value, label, swatch }) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={accent === value}
+          aria-label={`Destaque ${label}`}
+          title={label}
+          style={{ background: swatch }}
+          onClick={() => setAccent(value)}
+        />
       ))}
     </div>
   );
@@ -338,6 +364,8 @@ function AccountBox({
           </button>
           <p className="popover-note">Tema</p>
           <ThemeSwitch />
+          <p className="popover-note">Cor de destaque</p>
+          <AccentSwitch />
           <button type="button" className="btn" onClick={onFriends}>
             <UsersIcon size={16} />
             Amigos e código
