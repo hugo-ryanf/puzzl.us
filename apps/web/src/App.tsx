@@ -20,6 +20,7 @@ import {
 import { loadPlayerName } from './net/playerName';
 import { ExploreScreen } from './screens/explore/ExploreScreen';
 import { PrivacyScreen } from './screens/PrivacyScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 import { RankingScreen } from './screens/RankingScreen';
 import { RecordsScreen } from './screens/RecordsScreen';
 import { FriendsScreen } from './screens/FriendsScreen';
@@ -40,6 +41,11 @@ function friendCodeFromUrl(): string | undefined {
   return new URLSearchParams(location.search).get('amigo') ?? undefined;
 }
 
+/** Perfil público: https://site/perfil/K7QF-2M9D */
+function profileCodeFromUrl(): string | undefined {
+  return /^\/perfil\/([A-Za-z0-9-]{8,9})$/.exec(location.pathname)?.[1]?.toUpperCase();
+}
+
 const DEFAULT_RANKING: RankingQuery = {
   image: CATALOG[0]!.id,
   pieces: 48,
@@ -55,14 +61,15 @@ export function App() {
   >(null);
   /** Tela da barra lateral (o ranking, quando aberto, fica por cima dela). */
   const [section, setSection] = useState<Exclude<Section, 'ranking'>>(() =>
-    friendCodeFromUrl() ? 'friends' : 'explore',
+    profileCodeFromUrl() ? 'profile' : friendCodeFromUrl() ? 'friends' : 'explore',
   );
+  /** Perfil aberto (o próprio ou de outra pessoa), pelo código de amigo. */
+  const [profileCode, setProfileCode] = useState(profileCodeFromUrl);
   const [notice, setNotice] = useState<string>();
   const [name, setName] = useState(loadPlayerName);
   const account = useAccount();
-  // Logado e sem nome digitado ainda: começa com o primeiro nome da conta.
-  const accountName = account.user?.name.split(' ')[0];
-  const playerName = name.trim() ? name : (accountName ?? name);
+  // Logado, o nome nas salas é sempre o nickname do perfil (o servidor também garante isso).
+  const playerName = account.user ? account.user.name : name;
   const library = useLibrary(account.user);
   const signedIn = !!account.user;
   const presence = usePresence(account.user?.id);
@@ -169,15 +176,28 @@ export function App() {
   }
 
   const onExplore = section === 'explore' || section === 'favorites';
+  /** Perfil de alguém (pelo código de amigo); o endereço vira o link do perfil. */
+  const openProfile = (code: string) => {
+    setRanking(null);
+    setProfileCode(code);
+    setSection('profile');
+    history.replaceState(null, '', `/perfil/${code}`);
+  };
   return (
     <>
       <AppShell
         active={ranking ? 'ranking' : section}
         onNavigate={(next) => {
+          if (next === 'profile') {
+            if (account.user) openProfile(account.user.friendCode);
+            return;
+          }
+          if (location.pathname.startsWith('/perfil/')) history.replaceState(null, '', '/');
           if (next === 'ranking') return setRanking({ ...DEFAULT_RANKING, tab: 'general' });
           setRanking(null);
           setSection(next);
         }}
+        onOpenProfile={openProfile}
         onCreateRoom={() => {
           setRanking(null);
           if (!onExplore) setSection('explore'); // os diálogos moram no Explorar
@@ -204,13 +224,17 @@ export function App() {
               setSection('explore');
               setCreateRequested(true);
             }}
+            onOpenProfile={openProfile}
           />
+        ) : section === 'profile' && profileCode ? (
+          <ProfileScreen key={profileCode} code={profileCode} account={account} friends={friends} />
         ) : section === 'friends' ? (
           <FriendsScreen
             friends={friends}
             signedIn={signedIn}
             googleLogin={account.googleLogin}
             initialCode={friendCodeFromUrl()}
+            onOpenProfile={openProfile}
           />
         ) : section === 'saved' ? (
           <SavedScreen
