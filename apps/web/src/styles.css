@@ -1,6 +1,7 @@
-/* ── Tokens (do modelo "Explorar — tema claro") ─────────────────────────── */
+/* ── Tokens (do modelo "Explorar — tema claro"; o escuro logo abaixo) ───── */
 
 :root {
+  color-scheme: light;
   --bg: #f4f5f7;
   --surface: #ffffff;
   --border: #e4e6ea;
@@ -14,6 +15,17 @@
   --placeholder: #6b7180;
   --primary: #15171c;
   --primary-hover: #2a2d35;
+  /* Texto em cima do --primary (no escuro o botão principal fica claro e o texto escuro). */
+  --on-primary: #ffffff;
+  /* Fundo um tom acima da superfície (pódio, linha em destaque). */
+  --surface-2: #fafafb;
+  /* Trilho de controles segmentados e de barras de progresso. */
+  --segmented: #e9ebef;
+  --track: #d6e6ea;
+  /* Painéis translúcidos por cima da mesa e véu dos diálogos sobre ela. */
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.85);
+  --scrim: rgba(244, 245, 247, 0.6);
   /* Destaque só em ícones, marcas e indicadores: em texto branco não tem contraste suficiente. */
   --accent: #3a9aad;
   /* Fundo suave na cor de destaque (selo do resultado, linha da sua equipe no ranking). */
@@ -37,6 +49,86 @@
   --radius-thumb: 12px;
   --shadow-card: 0 14px 30px -14px rgba(21, 23, 28, 0.22);
   --shadow-panel: 0 18px 48px -18px rgba(21, 23, 28, 0.3);
+}
+
+/*
+ * Tema escuro: escolhido na barra lateral (data-theme no <html>) ou, em "Sistema", seguindo o
+ * aparelho. O mesmo bloco duas vezes porque CSS não deixa juntar as duas condições num só.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0f1115;
+  --surface: #171a20;
+  --surface-2: #1c2027;
+  --border: #2b2f38;
+  --border-strong: #363b46;
+  --border-hover: #4b515e;
+  --divider: #23262e;
+  --hover: #21252d;
+  --text: #eceef2;
+  --text-2: #c4c8d1;
+  --text-3: #9ba1ae;
+  --placeholder: #8a909c;
+  --primary: #eceef2;
+  --primary-hover: #ffffff;
+  --on-primary: #15171c;
+  --accent: #4fb3c6;
+  --accent-soft: #1b3439;
+  --brand-ink: #8fc9d6;
+  --brand-ink-2: #5fb8ca;
+  --pip-off: #3a3f4a;
+  --danger: #ff6b6b;
+  --notice-bg: #3a2a12;
+  --notice-text: #ffcf8a;
+  --board: #1b1e25;
+  --board-dot: #343946;
+  --speaking: #22c55e;
+  --segmented: #23272f;
+  --track: #23383d;
+  --glass: rgba(23, 26, 32, 0.8);
+  --glass-strong: rgba(23, 26, 32, 0.9);
+  --scrim: rgba(15, 17, 21, 0.6);
+  --shadow-card: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+  --shadow-panel: 0 18px 48px -18px rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0f1115;
+    --surface: #171a20;
+    --surface-2: #1c2027;
+    --border: #2b2f38;
+    --border-strong: #363b46;
+    --border-hover: #4b515e;
+    --divider: #23262e;
+    --hover: #21252d;
+    --text: #eceef2;
+    --text-2: #c4c8d1;
+    --text-3: #9ba1ae;
+    --placeholder: #8a909c;
+    --primary: #eceef2;
+    --primary-hover: #ffffff;
+    --on-primary: #15171c;
+    --accent: #4fb3c6;
+    --accent-soft: #1b3439;
+    --brand-ink: #8fc9d6;
+    --brand-ink-2: #5fb8ca;
+    --pip-off: #3a3f4a;
+    --danger: #ff6b6b;
+    --notice-bg: #3a2a12;
+    --notice-text: #ffcf8a;
+    --board: #1b1e25;
+    --board-dot: #343946;
+    --speaking: #22c55e;
+    --segmented: #23272f;
+    --track: #23383d;
+    --glass: rgba(23, 26, 32, 0.8);
+    --glass-strong: rgba(23, 26, 32, 0.9);
+    --scrim: rgba(15, 17, 21, 0.6);
+    --shadow-card: 0 14px 30px -14px rgba(0, 0, 0, 0.6);
+    --shadow-panel: 0 18px 48px -18px rgba(0, 0, 0, 0.7);
+  }
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────── */
@@ -141,7 +233,7 @@ select {
 .btn-primary {
   border-color: var(--primary);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 600;
 }
 
@@ -210,7 +302,7 @@ select {
 .chip[aria-checked='true'] {
   border-color: var(--primary);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 600;
 }
 
@@ -435,7 +527,7 @@ select {
 .join-code-go.ready {
   border-color: var(--primary);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .nav ul {
@@ -676,7 +768,7 @@ a.btn {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--brand-ink);
+  background: #2c5866;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -1201,7 +1293,7 @@ a.btn {
 .radio-chip:has(input:checked) {
   border-color: var(--primary);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 /* Rádios escondidos: o foco do teclado aparece no quadro/pílula inteiro. */
@@ -1895,7 +1987,7 @@ a.btn {
   aspect-ratio: 16 / 9;
   margin: 0;
   overflow: hidden;
-  background: var(--primary);
+  background: #15171c;
   box-shadow: 0 8px 20px -10px rgba(21, 23, 28, 0.45);
   transition: box-shadow 0.15s ease;
 }
@@ -2176,7 +2268,7 @@ a.btn {
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--glass);
   backdrop-filter: blur(6px);
   color: var(--text-3);
   font-size: 13px;
@@ -2251,7 +2343,7 @@ a.btn {
 
 .tool[aria-pressed='true'] {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .tool:disabled {
@@ -2315,7 +2407,7 @@ a.btn {
   right: 12px;
   width: 30px;
   height: 30px;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--glass-strong);
 }
 
 .reference-backdrop {
@@ -2361,7 +2453,7 @@ a.btn {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgba(244, 245, 247, 0.6);
+  background: var(--scrim);
 }
 
 .panel {
@@ -3696,7 +3788,7 @@ a.btn {
   flex-wrap: wrap;
   gap: 2px;
   padding: 4px;
-  background: #e9ebef;
+  background: var(--segmented);
 }
 
 .rk-segmented button {
@@ -3860,7 +3952,7 @@ a.btn {
   margin: 0;
   padding: 28px 32px 0;
   border-bottom: 1px solid var(--border);
-  background: #fafafb;
+  background: var(--surface-2);
   list-style: none;
 }
 
@@ -3897,7 +3989,7 @@ a.btn {
 }
 
 .rk-podium .rk-avatars > span {
-  box-shadow: 0 0 0 3px #fafafb;
+  box-shadow: 0 0 0 3px var(--surface-2);
   font-size: 16px;
 }
 
@@ -3964,12 +4056,12 @@ a.btn {
   box-sizing: border-box;
   min-height: 64px;
   padding: 8px 20px;
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid var(--divider);
   transition: background 0.15s ease;
 }
 
 .rk-rows .rk-row:hover {
-  background: #fafafb;
+  background: var(--surface-2);
 }
 
 .rk-row-header {
@@ -4086,7 +4178,7 @@ a.btn {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   font-size: 11px;
   font-weight: 700;
@@ -4248,7 +4340,7 @@ a.btn {
   flex: none;
   padding: 2px 7px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-size: 11px;
   font-weight: 700;
 }
@@ -4273,7 +4365,7 @@ a.btn {
   border-radius: 999px;
   display: block;
   height: 6px;
-  background: #d6e6ea;
+  background: var(--track);
 }
 
 .rk-me-bar span {
@@ -4302,4 +4394,40 @@ a.btn {
   color: #fff;
   font-size: 12px;
   font-weight: 700;
+}
+
+/* ── Tema (Sistema / Claro / Escuro) no rodapé da barra lateral ────────── */
+
+.theme-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--segmented);
+}
+
+.theme-switch button {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.theme-switch button[aria-pressed='true'] {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(21, 23, 28, 0.14);
+  color: var(--text);
+  font-weight: 600;
 }

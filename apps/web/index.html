@@ -7,6 +7,13 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#3a9aad" />
+    <script>
+      // Tema salvo na barra lateral, aplicado antes de desenhar (ver src/ui/theme.ts).
+      try {
+        var tema = localStorage.getItem('quebra-cabeca:tema');
+        if (tema === 'light' || tema === 'dark') document.documentElement.dataset.theme = tema;
+      } catch (e) {}
+    </script>
     <meta
       name="description"
       content="Monte quebra-cabeças com amigos em tempo real, com chamada de voz e câmera."

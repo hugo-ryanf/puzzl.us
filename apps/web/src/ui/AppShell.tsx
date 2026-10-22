@@ -7,13 +7,17 @@ import {
   BookmarkIcon,
   CompassIcon,
   HourglassIcon,
+  MonitorIcon,
+  MoonIcon,
   MoreIcon,
   PlusIcon,
+  SunIcon,
   TimerIcon,
   TrophyIcon,
   UsersIcon,
 } from './icons';
 import { avatarColor, initials } from './avatar';
+import { useTheme, type ThemeChoice } from './theme';
 import { Popover } from './Popover';
 
 export type Section = 'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking';
@@ -152,6 +156,7 @@ export function AppShell({
 
         <div className="sidebar-footer">
           <AccountBox account={account} onFriends={() => onNavigate('friends')} />
+          <ThemeSwitch />
           <p className="credits">
             Feito por{' '}
             <a href="https://github.com/hugo-ryanf" target="_blank" rel="noreferrer">
@@ -164,6 +169,33 @@ export function AppShell({
       </aside>
 
       <main className="main">{children}</main>
+    </div>
+  );
+}
+
+const THEMES: Array<{ value: ThemeChoice; label: string; icon: ReactNode }> = [
+  { value: 'system', label: 'Sistema', icon: <MonitorIcon size={16} /> },
+  { value: 'light', label: 'Claro', icon: <SunIcon size={16} /> },
+  { value: 'dark', label: 'Escuro', icon: <MoonIcon size={16} /> },
+];
+
+/** Claro, escuro ou o mesmo do aparelho (guardado neste navegador). */
+function ThemeSwitch() {
+  const [theme, setTheme] = useTheme();
+  return (
+    <div className="theme-switch" role="group" aria-label="Tema">
+      {THEMES.map(({ value, label, icon }) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={theme === value}
+          title={value === 'system' ? 'Seguir o tema do aparelho' : `Tema ${label.toLowerCase()}`}
+          onClick={() => setTheme(value)}
+        >
+          {icon}
+          {label}
+        </button>
+      ))}
     </div>
   );
 }
