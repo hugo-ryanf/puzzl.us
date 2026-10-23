@@ -4,7 +4,14 @@ import { Board } from '../../board/Board';
 import { usePuzzleImage } from '../../board/usePuzzleImage';
 import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
-import { FinalSeconds } from '../room/FinalSeconds';
+import { BoltIcon, SnowflakeIcon } from '../../ui/icons';
+import { useGameTime } from '../GameClock';
+import { ComboBurst } from '../room/ComboBurst';
+import { FinalSeconds, useFinalSeconds } from '../room/FinalSeconds';
+import { EventFeed } from './EventFeed';
+import { EnergyMeter, PowerBar } from './PowerBar';
+import { otherTeam } from './score';
+import { TugOfWar } from './TugOfWar';
 
 /** Abaixo disso a tela dividida não cabe: um tabuleiro por vez, com abas. */
 const NARROW_QUERY = '(max-width: 760px)';
@@ -19,8 +26,6 @@ function useNarrow(): boolean {
   }, []);
   return narrow;
 }
-
-const otherTeam = (team: BattleTeam): BattleTeam => (team === 'a' ? 'b' : 'a');
 
 /** Nomes, progresso e situação de um lado, em cima da metade dele. */
 function SideHeader({
@@ -42,6 +47,12 @@ function SideHeader({
         <strong>{mine ? 'Seu lado' : 'Adversário'}</strong>
         <small>{names.join(' & ') || 'ninguém ainda'}</small>
       </span>
+      {snapshot.powers && <EnergyMeter board={board} />}
+      {board?.lightning && (
+        <span className="lightning-pill" title="Rodada relâmpago: quebra-cabeça de 6 peças">
+          <BoltIcon size={14} /> Relâmpago
+        </span>
+      )}
       {timed && (
         <span className="solved-pill" aria-label={`${board?.solved ?? 0} montados`}>
           <strong>{board?.solved ?? 0}</strong> {board?.solved === 1 ? 'montado' : 'montados'}
@@ -66,11 +77,14 @@ function SideBoard({
   snapshot,
   team,
   mine,
+  now,
 }: {
   room: PuzzleRoom;
   snapshot: RoomSnapshot;
   team: BattleTeam;
   mine: boolean;
+  /** Relógio da partida agora (ms): os efeitos dos poderes valem até um instante dele. */
+  now: number;
 }) {
   const view = snapshot.boards[team];
   const image = usePuzzleImage(view?.imageId ?? snapshot.imageId);
@@ -78,17 +92,28 @@ function SideBoard({
   if (!image?.image || !source || !view) {
     return <p className="board-loading">{image?.error ?? 'Carregando…'}</p>;
   }
+  const playing = snapshot.phase === 'playing';
   return (
-    <Board
-      // Revanche ou quebra-cabeça seguinte = mesa nova: a cena recomeça do zero.
-      key={`${snapshot.round}:${team}:${view.seed}`}
-      room={room}
-      image={image.image}
-      phase={snapshot.phase}
-      source={source}
-      boardKey={team}
-      readOnly={!mine}
-    />
+    <>
+      <Board
+        // Revanche ou quebra-cabeça seguinte = mesa nova: a cena recomeça do zero.
+        key={`${snapshot.round}:${team}:${view.seed}`}
+        room={room}
+        image={image.image}
+        phase={snapshot.phase}
+        source={source}
+        boardKey={team}
+        readOnly={!mine}
+      />
+      {/* Efeitos dos poderes que este lado recebeu. */}
+      {playing && view.fogUntil > now && <div className="power-fog" aria-hidden="true" />}
+      {playing && view.frozenUntil > now && (
+        <div className="power-frozen" role="status">
+          <SnowflakeIcon size={28} />
+          Congelado!
+        </div>
+      )}
+    </>
   );
 }
 
@@ -101,6 +126,14 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
   const [peek, setPeek] = useState(false);
   const me = snapshot.players.find((p) => p.sessionId === room.sessionId);
   const myTeam: BattleTeam = me?.team || 'a';
+  const final = useFinalSeconds(snapshot);
+  const playing = snapshot.phase === 'playing' && snapshot.countdown === 0;
+  const now = useGameTime(
+    snapshot.phase,
+    snapshot.elapsedMs,
+    snapshot.durationMs,
+    snapshot.countdown > 0,
+  );
   const sides: BattleTeam[] = narrow
     ? [peek ? otherTeam(myTeam) : myTeam]
     : [myTeam, otherTeam(myTeam)];
@@ -128,11 +161,26 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
           <section key={team} className={mine ? 'battle-side mine' : 'battle-side'}>
             <SideHeader snapshot={snapshot} team={team} mine={mine} />
             <div className="battle-board">
-              <SideBoard room={room} snapshot={snapshot} team={team} mine={mine} />
+              <SideBoard room={room} snapshot={snapshot} team={team} mine={mine} now={now} />
+              {mine && <ComboBurst combo={me?.combo ?? 0} />}
+              {mine && snapshot.powers && snapshot.phase === 'playing' && (
+                <PowerBar room={room} board={snapshot.boards[team]} now={now} active={playing} />
+              )}
             </div>
           </section>
         );
       })}
+      {playing && (
+        <div className={narrow ? 'battle-hud narrow' : 'battle-hud'}>
+          {snapshot.suddenDeath && (
+            <div className="sudden-death-banner" role="status">
+              Morte súbita! <small>Quem montar este primeiro ganha</small>
+            </div>
+          )}
+          <TugOfWar snapshot={snapshot} myTeam={myTeam} hot={final.active} />
+          <EventFeed room={room} snapshot={snapshot} myTeam={myTeam} />
+        </div>
+      )}
       {/* Por tempo: nos últimos 10 s, o relógio grande em cima da linha do meio. */}
       {snapshot.timeLimitMs > 0 && <FinalSeconds snapshot={snapshot} onDivider={!narrow} />}
     </div>
