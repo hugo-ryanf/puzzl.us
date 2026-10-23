@@ -55,6 +55,11 @@ export function BulletResult({ room, snapshot, onShowRanking, onLeave }: BulletR
             <PartyIcon size={26} />
           </span>
           <h2 id="bullet-title">Tempo esgotado!</h2>
+          {snapshot.record && (
+            <p className="record-badge" role="status">
+              <TrophyIcon size={16} /> Novo recorde!
+            </p>
+          )}
           <p className="bullet-score">
             <strong>{solved}</strong>
             {solved === 1 ? ' quebra-cabeça montado' : ' quebra-cabeças montados'}
