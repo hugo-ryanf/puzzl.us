@@ -3,7 +3,9 @@ import { Board } from '../../board/Board';
 import { usePuzzleImage } from '../../board/usePuzzleImage';
 import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
+import { ComboBurst } from '../room/ComboBurst';
 import { FinalSeconds } from '../room/FinalSeconds';
+import { BonusBurst, LightningBanner, MagnetButton } from './BulletExtras';
 
 /** Quanto tempo o "+1" fica na tela depois de cada quebra-cabeça montado. */
 const CHEER_MS = 1200;
@@ -47,6 +49,12 @@ export function BulletBoard({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
           +1 <small>{cheer === 1 ? '1 montado' : `${cheer} montados`}</small>
         </div>
       )}
+      <ComboBurst
+        combo={snapshot.players.find((p) => p.sessionId === room.sessionId)?.combo ?? 0}
+      />
+      <BonusBurst bonusMs={snapshot.bonusMs} />
+      {snapshot.phase === 'playing' && snapshot.boards.main?.lightning && <LightningBanner />}
+      {snapshot.phase === 'playing' && <MagnetButton room={room} snapshot={snapshot} />}
       <FinalSeconds snapshot={snapshot} />
     </>
   );
