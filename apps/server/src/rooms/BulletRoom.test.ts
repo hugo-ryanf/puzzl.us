@@ -168,6 +168,47 @@ describe('BulletRoom', () => {
     await client.leave();
   });
 
+  it('peça dourada e montar rápido dão tempo extra', async () => {
+    const game = await create();
+    expect(game.board().golden).toBeGreaterThanOrEqual(0);
+    await solve(game);
+    // +5 s da dourada e +5 s por montar antes da meta (40 s para 12 peças).
+    expect(game.state.bonusMs).toBe(10_000);
+    expect(game.state.remainingMs).toBeGreaterThan(180_000);
+    await game.client.leave();
+  });
+
+  it('a rodada relâmpago (4º quebra-cabeça) dá um ímã, que encaixa peças sozinho', async () => {
+    const game = await create();
+    for (let round = 1; round <= 3; round++) {
+      expect(game.board().lightning).toBe(false);
+      await solve(game);
+      expect(await until(() => game.state.round === round + 1)).toBe(true);
+    }
+    expect(game.board().lightning).toBe(true);
+    expect(game.board().pieceGroup.length).toBeLessThanOrEqual(8); // ~6 peças
+    expect(game.board().golden).toBe(-1);
+    await solve(game);
+    expect(game.state.helpers).toBe(1);
+    expect(await until(() => game.state.round === 5)).toBe(true);
+
+    const groups = () => game.board().groups.size;
+    const before = groups();
+    game.client.send('magnet');
+    expect(await until(() => game.state.helpers === 0)).toBe(true);
+    expect(groups()).toBeLessThan(before);
+    await game.client.leave();
+  }, 20_000); // monta 4 quebra-cabeças em sequência
+
+  it('encaixes seguidos formam combo', async () => {
+    const game = await create();
+    const me = () => game.state.players.get(game.client.sessionId)!;
+    await solve(game, 1, 3);
+    expect(me().snaps).toBeGreaterThanOrEqual(1);
+    expect(me().combo).toBeGreaterThanOrEqual(2);
+    await game.client.leave();
+  });
+
   it('"3, 2, 1" antes de valer: peças travadas e relógio parado até o fim da contagem', async () => {
     COUNTDOWN.seconds = 1;
     try {
@@ -220,7 +261,7 @@ describe('BulletStore', () => {
     await bullet.saveRun(run(['Bia', 'Ana'], 6, 0)); // mesma dupla, melhor corrida
     await bullet.saveRun(run(['Ana', 'Caio'], 6, 5)); // mesmo tanto, mais peças no último
     const saved = await bullet.saveRun(run(['Bia', 'Caio'], 2, 0));
-    expect(saved).toEqual({ rank: 3, rankToday: 3 });
+    expect(saved).toEqual({ rank: 3, rankToday: 3, record: false }); // primeira corrida da dupla
 
     const top = (await bullet.leaderboard({ minutes: 5, pieces: 12, players: 2 })).entries;
     expect(top.map((entry) => [entry.players, entry.solved, entry.partial])).toEqual([
