@@ -34,6 +34,12 @@ export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
             mesa. Quem terminar primeiro ganha.
           </p>
         )}
+        {snapshot.powers && (
+          <p className="caption">
+            Com poderes: os encaixes enchem a energia do lado; gaste em Escudo, Neblina, Congelar ou
+            Embaralhar (teclas 1 a 4).
+          </p>
+        )}
         <div className="battle-teams">
           {BATTLE_TEAMS.map((team) => {
             const members = snapshot.players.filter((p) => p.team === team);
@@ -144,11 +150,13 @@ export function BattleResult({
               <strong>{names(winner) || TEAM_NAMES[winner]}</strong>{' '}
               {snapshot.walkover
                 ? 'ganhou: o outro lado saiu.'
-                : timed
-                  ? solvedBy(winner) === solvedBy(loser)
-                    ? `ganhou no desempate: ${solvedBy(winner)} montados para cada lado, mais peças encaixadas no último.`
-                    : `montou mais: ${solvedBy(winner)} a ${solvedBy(loser)}.`
-                  : `montou primeiro, em ${formatDuration(snapshot.durationMs)}.`}
+                : snapshot.suddenDeath
+                  ? `ganhou na morte súbita, depois de empatar em ${solvedBy(winner)} montados.`
+                  : timed
+                    ? solvedBy(winner) === solvedBy(loser)
+                      ? `ganhou no desempate: ${solvedBy(winner)} montados para cada lado, mais peças encaixadas no último.`
+                      : `montou mais: ${solvedBy(winner)} a ${solvedBy(loser)}.`
+                    : `montou primeiro, em ${formatDuration(snapshot.durationMs)}.`}
             </p>
           )}
         </header>
