@@ -426,3 +426,36 @@ export const MonitorIcon = (p: IconProps) => (
     <line x1="12" x2="12" y1="17" y2="21" />
   </Icon>
 );
+
+export const MagnetIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3L6 15" />
+    <path d="m5 8 4 4" />
+    <path d="m12 15 4 4" />
+  </Icon>
+);
+
+export const ShieldIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+  </Icon>
+);
+
+export const CloudFogIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
+    <path d="M16 17H7" />
+    <path d="M17 21H9" />
+  </Icon>
+);
+
+export const SnowflakeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <line x1="2" x2="22" y1="12" y2="12" />
+    <line x1="12" x2="12" y1="2" y2="22" />
+    <path d="m20 16-4-4 4-4" />
+    <path d="m4 8 4 4-4 4" />
+    <path d="m16 4-4 4-4-4" />
+    <path d="m8 20 4-4 4 4" />
+  </Icon>
+);
