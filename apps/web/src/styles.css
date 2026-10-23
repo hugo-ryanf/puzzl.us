@@ -3095,21 +3095,36 @@ a.btn {
   }
 }
 
-/* Últimos 10 s: o relógio cresce em vermelho no meio da mesa (na batalha, na linha do meio). */
-.final-seconds {
+/* Últimos 10 s: o relógio cresce em vermelho e pega fogo no meio da mesa (na batalha, na linha
+   do meio); a borda da mesa pulsa em vermelho e laranja. */
+.final-seconds-wrap {
   position: absolute;
-  top: 16px;
+  top: 24px;
   left: 50%;
   z-index: 5;
-  display: grid;
-  place-items: center;
   width: 96px;
   height: 96px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.final-seconds-wrap.on-divider {
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.final-seconds {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
   border: 4px solid var(--danger);
   border-radius: 999px;
   background: var(--surface);
   box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--danger) 18%, transparent),
+    0 0 0 6px color-mix(in srgb, #ff7a00 30%, transparent),
+    0 0 28px 6px color-mix(in srgb, #ff5a00 45%, transparent),
     var(--shadow-panel);
   color: var(--danger);
   font-family: var(--font-display);
@@ -3117,17 +3132,54 @@ a.btn {
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  transform: translateX(-50%);
-}
-
-.final-seconds.on-divider {
-  top: 50%;
-  transform: translate(-50%, -50%);
 }
 
 .final-seconds span {
   animation: final-beat 1s ease-out both;
+}
+
+/* A chama atrás do relógio: sobe por cima dele e tremula. */
+.final-flame {
+  position: absolute;
+  bottom: 30%;
+  left: 50%;
+  width: 124px;
+  height: 140px;
+  border-radius: 50% 50% 42% 42% / 62% 62% 38% 38%;
+  background: radial-gradient(
+    ellipse at 50% 82%,
+    rgba(255, 224, 120, 0.95) 0 16%,
+    rgba(255, 140, 0, 0.88) 38%,
+    rgba(226, 46, 20, 0.6) 58%,
+    transparent 72%
+  );
+  filter: blur(5px);
+  transform: translateX(-50%);
+  transform-origin: 50% 100%;
+  animation: flame-flicker 0.35s ease-in-out infinite alternate;
+}
+
+.final-ember {
+  position: absolute;
+  bottom: 70%;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ffb020;
+  box-shadow: 0 0 6px 2px rgba(255, 120, 0, 0.8);
+  opacity: 0;
+  animation: ember-rise 1.6s ease-out infinite;
+}
+
+.final-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 3px color-mix(in srgb, var(--danger) 80%, transparent),
+    inset 0 0 70px rgba(255, 90, 0, 0.35);
+  animation: glow-pulse 1s ease-in-out infinite;
 }
 
 @keyframes final-beat {
@@ -3139,11 +3191,530 @@ a.btn {
   }
 }
 
+@keyframes flame-flicker {
+  from {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateX(-50%) scale(1.06, 1.14) skewX(-3deg);
+    opacity: 1;
+  }
+}
+
+@keyframes ember-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(1);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-70px) scale(0.4);
+  }
+}
+
+@keyframes glow-pulse {
+  50% {
+    box-shadow:
+      inset 0 0 0 5px color-mix(in srgb, #ff7a00 85%, transparent),
+      inset 0 0 110px rgba(255, 90, 0, 0.5);
+  }
+}
+
+/* Combo: "Combo x3" no topo da minha mesa a cada encaixe seguido. */
+.combo-burst {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  z-index: 5;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: combo-pop 0.9s ease-out forwards;
+}
+
+.combo-burst strong {
+  font-size: 28px;
+}
+
+.combo-burst.big {
+  color: #e8590c;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, #ff7a00 35%, transparent),
+    var(--shadow-panel);
+}
+
+@keyframes combo-pop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.08);
+  }
+  35% {
+    transform: translateX(-50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-14px);
+  }
+}
+
+/* Batalha: cabo de guerra e avisos, no alto e no meio (a linha que divide as mesas). */
+.battle-hud {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.battle-hud.narrow {
+  top: 108px;
+}
+
+.tug {
+  position: relative;
+  width: 220px;
+  height: 22px;
+}
+
+.tug-rope {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--border-strong) 0 6px,
+    var(--surface-2) 6px 12px
+  );
+  transform: translateY(-50%);
+}
+
+.tug-center {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--text-3);
+  transform: translateX(-50%);
+}
+
+.tug-knot {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--surface);
+  border-radius: 999px;
+  background: var(--text-3);
+  box-shadow: var(--shadow-card);
+  transform: translate(-50%, -50%);
+  transition:
+    left 0.6s cubic-bezier(0.3, 1.4, 0.5, 1),
+    background 0.3s ease;
+}
+
+.tug.mine .tug-knot {
+  background: var(--accent);
+}
+
+.tug.theirs .tug-knot {
+  background: var(--danger);
+}
+
+.tug.hot .tug-knot {
+  box-shadow:
+    0 0 10px 4px rgba(255, 120, 0, 0.75),
+    0 -6px 14px 2px rgba(255, 200, 60, 0.6);
+  animation: knot-burn 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes knot-burn {
+  to {
+    box-shadow:
+      0 0 16px 6px rgba(255, 90, 0, 0.85),
+      0 -10px 18px 4px rgba(255, 210, 80, 0.7);
+  }
+}
+
+.event-feed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-item {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: event-in 0.25s ease-out both;
+}
+
+.event-item.mine {
+  color: var(--accent);
+}
+
+.event-item.theirs {
+  color: var(--danger);
+}
+
+@keyframes event-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .start-countdown span,
-  .final-seconds span {
+  .final-seconds span,
+  .final-flame,
+  .final-ember,
+  .final-glow,
+  .combo-burst,
+  .tug-knot,
+  .event-item {
+    animation: none;
+    transition: none;
+  }
+
+  .final-ember {
+    display: none;
+  }
+}
+
+/* Bullet: bônus de tempo, rodada relâmpago e o botão do Ímã. */
+.bonus-burst {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: #2f9e44;
+  box-shadow: var(--shadow-panel);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  pointer-events: none;
+  animation: bonus-pop 1.3s ease-out forwards;
+}
+
+@keyframes bonus-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  30% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
+
+.lightning-banner,
+.lightning-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: #ffd43b;
+  color: #3b2f00;
+  font-weight: 700;
+}
+
+.lightning-banner {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  padding: 6px 14px;
+  box-shadow: var(--shadow-card);
+  font-size: 14px;
+  pointer-events: none;
+  animation: lightning-flash 0.6s ease-out 2;
+}
+
+.lightning-pill {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+@keyframes lightning-flash {
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(255, 212, 59, 0.45),
+      var(--shadow-card);
+  }
+}
+
+.magnet-btn {
+  position: absolute;
+  bottom: 20px;
+  left: 16px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  color: var(--text-3);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.magnet-btn.charged {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.magnet-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.magnet-btn:not(:disabled):hover {
+  background: var(--accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bonus-burst,
+  .lightning-banner {
     animation: none;
   }
+}
+
+/* Batalha com poderes: energia no cabeçalho de cada lado, a fileira de poderes na minha mesa e
+   os efeitos recebidos (neblina, congelado) por cima da mesa de quem recebeu. */
+.energy-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.energy-shield {
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.energy-track,
+.power-energy-track {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+.energy-track {
+  width: 56px;
+  height: 6px;
+}
+
+.energy-track > span,
+.power-energy-track > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #fab005, #fd7e14);
+  transition: width 0.3s ease;
+}
+
+.power-bar {
+  position: absolute;
+  bottom: 20px;
+  left: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-card);
+}
+
+.power-energy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.power-energy-track {
+  width: 40px;
+  height: 6px;
+}
+
+.power-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 64px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.power-btn small {
+  color: #e8590c;
+  font-weight: 700;
+}
+
+.power-btn:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.power-btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.power-cooldown {
+  min-width: 32px;
+  color: var(--text-3);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 760px) {
+  .power-name {
+    display: none;
+  }
+
+  .power-btn {
+    min-width: 44px;
+  }
+}
+
+.power-fog {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: color-mix(in srgb, var(--board) 40%, rgba(200, 205, 215, 0.55));
+  backdrop-filter: blur(14px);
+  pointer-events: none;
+  animation: fog-in 0.4s ease-out;
+}
+
+@keyframes fog-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.power-frozen {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(165, 216, 255, 0.28);
+  box-shadow: inset 0 0 0 4px rgba(116, 192, 252, 0.8);
+  color: #1c7ed6;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .power-fog {
+    animation: none;
+  }
+}
+
+/* Morte súbita: faixa no alto das mesas e o lugar do relógio no cabeçalho. */
+.sudden-death-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 18px;
+  border-radius: 16px;
+  background: var(--danger);
+  box-shadow: var(--shadow-panel);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  animation: event-in 0.3s ease-out both;
+}
+
+.sudden-death-banner small {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.clock-pill.sudden-death {
+  color: var(--danger);
+  font-weight: 800;
 }
 
 .battle-split {
@@ -5011,6 +5582,38 @@ a.btn {
 
 .profile-streak-bar > span.on {
   background: #f2b705;
+}
+
+.profile-battles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-battles h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+}
+
+.record-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px auto 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #ffd43b;
+  color: #3b2f00;
+  font-weight: 800;
+}
+
+.best-pill {
+  color: var(--text-3);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .profile-numbers {
