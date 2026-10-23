@@ -35,6 +35,11 @@ export const PlayerSchema = schema(
      * jogadores dá peças − 1 no fim: é a "contribuição" de cada um no resultado.
      */
     snaps: t.uint16().default(0),
+    /**
+     * Bullet e Batalha: encaixes seguidos, cada um a menos de COMBO_WINDOW_MS do anterior (1 =
+     * sem combo). Sobe a cada encaixe dentro do prazo e volta a 1 no primeiro fora dele.
+     */
+    combo: t.uint8().default(0),
     /** Lado na Batalha ('a' ou 'b'); vazio nos outros modos. */
     team: t.string().default(''),
   },
@@ -71,6 +76,20 @@ export const BoardSchema = schema(
     durationMs: t.uint32().default(0),
     /** Batalha por tempo: quantos quebra-cabeças este lado já montou (passa para a mesa seguinte). */
     solved: t.uint16().default(0),
+    /**
+     * Bullet e batalha por tempo: a peça dourada deste quebra-cabeça (encaixá-la vale bônus);
+     * -1 quando não há (ou já foi encaixada).
+     */
+    golden: t.int16().default(-1),
+    /** Rodada relâmpago: quebra-cabeça pequeno que, montado, vale uma ação. */
+    lightning: t.boolean().default(false),
+    /** Batalha com poderes: energia do lado (0–100), escudo armado e quando volta a poder usar. */
+    energy: t.uint8().default(0),
+    shield: t.boolean().default(false),
+    powerReadyAt: t.uint32().default(0),
+    /** Efeitos recebidos, até quando valem (em ms do relógio da partida, como elapsedMs). */
+    fogUntil: t.uint32().default(0),
+    frozenUntil: t.uint32().default(0),
   },
   'BoardSchema',
 );
@@ -121,6 +140,19 @@ export const RoomState = schema(
      * ficam travadas e o relógio só começa quando chega a 0.
      */
     countdown: t.uint8().default(0),
+    /** Bullet: tempo ganho em bônus (peça dourada, montar rápido), somado ao tempo escolhido. */
+    bonusMs: t.uint32().default(0),
+    /** Bullet: a corrida (já gravada) bateu o recorde da equipe na categoria. */
+    record: t.boolean().default(false),
+    /** Bullet: ajudas "Ímã" guardadas (cada rodada relâmpago montada dá uma). */
+    helpers: t.uint8().default(0),
+    /** Batalha: poderes ligados nesta sala. */
+    powers: t.boolean().default(false),
+    /**
+     * Batalha por tempo empatada no fim do tempo: os dois lados recebem mais um quebra-cabeça e
+     * quem montar primeiro ganha. Fica true até a revanche (o resultado diz como foi).
+     */
+    suddenDeath: t.boolean().default(false),
     /** Bullet: quebra-cabeça da vez (sobe a cada um novo). */
     round: t.uint16().default(0),
     /** Bullet: quantos quebra-cabeças a equipe já montou. */
