@@ -305,6 +305,13 @@ mostrar; entrar pelo código funciona para qualquer modo.
   as peças ficam travadas (servidor e cliente) e o relógio não anda. Nos últimos 10 s, o cliente
   mostra o relógio grande em vermelho no meio da mesa (`FinalSeconds`; na batalha, em cima da
   linha do meio).
+- **Sons** (`apps/web/src/sound/sounds.ts`, Web Audio API, independentes da chamada de voz): a
+  contagem é um arquivo (`public/sounds/countdown.mp3`), tocado do ponto certo para acabar junto
+  com o zero — só o final dele no "3, 2, 1" e os últimos 10 s no fim do tempo. Os outros são
+  sintetizados na hora: encaixe (da minha mesa; na batalha, só do meu lado), quebra-cabeça
+  montado, fim (vitória, derrota, empate; sino no fim do Bullet) e convite de amigo
+  (`useGameSounds` na sala; o convite na presença). O botão de alto-falante no cabeçalho da sala
+  liga e desliga tudo, lembrado neste navegador (`quebra-cabeca:som`).
 - Os modos novos não têm snapshot nem "Salvar e sair": se o servidor reiniciar no meio, a
   partida acaba.
 - **Jogar novamente** (mensagem `playAgain`, só o anfitrião, depois do fim e com o resultado já
