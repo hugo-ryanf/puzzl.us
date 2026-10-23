@@ -43,6 +43,15 @@ export type GameMode = 'classic' | 'bullet' | 'battle';
 /** Andamento da partida: lobby (esperando o anfitrião) → playing → completed. */
 export type GamePhase = 'lobby' | 'playing' | 'completed';
 
+/** Rodada relâmpago (Bullet e batalha por tempo): a cada quantos quebra-cabeças e o tamanho. */
+export const LIGHTNING_EVERY = 4;
+export const LIGHTNING_PIECES = 6;
+/** O 1º quebra-cabeça da partida é o índice 0: o 4º, o 8º… são relâmpago. */
+export const isLightningRound = (index: number) => (index + 1) % LIGHTNING_EVERY === 0;
+/** Bullet: até quantas ajudas "Ímã" cabem guardadas e quantas peças cada uma encaixa. */
+export const MAX_HELPERS = 2;
+export const MAGNET_PIECES = 3;
+
 /**
  * Situação do registro no ranking depois que o puzzle termina.
  * 'unranked': foto enviada e não publicada — única, então não há com quem comparar.
@@ -247,6 +256,13 @@ export interface ProfileStats {
   /** Mais quebra-cabeças numa corrida de Bullet (qualquer tempo e tamanho). */
   bulletBest: number;
   friends: number;
+  /** Batalhas: vitórias, derrotas, maior sequência de vitórias e viradas nos últimos 10 s. */
+  battleWins: number;
+  battleLosses: number;
+  battleBestStreak: number;
+  battleComebacks: number;
+  /** Quem mais enfrentou (código de amigo só se tiver conta). */
+  rival: { name: string; friendCode: string | null; battles: number } | null;
 }
 
 /** GET /api/profiles/:friendCode — o perfil público (o que qualquer um pode ver). */
@@ -625,6 +641,8 @@ export const CreateBattleOptions = JoinOptions.extend({
   imageId: z.union([imageId, z.literal(RANDOM_IMAGE)]),
   format: z.enum(['1v1', '2v2']),
   minutes: bulletMinutes.optional(),
+  /** Com poderes (barra de energia); ligado por padrão. */
+  powers: z.boolean().default(true),
 }).refine(
   ({ minutes, pieceCount }) =>
     ((minutes === undefined ? PIECE_COUNT_PRESETS : BULLET_PIECES) as readonly number[]).includes(
@@ -633,6 +651,38 @@ export const CreateBattleOptions = JoinOptions.extend({
   { message: 'Tamanho inválido', path: ['pieceCount'] },
 );
 export type CreateBattleOptions = z.infer<typeof CreateBattleOptions>;
+
+/**
+ * Poderes da batalha: custam energia (0–100, enchida pelos encaixes) e cada lado espera
+ * POWER_COOLDOWN_MS entre um e outro. O escudo protege o próprio lado; os outros vão no adversário.
+ */
+export const BATTLE_POWERS = ['shield', 'fog', 'freeze', 'shuffle'] as const;
+export type BattlePower = (typeof BATTLE_POWERS)[number];
+export const POWER_COST: Record<BattlePower, number> = {
+  shield: 25,
+  fog: 30,
+  freeze: 40,
+  shuffle: 60,
+};
+export const POWER_COOLDOWN_MS = 6000;
+export const FOG_MS = 5000;
+export const FREEZE_MS = 3000;
+export const MAX_ENERGY = 100;
+/** Energia ganha: por encaixe (mais por nível de combo), dourada, montado e relâmpago. */
+export const ENERGY_PER_SNAP = 4;
+export const ENERGY_PER_COMBO = 2;
+export const ENERGY_GOLDEN = 25;
+export const ENERGY_SOLVED = 30;
+export const ENERGY_LIGHTNING = 100;
+
+export const UsePowerMessage = z.object({ power: z.enum(BATTLE_POWERS) });
+
+/** Aviso 'power' para todos: quem usou, qual e se o escudo do outro lado anulou. */
+export interface PowerBroadcast {
+  team: BattleTeam;
+  power: BattlePower;
+  blocked: boolean;
+}
 
 /** Lobby da Batalha: trocar de lado. */
 export const ChooseTeamMessage = z.object({ team: z.enum(BATTLE_TEAMS) });
