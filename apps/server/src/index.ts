@@ -7,6 +7,7 @@ import { createGoogleAuth, googleConfigFromEnv } from './auth/google';
 import type { AuthOptions } from './auth/routes';
 import { createLibraryStore } from './library/library';
 import { createSavedGameStore } from './rooms/savedGames';
+import { createBattleStore, type BattleStore } from './db/battleStore';
 import { createBulletStore, type BulletStore } from './db/bulletStore';
 import { createFriendStore } from './friends/friends';
 import { createProfileStore } from './profile/profile';
@@ -34,6 +35,7 @@ let uploads: UploadStore | undefined;
 let snapshots: SnapshotStore | undefined;
 let community: CommunityStore | undefined;
 let bullet: BulletStore | undefined;
+let battles: BattleStore | undefined;
 let auth: AuthOptions | undefined;
 /** URL pública do site: para onde o login com Google devolve o navegador. */
 const publicUrl = (process.env.PUBLIC_URL ?? 'http://localhost:5173').replace(/\/+$/, '');
@@ -46,6 +48,7 @@ if (databaseUrl) {
   snapshots = createSnapshotStore(db);
   community = createCommunityStore(db);
   bullet = createBulletStore(db);
+  battles = createBattleStore(db);
   scheduleSnapshotCleanup(snapshots);
   const accounts = createAccountStore(db);
   setInterval(() => void accounts.deleteExpiredSessions(), SESSION_CLEANUP_MS).unref();
@@ -88,6 +91,7 @@ await createGameServer({
   snapshots,
   community,
   bullet,
+  battles,
   auth,
   webDist,
   trustProxy: process.env.TRUST_PROXY === '1',
