@@ -1,4 +1,11 @@
-import { GroupSchema, PuzzleEngine, type MoveMessage, type RoomState } from '@puzzle/shared';
+import {
+  GroupSchema,
+  PuzzleEngine,
+  neighborsOf,
+  type GroupState,
+  type MoveMessage,
+  type RoomState,
+} from '@puzzle/shared';
 
 /** Onde o tabuleiro é espelhado: a raiz do RoomState (clássico) ou um BoardSchema (modos novos). */
 export type BoardTarget = Pick<RoomState, 'groups' | 'pieceGroup'>;
@@ -56,15 +63,54 @@ export class BoardRuntime {
       (other) => this.target.groups.get(String(other.id))?.heldBy === '',
     );
 
+    group.heldBy = '';
+    this.syncMerge(groupId, absorbedGroupIds);
+    return { snaps: absorbedGroupIds.length, completed };
+  }
+
+  /** Copia para o estado o resultado de um encaixe: posição do grupo e peças que entraram. */
+  private syncMerge(groupId: number, absorbedGroupIds: number[]): void {
     const merged = this.engine.getGroup(groupId);
+    const group = this.target.groups.get(String(groupId))!;
     group.x = merged.x;
     group.y = merged.y;
-    group.heldBy = '';
     for (const id of absorbedGroupIds) this.target.groups.delete(String(id));
     for (const pieceId of merged.pieceIds) {
       if (this.target.pieceGroup[pieceId] !== groupId) this.target.pieceGroup[pieceId] = groupId;
     }
-    return { snaps: absorbedGroupIds.length, completed };
+  }
+
+  /** A peça já está encaixada em alguma outra (todas começam soltas). */
+  isSnapped(pieceId: number): boolean {
+    return this.engine.groupOf(pieceId).pieceIds.length > 1;
+  }
+
+  /**
+   * Ímã: encaixa sozinho até `count` peças soltas, cada uma no maior bloco vizinho dela (nada na
+   * mão de alguém). Devolve quantos encaixes fez e se a mesa ficou completa.
+   */
+  magnet(count: number): { snaps: number; completed: boolean } {
+    const free = (group: GroupState) => this.target.groups.get(String(group.id))?.heldBy === '';
+    let snaps = 0;
+    for (let i = 0; i < count; i++) {
+      let best: { loose: GroupState; target: GroupState } | undefined;
+      for (const loose of this.engine.allGroups()) {
+        if (loose.pieceIds.length !== 1 || !free(loose)) continue;
+        for (const neighborId of neighborsOf(this.engine.puzzle, loose.pieceIds[0]!)) {
+          const target = this.engine.groupOf(neighborId);
+          if (target.id === loose.id || !free(target)) continue;
+          if (!best || target.pieceIds.length > best.target.pieceIds.length)
+            best = { loose, target };
+        }
+      }
+      if (!best) break;
+      // Mesmo deslocamento do vizinho = a peça no lugar certo em relação a ele.
+      this.engine.moveGroup(best.loose.id, best.target.x, best.target.y);
+      const { absorbedGroupIds } = this.engine.dropGroup(best.loose.id, free);
+      this.syncMerge(best.loose.id, absorbedGroupIds);
+      snaps += absorbedGroupIds.length;
+    }
+    return { snaps, completed: this.engine.isComplete() };
   }
 
   /** Reespalha as peças soltas; blocos montados e peças na mão de alguém ficam. */
