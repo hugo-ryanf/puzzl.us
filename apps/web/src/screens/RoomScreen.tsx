@@ -20,6 +20,7 @@ import { CompletedModal } from './room/CompletedModal';
 import { PlayerAvatars } from './room/PlayerAvatars';
 import { RoomHeader } from './room/RoomHeader';
 import { StartCountdown } from './room/StartCountdown';
+import { useGameSounds } from './room/useGameSounds';
 
 interface RoomScreenProps {
   room: PuzzleRoom;
@@ -45,6 +46,7 @@ export function RoomScreen({
   const solo = snapshot.maxPlayers === 1;
   // Solo não entra na chamada: não há com quem falar (e poupa a cota do LiveKit).
   const voice = useVoiceChat(room, !solo);
+  useGameSounds(room.sessionId, snapshot);
   const [reconnecting, setReconnecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
