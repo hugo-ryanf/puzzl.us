@@ -236,6 +236,12 @@ function LobbyPanel({ snapshot, isHost, onStart }: LobbyPanelProps) {
             outro na hora.
           </p>
         )}
+        {bullet && (
+          <p className="caption">
+            Bônus: a peça dourada e cada quebra-cabeça montado rápido valem +5 s. A cada 4, vem um
+            relâmpago de 6 peças que dá um Ímã (encaixa 3 peças sozinho).
+          </p>
+        )}
         {isHost ? (
           <>
             {bullet ? (
