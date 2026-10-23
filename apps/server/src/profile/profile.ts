@@ -1,4 +1,5 @@
-import { and, count, countDistinct, eq, gte, max, or, sql } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, gte, max, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { RANKING_TIME_ZONE, type ProfileStats, type PublicProfile } from '@puzzle/shared';
 import { profileAvatar, profileName } from '../auth/accounts';
 import type { AppDatabase } from '../db/database';
@@ -9,7 +10,16 @@ import {
   longestStreak,
   streakOf,
 } from '../db/rankingPage';
-import { bulletRuns, friendships, gamePlayers, games, players, users } from '../db/schema';
+import {
+  battleResultPlayers,
+  battleResults,
+  bulletRuns,
+  friendships,
+  gamePlayers,
+  games,
+  players,
+  users,
+} from '../db/schema';
 
 /** A sequência só olha para trás até aqui. */
 const STREAK_LOOKBACK = sql`now() - interval '400 days'`;
@@ -50,6 +60,11 @@ export function createProfileStore(db: AppDatabase): ProfileStore {
         teamPuzzles: 0,
         bulletBest: 0,
         friends,
+        battleWins: 0,
+        battleLosses: 0,
+        battleBestStreak: 0,
+        battleComebacks: 0,
+        rival: null,
       };
     }
 
@@ -102,6 +117,7 @@ export function createProfileStore(db: AppDatabase): ProfileStore {
 
     const days = new Set([...gameDays, ...bulletDays].map((row) => row.day));
     return {
+      ...(await battleStats(player.id)),
       puzzles: totals?.puzzles ?? 0,
       images: totals?.images ?? 0,
       pieces: totals?.pieces ?? 0,
@@ -113,6 +129,55 @@ export function createProfileStore(db: AppDatabase): ProfileStore {
       teamPuzzles: totals?.teamPuzzles ?? 0,
       bulletBest: bullet?.best ?? 0,
       friends,
+    };
+  };
+
+  /** Placar das batalhas do jogador, na ordem em que aconteceram, e quem ele mais enfrentou. */
+  const battleStats = async (playerId: string) => {
+    const history = await db
+      .select({
+        won: sql<boolean>`${battleResults.winner} = ${battleResultPlayers.team}`,
+        comeback: battleResults.comeback,
+      })
+      .from(battleResultPlayers)
+      .innerJoin(battleResults, eq(battleResults.id, battleResultPlayers.resultId))
+      .where(eq(battleResultPlayers.playerId, playerId))
+      .orderBy(asc(battleResults.finishedAt));
+    let run = 0;
+    let bestRun = 0;
+    for (const { won } of history) {
+      run = won ? run + 1 : 0;
+      bestRun = Math.max(bestRun, run);
+    }
+
+    const me = alias(battleResultPlayers, 'me');
+    const [rival] = await db
+      .select({
+        name: sql<string>`coalesce(${profileName}, ${players.nickname})`,
+        friendCode: users.friendCode,
+        battles: count(),
+      })
+      .from(battleResultPlayers)
+      .innerJoin(
+        me,
+        and(
+          eq(me.resultId, battleResultPlayers.resultId),
+          eq(me.playerId, playerId),
+          ne(me.team, battleResultPlayers.team),
+        ),
+      )
+      .innerJoin(players, eq(players.id, battleResultPlayers.playerId))
+      .leftJoin(users, eq(users.id, players.userId))
+      .groupBy(battleResultPlayers.playerId, players.nickname, users.id)
+      .orderBy(desc(count()))
+      .limit(1);
+
+    return {
+      battleWins: history.filter((row) => row.won).length,
+      battleLosses: history.filter((row) => !row.won).length,
+      battleBestStreak: bestRun,
+      battleComebacks: history.filter((row) => row.won && row.comeback).length,
+      rival: rival ? { ...rival, friendCode: rival.friendCode ?? null } : null,
     };
   };
 
