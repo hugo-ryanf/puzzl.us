@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, ne, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, ne, or, sql } from 'drizzle-orm';
 import type {
   BulletRankingEntry,
   BulletRankingQuery,
@@ -27,8 +27,16 @@ type Category = Pick<BulletResult, 'minutes' | 'pieceCount'> & { teamSize: numbe
 type Query = Omit<BulletRankingQuery, 'period'> & { period?: RankingPeriod };
 
 export interface BulletStore {
-  /** Grava a corrida e devolve a posição da equipe na categoria: de sempre e só de hoje. */
-  saveRun(result: BulletResult): Promise<{ rank: number; rankToday: number }>;
+  /**
+   * Grava a corrida e devolve a posição da equipe na categoria (de sempre e só de hoje) e se ela
+   * bateu o recorde da própria equipe (a primeira corrida não conta como recorde).
+   */
+  saveRun(result: BulletResult): Promise<{ rank: number; rankToday: number; record: boolean }>;
+  /** A melhor corrida de um jogador na categoria (sozinho ou em qualquer equipe do tamanho). */
+  personalBest(
+    query: Omit<BulletRankingQuery, 'period'>,
+    playerId: string,
+  ): Promise<{ solved: number; partial: number } | null>;
   /** Melhor corrida de cada equipe; `viewerPlayerId` acha "Sua posição". */
   leaderboard(
     query: Query,
@@ -73,6 +81,16 @@ export function createBulletStore(db: AppDatabase): BulletStore {
       const category = { ...result, teamSize: team.length };
       return db.transaction(async (tx) => {
         const { teamKey } = await resolveTeam(tx, team);
+        const [previous] = await tx
+          .select({ solved: bulletRuns.solved, partial: bulletRuns.partial })
+          .from(bulletRuns)
+          .where(and(sameCategory(category), eq(bulletRuns.teamKey, teamKey)))
+          .orderBy(desc(bulletRuns.solved), desc(bulletRuns.partial))
+          .limit(1);
+        const record =
+          previous !== undefined &&
+          (result.solved > previous.solved ||
+            (result.solved === previous.solved && result.partial > previous.partial));
         await tx.insert(bulletRuns).values({
           roomCode: result.roomCode,
           minutes: result.minutes,
@@ -102,8 +120,24 @@ export function createBulletStore(db: AppDatabase): BulletStore {
             );
           return (better?.total ?? 0) + 1;
         };
-        return { rank: await rankIn('all'), rankToday: await rankIn('day') };
+        return { rank: await rankIn('all'), rankToday: await rankIn('day'), record };
       });
+    },
+
+    async personalBest({ minutes, pieces, players: teamSize }, playerId) {
+      const [best] = await db
+        .select({ solved: bulletRuns.solved, partial: bulletRuns.partial })
+        .from(bulletRuns)
+        .where(
+          and(
+            sameCategory({ minutes, pieceCount: pieces, teamSize }),
+            // O id do jogador é um uuid: procurar dentro da team_key não confunde ninguém.
+            sql`position(${playerId} in ${bulletRuns.teamKey}) > 0`,
+          ),
+        )
+        .orderBy(desc(bulletRuns.solved), desc(bulletRuns.partial))
+        .limit(1);
+      return best ?? null;
     },
 
     async leaderboard(
