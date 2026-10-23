@@ -2,7 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { matchMaker, type Server } from '@colyseus/core';
 import { ColyseusSDK, type Room as ClientRoom } from '@colyseus/sdk';
-import { BATTLE_ROOM, CATALOG, RoomState, type BoardSchema } from '@puzzle/shared';
+import {
+  BATTLE_ROOM,
+  CATALOG,
+  ENERGY_PER_SNAP,
+  POWER_COST,
+  RoomState,
+  type BoardSchema,
+  type PowerBroadcast,
+} from '@puzzle/shared';
 import { createGameServer } from '../app';
 import { COUNTDOWN } from './BaseGameRoom';
 import type { BattleRoom } from './BattleRoom';
@@ -31,12 +39,17 @@ async function until(check: () => boolean) {
  * Batalha com Ana (lado A, anfitriã) e Bia (lado B); `extra` entram depois. `minutes`: batalha
  * por tempo (12 peças, fotos sorteadas).
  */
-async function setup(format: '1v1' | '2v2' = '1v1', extra: string[] = [], minutes?: 3) {
+async function setup(
+  format: '1v1' | '2v2' = '1v1',
+  extra: string[] = [],
+  minutes?: 3,
+  powers?: boolean,
+) {
   const ana = await sdk.create(
     BATTLE_ROOM,
     minutes
-      ? { ...player('Ana'), pieceCount: 12, imageId: 'random', format, minutes }
-      : { ...player('Ana'), pieceCount: 24, imageId: CATALOG[0]!.id, format },
+      ? { ...player('Ana'), pieceCount: 12, imageId: 'random', format, minutes, powers }
+      : { ...player('Ana'), pieceCount: 24, imageId: CATALOG[0]!.id, format, powers },
     RoomState,
   );
   const room = matchMaker.getLocalRoomById(ana.roomId) as unknown as BattleRoom;
@@ -62,6 +75,17 @@ async function solve(client: ClientRoom, board: BoardSchema, key: 'a' | 'b') {
     client.send('drop', { groupId, x: anchor.x, y: anchor.y, board: key });
     await until(() => groups.get(String(groupId))?.heldBy !== client.sessionId);
   }
+}
+
+/** Encaixa a peça `pieceId` no bloco da peça 0 (as duas vizinhas: 0 e 1). */
+async function snapOne(client: ClientRoom, board: BoardSchema, key: 'a' | 'b', pieceId = 1) {
+  const { pieceGroup, groups } = board;
+  const groupId = pieceGroup[pieceId]!;
+  const anchor = groups.get(String(pieceGroup[0]))!;
+  client.send('grab', { groupId, board: key });
+  await until(() => groups.get(String(groupId))?.heldBy === client.sessionId);
+  client.send('drop', { groupId, x: anchor.x, y: anchor.y, board: key });
+  await until(() => groups.get(String(groupId))?.heldBy !== client.sessionId);
 }
 
 describe('BattleRoom', () => {
@@ -177,7 +201,7 @@ describe('BattleRoom', () => {
       await bia.leave();
     });
 
-    it('no fim do tempo ganha quem montou mais; empate vai para as peças encaixadas', async () => {
+    it('no fim do tempo ganha quem montou mais; empate total vai para a morte súbita', async () => {
       const { ana, bia, room, state, board } = await setup('1v1', [], 3);
       ana.send('start');
       await until(() => state.phase === 'playing');
@@ -195,8 +219,20 @@ describe('BattleRoom', () => {
       expect(state.remainingMs).toBe(3 * 60_000);
       ana.send('start');
       await until(() => state.phase === 'playing');
+      const seed = board('a').config.seed;
       (room as unknown as { timeUp(): void }).timeUp();
-      expect(state.winner).toBe('draw');
+      // Ninguém montou nada: morte súbita, com o mesmo quebra-cabeça novo nos dois lados.
+      expect(state.phase).toBe('playing');
+      expect(state.suddenDeath).toBe(true);
+      expect(board('a').config.seed).not.toBe(seed);
+      expect(board('a').config.seed).toBe(board('b').config.seed);
+      await solve(bia, board('b'), 'b');
+      expect(await until(() => state.phase === 'completed')).toBe(true);
+      expect(state.winner).toBe('b');
+
+      ana.send('rematch');
+      expect(await until(() => state.phase === 'lobby')).toBe(true);
+      expect(state.suddenDeath).toBe(false);
       await ana.leave();
       await bia.leave();
     });
@@ -221,6 +257,89 @@ describe('BattleRoom', () => {
       } finally {
         COUNTDOWN.seconds = 0;
       }
+    });
+
+    it('dourada e rodada relâmpago iguais para os dois lados', async () => {
+      const { ana, bia, room, board } = await setup('1v1', [], 3);
+      expect(board('a').golden).toBeGreaterThanOrEqual(0);
+      expect(board('a').golden).toBe(board('b').golden);
+      const roundAt = (index: number) =>
+        (room as unknown as { roundAt(i: number): { lightning: boolean } }).roundAt(index);
+      expect([0, 1, 2, 3, 7].map((i) => roundAt(i).lightning)).toEqual([
+        false,
+        false,
+        false,
+        true,
+        true,
+      ]);
+      await ana.leave();
+      await bia.leave();
+    });
+
+    it('poderes: energia por encaixe, custo, recarga, congelar e escudo', async () => {
+      const { ana, bia, state, board } = await setup('1v1', [], 3);
+      expect(state.powers).toBe(true);
+      const broadcasts: PowerBroadcast[] = [];
+      bia.onMessage('power', (message: PowerBroadcast) => broadcasts.push(message));
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+
+      await snapOne(ana, board('a'), 'a');
+      expect(board('a').energy).toBeGreaterThanOrEqual(ENERGY_PER_SNAP);
+
+      // Congelar: a Bia não pega peça nenhuma; o segundo poder logo em seguida não vale (recarga).
+      board('a').energy = 100;
+      ana.send('usePower', { power: 'freeze' });
+      expect(await until(() => board('b').frozenUntil > 0)).toBe(true);
+      expect(board('a').energy).toBe(100 - POWER_COST.freeze);
+      const groupId = board('b').pieceGroup[1]!;
+      bia.send('grab', { groupId, board: 'b' });
+      ana.send('usePower', { power: 'fog' });
+      await wait(100);
+      expect(board('b').groups.get(String(groupId))!.heldBy).toBe('');
+      expect(board('a').energy).toBe(100 - POWER_COST.freeze);
+      expect(board('b').fogUntil).toBe(0);
+
+      // Escudo da Bia anula a neblina da Ana.
+      board('b').energy = 100;
+      bia.send('usePower', { power: 'shield' });
+      expect(await until(() => board('b').shield)).toBe(true);
+      board('a').powerReadyAt = 0;
+      ana.send('usePower', { power: 'fog' });
+      expect(await until(() => !board('b').shield)).toBe(true);
+      expect(board('b').fogUntil).toBe(0);
+      expect(await until(() => broadcasts.length === 3)).toBe(true);
+      expect(broadcasts.at(-1)).toEqual({ team: 'a', power: 'fog', blocked: true });
+      await ana.leave();
+      await bia.leave();
+    });
+
+    it('embaralhar mexe nas peças soltas do adversário', async () => {
+      const { ana, bia, state, board } = await setup('1v1', [], 3);
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      const positions = () => [...board('b').groups.values()].map((g) => `${g.x},${g.y}`).join();
+      const before = positions();
+      board('a').energy = 100;
+      ana.send('usePower', { power: 'shuffle' });
+      expect(await until(() => positions() !== before)).toBe(true);
+      await ana.leave();
+      await bia.leave();
+    });
+
+    it('sem poderes: não junta energia e o pedido é ignorado', async () => {
+      const { ana, bia, state, board } = await setup('1v1', [], 3, false);
+      expect(state.powers).toBe(false);
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      await snapOne(ana, board('a'), 'a');
+      expect(board('a').energy).toBe(0);
+      board('a').energy = 100;
+      ana.send('usePower', { power: 'freeze' });
+      await wait(100);
+      expect(board('b').frozenUntil).toBe(0);
+      await ana.leave();
+      await bia.leave();
     });
 
     it('recusa tamanho fora dos do Bullet', async () => {
