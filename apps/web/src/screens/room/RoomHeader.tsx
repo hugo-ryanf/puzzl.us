@@ -16,6 +16,7 @@ import type { VoiceChat } from '../../voice/useVoiceChat';
 import { setSoundEnabled, useSoundEnabled } from '../../sound/sounds';
 import { VoiceMenu } from '../../voice/VoiceMenu';
 import { GameClock } from '../GameClock';
+import { BulletBestPill } from '../bullet/BulletBestPill';
 import { InviteMenu } from './InviteMenu';
 
 interface RoomHeaderProps {
@@ -100,20 +101,25 @@ export function RoomHeader({
       </div>
 
       <div className="room-progress">
-        <span className="clock-pill">
-          <GameClock
-            phase={phase}
-            elapsedMs={elapsedMs}
-            durationMs={durationMs}
-            limitMs={bullet || timedBattle ? snapshot.timeLimitMs : undefined}
-            paused={snapshot.countdown > 0}
-          />
-        </span>
+        {snapshot.suddenDeath && phase === 'playing' ? (
+          <span className="clock-pill sudden-death">Morte súbita</span>
+        ) : (
+          <span className="clock-pill">
+            <GameClock
+              phase={phase}
+              elapsedMs={elapsedMs}
+              durationMs={durationMs}
+              limitMs={bullet || timedBattle ? snapshot.timeLimitMs + snapshot.bonusMs : undefined}
+              paused={snapshot.countdown > 0}
+            />
+          </span>
+        )}
         {(bullet || timedBattle) && (
           <span className="solved-pill" aria-label={`${solved} montados`}>
             <strong>{solved}</strong> {solved === 1 ? 'montado' : 'montados'}
           </span>
         )}
+        {bullet && <BulletBestPill snapshot={snapshot} />}
         <div
           className="progress-bar"
           role="progressbar"
