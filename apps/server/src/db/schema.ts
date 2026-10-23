@@ -301,3 +301,43 @@ export const bulletRuns = pgTable(
     ),
   ],
 );
+
+/**
+ * Uma batalha terminada (com vencedor: a morte súbita desempata a batalha por tempo). Sem
+ * ranking: alimenta o placar de vitórias e as conquistas do perfil. `comeback` = o vencedor
+ * estava atrás a 10 s do fim (batalha por tempo).
+ */
+export const battleResults = pgTable(
+  'battle_results',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    roomCode: text('room_code').notNull(),
+    /** '1v1' | '2v2'. */
+    format: text('format').notNull(),
+    timed: boolean('timed').notNull(),
+    /** 'a' | 'b'. */
+    winner: text('winner').notNull(),
+    walkover: boolean('walkover').notNull().default(false),
+    comeback: boolean('comeback').notNull().default(false),
+    finishedAt: timestamp('finished_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [index('battle_results_finished_idx').on(table.finishedAt)],
+);
+
+export const battleResultPlayers = pgTable(
+  'battle_result_players',
+  {
+    resultId: uuid('result_id')
+      .notNull()
+      .references(() => battleResults.id, { onDelete: 'cascade' }),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id),
+    /** Lado em que jogou ('a' ou 'b'). */
+    team: text('team').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.resultId, table.playerId] }),
+    index('battle_result_players_player_idx').on(table.playerId),
+  ],
+);
