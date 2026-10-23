@@ -10,6 +10,11 @@ export type GameSound = 'snap' | 'solved' | 'win' | 'lose' | 'draw' | 'end' | 'i
 /** Mesma família das outras chaves do site; 'off' = sons desligados. */
 const KEY = 'quebra-cabeca:som';
 const COUNTDOWN_URL = '/sounds/countdown.mp3';
+/**
+ * Onde fica o "zero" no arquivo (s): bipes a cada segundo até 7,87 s e o som final em 8,87 s;
+ * depois, ~2 s de silêncio. É esse ponto que se alinha com o fim da contagem do jogo.
+ */
+const COUNTDOWN_ZERO_AT = 8.87;
 const VOLUME = 0.6;
 
 let enabled = loadEnabled();
@@ -82,7 +87,9 @@ export function preloadCountdown() {
 }
 
 /**
- * Toca o fim da contagem: os últimos `leftMs` do arquivo, para ele acabar junto com o zero.
+ * Toca a contagem de modo que o "zero" do arquivo caia no zero do jogo, daqui a `leftMs`: com
+ * pouco tempo, começa do meio do arquivo (no "3, 2, 1", os três últimos bipes e o som final);
+ * com mais tempo do que o arquivo tem antes do zero, espera um pouco para começar.
  * Devolve a função que interrompe (saiu da sala no meio).
  */
 export function playCountdown(leftMs: number): () => void {
@@ -99,7 +106,9 @@ export function playCountdown(leftMs: number): () => void {
     source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(out);
-    source.start(0, Math.max(0, buffer.duration - left));
+    const offset = COUNTDOWN_ZERO_AT - left;
+    if (offset >= 0) source.start(0, offset);
+    else source.start(ctx.currentTime - offset);
   });
   return () => {
     stopped = true;
