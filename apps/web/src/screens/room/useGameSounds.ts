@@ -13,10 +13,13 @@ export function useGameSounds(selfId: string, snapshot: RoomSnapshot) {
   const battle = mode === 'battle';
   const solved = battle ? (myTeam ? (snapshot.boards[myTeam]?.solved ?? 0) : 0) : snapshot.solved;
   // Encaixes de quem está na minha mesa, por jogador (quem entra ou sai não conta como encaixe).
-  const snaps = new Map(
-    players.filter((p) => !battle || p.team === myTeam).map((p) => [p.sessionId, p.snaps]),
-  );
-  const last = useRef({ snaps, solved, phase });
+  const atMyTable = players.filter((p) => !battle || p.team === myTeam);
+  const snaps = new Map(atMyTable.map((p) => [p.sessionId, p.snaps]));
+  const combos = new Map(atMyTable.map((p) => [p.sessionId, p.combo]));
+  const myBoard = snapshot.boards[battle ? myTeam || 'a' : 'main'];
+  const lightning = myBoard?.lightning ?? false;
+  const { bonusMs, helpers, suddenDeath, record } = snapshot;
+  const last = useRef({ snaps, solved, phase, lightning, bonusMs, helpers, suddenDeath, record });
 
   useEffect(() => {
     if (timeLimitMs > 0) preloadCountdown();
@@ -24,18 +27,35 @@ export function useGameSounds(selfId: string, snapshot: RoomSnapshot) {
 
   useEffect(() => {
     const before = last.current;
-    last.current = { snaps, solved, phase };
+    last.current = { snaps, solved, phase, lightning, bonusMs, helpers, suddenDeath, record };
+    // O recorde chega depois do fim (quando o ranking grava a corrida).
+    if (record && !before.record) {
+      playSound('record');
+      return;
+    }
     if (phase === 'completed' && before.phase === 'playing') {
       playSound(endSound(mode, winner, myTeam));
       return;
     }
     if (phase !== 'playing') return;
+    if (suddenDeath && !before.suddenDeath) {
+      playSound('suddenDeath');
+      return;
+    }
+    if (helpers < before.helpers) playSound('magnet');
+    if (bonusMs > before.bonusMs) playSound('bonus');
+    if (lightning && !before.lightning) playSound('lightning');
     if (solved > before.solved) {
       playSound('solved');
       return;
     }
-    const snapped = [...snaps].some(([id, count]) => count > (before.snaps.get(id) ?? count));
-    if (snapped) playSound('snap');
+    // Quem encaixou (de preferência eu): o tom sobe com o combo dele.
+    const snappers = [...snaps]
+      .filter(([id, count]) => count > (before.snaps.get(id) ?? count))
+      .map(([id]) => id);
+    if (snappers.length === 0) return;
+    const who = snappers.includes(selfId) ? selfId : snappers[0]!;
+    playSound('snap', { combo: combos.get(who) });
   });
 }
 
