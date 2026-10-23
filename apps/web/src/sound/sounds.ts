@@ -5,7 +5,23 @@ import { useSyncExternalStore } from 'react';
  * na hora com a Web Audio API (nada para baixar). Um volume geral liga e desliga tudo, e a
  * escolha fica neste navegador. Independente do áudio da chamada de voz.
  */
-export type GameSound = 'snap' | 'solved' | 'win' | 'lose' | 'draw' | 'end' | 'invite';
+export type GameSound =
+  | 'snap'
+  | 'solved'
+  | 'win'
+  | 'lose'
+  | 'draw'
+  | 'end'
+  | 'invite'
+  | 'bonus'
+  | 'lightning'
+  | 'magnet'
+  | 'shield'
+  | 'fog'
+  | 'freeze'
+  | 'shuffle'
+  | 'suddenDeath'
+  | 'record';
 
 /** Mesma família das outras chaves do site; 'off' = sons desligados. */
 const KEY = 'quebra-cabeca:som';
@@ -175,6 +191,53 @@ const SOUNDS: Record<GameSound, Note[]> = {
     { freq: 783.99, at: 0, duration: 0.5, type: 'sine', volume: 0.35 },
     { freq: 1046.5, at: 0.18, duration: 0.8, type: 'sine', volume: 0.35 },
   ],
+  // Bônus de tempo: moedinha (duas notas rápidas e agudas).
+  bonus: [
+    { freq: 987.77, at: 0, duration: 0.08, type: 'square', volume: 0.1 },
+    { freq: 1318.5, at: 0.07, duration: 0.3, type: 'square', volume: 0.1 },
+  ],
+  // Rodada relâmpago: um "zap" descendo rápido, duas vezes.
+  lightning: [
+    { freq: 1800, glideTo: 300, at: 0, duration: 0.12, type: 'sawtooth', volume: 0.12 },
+    { freq: 1600, glideTo: 250, at: 0.1, duration: 0.18, type: 'sawtooth', volume: 0.1 },
+  ],
+  // Ímã: zumbido subindo.
+  magnet: [{ freq: 220, glideTo: 880, at: 0, duration: 0.35, type: 'sine', volume: 0.3 }],
+  // Escudo: "tlim" metálico (duas notas juntas, agudas).
+  shield: [
+    { freq: 1046.5, at: 0, duration: 0.4, type: 'triangle', volume: 0.25 },
+    { freq: 1568, at: 0, duration: 0.4, type: 'sine', volume: 0.15 },
+  ],
+  // Neblina: sopro grave descendo.
+  fog: [{ freq: 520, glideTo: 160, at: 0, duration: 0.6, type: 'sine', volume: 0.3 }],
+  // Congelar: cristais (notas agudas rápidas).
+  freeze: [
+    { freq: 2093, at: 0, duration: 0.12, type: 'sine', volume: 0.18 },
+    { freq: 2637, at: 0.06, duration: 0.12, type: 'sine', volume: 0.16 },
+    { freq: 3136, at: 0.12, duration: 0.25, type: 'sine', volume: 0.14 },
+  ],
+  // Embaralhar: notas alternando rápido, como peças voando.
+  shuffle: [
+    { freq: 440, at: 0, duration: 0.06, type: 'square', volume: 0.1 },
+    { freq: 660, at: 0.05, duration: 0.06, type: 'square', volume: 0.1 },
+    { freq: 494, at: 0.1, duration: 0.06, type: 'square', volume: 0.1 },
+    { freq: 740, at: 0.15, duration: 0.06, type: 'square', volume: 0.1 },
+    { freq: 554, at: 0.2, duration: 0.1, type: 'square', volume: 0.1 },
+  ],
+  // Morte súbita: gongo grave, duas batidas.
+  suddenDeath: [
+    { freq: 98, at: 0, duration: 1.1, type: 'triangle', volume: 0.5 },
+    { freq: 147, at: 0, duration: 0.9, type: 'sine', volume: 0.25 },
+    { freq: 98, at: 0.45, duration: 1.2, type: 'triangle', volume: 0.45 },
+  ],
+  // Novo recorde: fanfarra subindo mais alto que a vitória.
+  record: [
+    { freq: 659.25, at: 0, duration: 0.12, type: 'square', volume: 0.12 },
+    { freq: 783.99, at: 0.1, duration: 0.12, type: 'square', volume: 0.12 },
+    { freq: 1046.5, at: 0.2, duration: 0.12, type: 'square', volume: 0.12 },
+    { freq: 1318.5, at: 0.3, duration: 0.8, type: 'triangle', volume: 0.3 },
+    { freq: 1046.5, at: 0.3, duration: 0.8, type: 'triangle', volume: 0.18 },
+  ],
   // Convite de amigo: um "plim" suave.
   invite: [
     { freq: 1318.5, at: 0, duration: 0.25, type: 'sine', volume: 0.22 },
@@ -182,12 +245,14 @@ const SOUNDS: Record<GameSound, Note[]> = {
   ],
 };
 
-export function playSound(name: GameSound) {
+/** `combo`: no encaixe, cada nível de combo sobe o tom um pouco (até ~1,5×). */
+export function playSound(name: GameSound, { combo = 1 }: { combo?: number } = {}) {
   const sound = enabled ? audio() : undefined;
   if (!sound) return;
   const { ctx, out } = sound;
   const now = ctx.currentTime + 0.01;
-  const detune = name === 'snap' ? 0.94 + Math.random() * 0.12 : 1;
+  const detune =
+    name === 'snap' ? (0.94 + Math.random() * 0.12) * (1 + 0.06 * Math.max(0, combo - 1)) : 1;
   for (const note of SOUNDS[name]) {
     const start = now + note.at;
     const end = start + note.duration;
