@@ -7,21 +7,38 @@ import {
   CATALOG,
   ChooseTeamMessage,
   CreateBattleOptions,
+  ENERGY_GOLDEN,
+  ENERGY_LIGHTNING,
+  ENERGY_PER_COMBO,
+  ENERGY_PER_SNAP,
+  ENERGY_SOLVED,
+  FOG_MS,
+  FREEZE_MS,
   GrabMessage,
+  MAX_ENERGY,
   MoveMessage,
+  POWER_COOLDOWN_MS,
+  POWER_COST,
   PuzzleConfigSchema,
   PuzzleEngine,
   RANDOM_IMAGE,
   RoomState,
   ScatterMessage,
+  UsePowerMessage,
   generatePuzzle,
   gridForPieceCount,
+  isLightningRound,
+  LIGHTNING_PIECES,
+  type BattlePower,
   type BattleTeam,
   type GroupState,
+  type PowerBroadcast,
   type Puzzle,
   type GameMode,
   type GamePhase,
 } from '@puzzle/shared';
+import type { BattleStore } from '../db/battleStore';
+import type { TeamMember } from '../db/gameStore';
 import { BaseGameRoom } from './BaseGameRoom';
 import { BoardRuntime } from './board';
 import { NEXT_ROUND_DELAY_MS } from './BulletRoom';
@@ -37,6 +54,9 @@ interface Round {
   settings: NonNullable<ConstructorParameters<typeof PuzzleConfigSchema>[0]>;
   puzzle: Puzzle;
   layout: GroupState[];
+  /** Rodada relâmpago (pequena) e a peça dourada (-1 sem): iguais para os dois lados. */
+  lightning: boolean;
+  golden: number;
 }
 
 /**
@@ -58,6 +78,13 @@ export class BattleRoom extends BaseGameRoom {
   private deck: string[] = [];
   private endTimer?: Delayed;
   private readonly nextRoundTimers = new Map<BattleTeam, Delayed>();
+  /** Placar de vitórias (perfil); injetado por createGameServer. Sem banco, fica undefined. */
+  protected battles?: BattleStore;
+  /** Quem começou a partida em cada lado (quem sair no meio continua contando). */
+  private lineup?: Record<BattleTeam, TeamMember[]>;
+  /** Batalha por tempo: quem estava na frente a 10 s do fim ('' = empatados), para a virada. */
+  private leaderAt10s: BattleTeam | '' = '';
+  private leaderTimer?: Delayed;
 
   messages = {
     ...this.commonMessages(),
@@ -71,6 +98,7 @@ export class BattleRoom extends BaseGameRoom {
     }),
     drop: validate(MoveMessage, (client, message) => this.drop(client, message)),
     scatter: validate(ScatterMessage, (client, { board }) => this.scatter(client, board)),
+    usePower: validate(UsePowerMessage, (client, { power }) => this.usePower(client, power)),
     rematch: (client: Client) => this.rematch(client),
     playAgain: (client: Client) => this.rematch(client),
   };
@@ -85,6 +113,7 @@ export class BattleRoom extends BaseGameRoom {
       mode: 'battle' satisfies GameMode,
       timeLimitMs,
       remainingMs: timeLimitMs,
+      powers: this.options.powers,
     });
     await this.setupBoards();
   }
@@ -166,7 +195,9 @@ export class BattleRoom extends BaseGameRoom {
     while (this.rounds.length <= index) {
       const imageId = this.drawImage();
       const { width, height } = CATALOG.find((image) => image.id === imageId)!;
-      const { rows, cols } = gridForPieceCount(this.options.pieceCount, width / height);
+      const lightning = isLightningRound(this.rounds.length);
+      const pieces = lightning ? LIGHTNING_PIECES : this.options.pieceCount;
+      const { rows, cols } = gridForPieceCount(pieces, width / height);
       const seed = randomUUID().slice(0, 8);
       const puzzle = generatePuzzle({ seed, rows, cols, width, height });
       const layout = [...PuzzleEngine.scattered(puzzle).allGroups()].map(
@@ -182,15 +213,28 @@ export class BattleRoom extends BaseGameRoom {
         pieceCount: this.options.pieceCount,
         maxPlayers: this.maxClients,
       };
-      this.rounds.push({ settings, puzzle, layout });
+      const golden = lightning ? -1 : Math.floor(Math.random() * rows * cols);
+      this.rounds.push({ settings, puzzle, layout, lightning, golden });
     }
     return this.rounds[index]!;
   }
 
   /** Põe o lado no quebra-cabeça `index` (mesa nova; o cliente remonta só a desse lado). */
   private placeRound(team: BattleTeam, index: number, solved: number) {
-    const { settings, puzzle, layout } = this.roundAt(index);
-    const board = new BoardSchema({ config: new PuzzleConfigSchema(settings), solved });
+    const { settings, puzzle, layout, lightning, golden } = this.roundAt(index);
+    // Energia, escudo e efeitos são do lado, não da mesa: passam para o quebra-cabeça seguinte.
+    const previous = this.state.boards.get(team);
+    const board = new BoardSchema({
+      config: new PuzzleConfigSchema(settings),
+      solved,
+      lightning,
+      golden,
+      energy: previous?.energy ?? 0,
+      shield: previous?.shield ?? false,
+      powerReadyAt: previous?.powerReadyAt ?? 0,
+      fogUntil: previous?.fogUntil ?? 0,
+      frozenUntil: previous?.frozenUntil ?? 0,
+    });
     const runtime = new BoardRuntime(PuzzleEngine.fromGroups(puzzle, layout), board);
     runtime.mirror();
     this.position.set(team, index);
@@ -240,6 +284,10 @@ export class BattleRoom extends BaseGameRoom {
     if (client.sessionId !== this.state.hostId || this.phase !== 'lobby') return;
     if (BATTLE_TEAMS.some((team) => this.teamCount(team) === 0)) return;
     this.state.phase = 'playing' satisfies GamePhase;
+    const sessionsOf = (team: BattleTeam) =>
+      [...this.state.players.entries()].filter(([, p]) => p.team === team).map(([id]) => id);
+    this.lineup = { a: this.team(sessionsOf('a')), b: this.team(sessionsOf('b')) };
+    this.leaderAt10s = '';
     if (!this.timed) {
       this.startClock(Date.now(), 0);
       return;
@@ -250,7 +298,20 @@ export class BattleRoom extends BaseGameRoom {
         this.state.remainingMs = Math.max(0, limit - this.elapsed());
       });
       this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
+      this.leaderTimer = this.clock.setTimeout(() => {
+        this.leaderAt10s = this.leader();
+      }, limit - 10_000);
     });
+  }
+
+  /** Quem está na frente agora (montados, depois peças encaixadas no da vez); '' empatados. */
+  private leader(): BattleTeam | '' {
+    const score = (team: BattleTeam) => {
+      const board = this.state.boards.get(team)!;
+      return board.solved * 10_000 + (board.done ? 0 : this.boards.get(team)!.placed());
+    };
+    const diff = score('a') - score('b');
+    return diff > 0 ? 'a' : diff < 0 ? 'b' : '';
   }
 
   /** O tabuleiro só aceita quem é daquele lado, com a partida valendo e a mesa por montar. */
@@ -259,7 +320,9 @@ export class BattleRoom extends BaseGameRoom {
     if (!team || board !== team || this.phase !== 'playing' || this.state.countdown > 0) {
       return undefined;
     }
-    if (this.state.boards.get(team)?.done) return undefined;
+    const side = this.state.boards.get(team);
+    // Congelado (poder do adversário): ninguém do lado pega nem solta peças até passar.
+    if (!side || side.done || side.frozenUntil > this.elapsed()) return undefined;
     return this.boards.get(team);
   }
 
@@ -268,17 +331,29 @@ export class BattleRoom extends BaseGameRoom {
     const result = runtime?.drop(client.sessionId, message);
     if (!result) return;
     const player = this.state.players.get(client.sessionId)!;
-    player.snaps += result.snaps;
-    if (!result.completed) return;
+    this.countSnaps(client.sessionId, result.snaps);
     const team = player.team as BattleTeam;
     const board = this.state.boards.get(team)!;
+    if (result.snaps > 0) {
+      this.gainEnergy(
+        board,
+        result.snaps * ENERGY_PER_SNAP + (player.combo - 1) * ENERGY_PER_COMBO,
+      );
+    }
+    if (board.golden >= 0 && runtime!.isSnapped(board.golden)) {
+      board.golden = -1;
+      this.gainEnergy(board, ENERGY_GOLDEN);
+    }
+    if (!result.completed) return;
     board.done = true;
     board.durationMs = this.elapsed();
-    if (!this.timed) {
+    // Corrida, ou a morte súbita da batalha por tempo: quem montar primeiro ganha.
+    if (!this.timed || this.state.suddenDeath) {
       this.finish(team);
       return;
     }
     // Por tempo: conta e, depois de a foto aparecer montada, vem o próximo da sequência.
+    this.gainEnergy(board, board.lightning ? ENERGY_LIGHTNING : ENERGY_SOLVED);
     board.solved += 1;
     const solved = board.solved;
     this.nextRoundTimers.set(
@@ -287,6 +362,45 @@ export class BattleRoom extends BaseGameRoom {
         if (this.phase === 'playing') this.placeRound(team, this.position.get(team)! + 1, solved);
       }, NEXT_ROUND_DELAY_MS),
     );
+  }
+
+  private gainEnergy(board: BoardSchema, amount: number) {
+    if (this.state.powers) board.energy = Math.min(MAX_ENERGY, board.energy + Math.max(0, amount));
+  }
+
+  /**
+   * Poder de um lado: precisa de energia, da recarga vencida e da partida valendo. O escudo arma o
+   * próprio lado; os outros vão na mesa do adversário, a não ser que o escudo dele anule.
+   */
+  private usePower(client: Client, power: BattlePower) {
+    const team = this.state.players.get(client.sessionId)?.team as BattleTeam | '';
+    if (!team || !this.state.powers || this.phase !== 'playing' || this.state.countdown > 0) return;
+    const mine = this.state.boards.get(team)!;
+    const now = this.elapsed();
+    if (mine.energy < POWER_COST[power] || now < mine.powerReadyAt) return;
+    mine.energy -= POWER_COST[power];
+    mine.powerReadyAt = now + POWER_COOLDOWN_MS;
+
+    const target = otherTeam(team);
+    const theirs = this.state.boards.get(target)!;
+    let blocked = false;
+    if (power === 'shield') {
+      mine.shield = true;
+    } else if (theirs.shield) {
+      theirs.shield = false;
+      blocked = true;
+    } else if (power === 'fog') {
+      theirs.fogUntil = now + FOG_MS;
+    } else if (power === 'freeze') {
+      theirs.frozenUntil = now + FREEZE_MS;
+      // Solta o que o outro lado tinha na mão: congelado, não mexe em nada.
+      for (const [sessionId, player] of this.state.players) {
+        if (player.team === target) this.boards.get(target)?.releaseHeldBy(sessionId);
+      }
+    } else {
+      this.boards.get(target)?.scatter();
+    }
+    this.broadcast('power', { team, power, blocked } satisfies PowerBroadcast);
   }
 
   /**
@@ -302,7 +416,26 @@ export class BattleRoom extends BaseGameRoom {
     const [a, b] = [score('a'), score('b')];
     const diff = a[0] - b[0] || a[1] - b[1];
     this.state.remainingMs = 0;
-    this.finish(diff > 0 ? 'a' : diff < 0 ? 'b' : 'draw');
+    if (diff !== 0) {
+      this.finish(diff > 0 ? 'a' : 'b');
+      return;
+    }
+    this.suddenDeath();
+  }
+
+  /**
+   * Empate no fim do tempo: o relógio para e os dois lados recebem o mesmo quebra-cabeça novo
+   * (o seguinte de quem estava mais adiantado na sequência). Quem montar primeiro ganha.
+   */
+  private suddenDeath() {
+    this.clockTimer?.clear();
+    for (const timer of this.nextRoundTimers.values()) timer.clear();
+    this.nextRoundTimers.clear();
+    const next = Math.max(...BATTLE_TEAMS.map((team) => this.position.get(team) ?? 0)) + 1;
+    this.state.suddenDeath = true;
+    for (const team of BATTLE_TEAMS) {
+      this.placeRound(team, next, this.state.boards.get(team)!.solved);
+    }
   }
 
   private scatter(client: Client, board: string | undefined) {
@@ -321,12 +454,33 @@ export class BattleRoom extends BaseGameRoom {
     this.stopCountdown();
     this.clockTimer?.clear();
     this.endTimer?.clear();
+    this.leaderTimer?.clear();
     for (const timer of this.nextRoundTimers.values()) timer.clear();
     this.nextRoundTimers.clear();
     this.state.winner = winner;
     this.state.durationMs = this.state.elapsedMs = this.elapsed();
     this.state.phase = 'completed' satisfies GamePhase;
     for (const sessionId of this.state.players.keys()) this.releaseHeldBy(sessionId);
+    if (winner !== 'draw') this.saveResult(winner);
+  }
+
+  /** Grava o resultado (sem travar a sala: o placar é só do perfil). */
+  private saveResult(winner: BattleTeam) {
+    if (!this.battles || !this.lineup) return;
+    this.battles
+      .saveResult({
+        roomCode: this.roomId,
+        format: this.options.format,
+        timed: this.timed,
+        winner,
+        walkover: this.state.walkover,
+        comeback: this.timed && this.leaderAt10s !== '' && this.leaderAt10s !== winner,
+        finishedAt: new Date(),
+        teams: this.lineup,
+      })
+      .catch((error: unknown) => {
+        console.error(`[batalha ${this.roomId}] falha ao gravar o resultado`, error);
+      });
   }
 
   /** Revanche (anfitrião): mesas novas, mesmos lados; foto nova se era aleatória. */
@@ -338,13 +492,15 @@ export class BattleRoom extends BaseGameRoom {
     this.state.elapsedMs = 0;
     this.state.durationMs = 0;
     this.state.remainingMs = this.state.timeLimitMs;
-    for (const player of this.state.players.values()) player.snaps = 0;
+    this.state.suddenDeath = false;
+    this.resetSnaps();
     this.boards.clear();
     this.state.boards.clear();
     await this.setupBoards();
   }
 
   onDispose() {
+    this.leaderTimer?.clear();
     this.countdownTimer?.clear();
     this.clockTimer?.clear();
     this.endTimer?.clear();
