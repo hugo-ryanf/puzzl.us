@@ -22,6 +22,7 @@ import { PresenceRoom } from './friends/PresenceRoom';
 import { createPresenceHub } from './friends/presence';
 import { registerFriendRoutes } from './friends/routes';
 import { registerProfileRoutes } from './profile/routes';
+import type { BattleStore } from './db/battleStore';
 import type { BulletStore } from './db/bulletStore';
 import type { GameStore } from './db/gameStore';
 import { BattleRoom } from './rooms/BattleRoom';
@@ -45,6 +46,8 @@ export interface GameServerOptions {
   community?: CommunityStore;
   /** Ranking do Bullet. Sem banco, a corrida termina sem posição. */
   bullet?: BulletStore;
+  /** Placar das batalhas (perfil). Sem banco, a batalha não fica registrada. */
+  battles?: BattleStore;
   /**
    * Contas (login com Google). Sem banco fica undefined: todo mundo joga como convidado e o
    * /api/me responde que não há login.
@@ -73,6 +76,7 @@ export function createGameServer({
   snapshots,
   community,
   bullet,
+  battles,
   auth,
   webDist,
   trustProxy = false,
@@ -197,6 +201,22 @@ export function createGameServer({
         res.json(await bullet.leaderboard(query.data, await viewerOf(req)));
       });
 
+      // Recorde de quem está vendo na categoria (lobby do Bullet: "Seu melhor").
+      app.get('/api/ranking/bullet/me', async (req, res) => {
+        const query = BulletRankingQuery.omit({ period: true }).safeParse(req.query);
+        if (!query.success) {
+          res.status(400).json({ error: 'parâmetros inválidos', issues: query.error.issues });
+          return;
+        }
+        if (!bullet) {
+          res.status(503).json({ error: 'ranking indisponível: servidor sem banco de dados' });
+          return;
+        }
+        noStore(res);
+        const viewer = await viewerOf(req);
+        res.json({ best: viewer ? await bullet.personalBest(query.data, viewer) : null });
+      });
+
       if (webDist) serveWebApp(app, webDist);
     },
   });
@@ -233,6 +253,7 @@ export function createGameServer({
   server.define(
     BATTLE_ROOM,
     class extends BattleRoom {
+      protected override battles = battles;
       protected override uploads = uploads;
       protected override voice = voice;
       protected override snapshots = snapshots;
