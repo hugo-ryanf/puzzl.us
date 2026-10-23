@@ -4,8 +4,16 @@ import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import type { FriendView } from '@puzzle/shared';
 import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
 import logoUrl from '../../assets/logo.webp';
-import { CheckIcon, HourglassIcon, LinkIcon, LogOutIcon } from '../../ui/icons';
+import {
+  CheckIcon,
+  HourglassIcon,
+  LinkIcon,
+  LogOutIcon,
+  VolumeIcon,
+  VolumeXIcon,
+} from '../../ui/icons';
 import type { VoiceChat } from '../../voice/useVoiceChat';
+import { setSoundEnabled, useSoundEnabled } from '../../sound/sounds';
 import { VoiceMenu } from '../../voice/VoiceMenu';
 import { GameClock } from '../GameClock';
 import { InviteMenu } from './InviteMenu';
@@ -143,6 +151,7 @@ export function RoomHeader({
             <span className="bar-divider" aria-hidden="true" />
           </>
         )}
+        <SoundToggle />
         {onSaveAndLeave && (
           <button
             type="button"
@@ -161,5 +170,23 @@ export function RoomHeader({
         </button>
       </div>
     </header>
+  );
+}
+
+/** Liga e desliga os sons do jogo (encaixe, contagem, fim…), não o áudio da chamada. */
+function SoundToggle() {
+  const on = useSoundEnabled();
+  const label = on ? 'Desligar os sons do jogo' : 'Ligar os sons do jogo';
+  return (
+    <button
+      type="button"
+      className={on ? 'btn icon-btn' : 'btn icon-btn muted'}
+      aria-label={label}
+      aria-pressed={!on}
+      title={label}
+      onClick={() => setSoundEnabled(!on)}
+    >
+      {on ? <VolumeIcon size={18} /> : <VolumeXIcon size={18} />}
+    </button>
   );
 }
