@@ -48,6 +48,17 @@ export function fetchBulletRanking(
   return getRanking('/api/ranking/bullet', query);
 }
 
+/** Bullet: a melhor corrida de quem está vendo na categoria (null = nunca jogou nela). */
+export async function fetchBulletBest(
+  query: Omit<BulletRankingQuery, 'period'>,
+): Promise<{ solved: number; partial: number } | null> {
+  const { best } = await getRanking<{ best: { solved: number; partial: number } | null }>(
+    '/api/ranking/bullet/me',
+    query,
+  );
+  return best;
+}
+
 /** Fotos mais jogadas no período, com as do período anterior (tendência). */
 export function fetchPopularImages(query: Partial<PopularQuery>): Promise<PopularImage[]> {
   return getRanking('/api/ranking/popular', query);
