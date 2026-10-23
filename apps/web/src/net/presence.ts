@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Room } from '@colyseus/sdk';
 import type { InviteMessage } from '@puzzle/shared';
+import { playSound } from '../sound/sounds';
 import { joinPresence } from './connection';
 
 /** Esperas entre tentativas de reconectar (servidor reiniciando, Render acordando). */
@@ -40,10 +41,11 @@ export function usePresence(userId: string | null | undefined): Presence {
           attempt = 0;
           setVersion((v) => v + 1); // reconectou: a lista pode ter mudado enquanto isso
           joined.onMessage('friendsChanged', () => setVersion((v) => v + 1));
-          joined.onMessage('invite', (invite: InviteMessage) =>
+          joined.onMessage('invite', (invite: InviteMessage) => {
+            playSound('invite');
             // Um aviso por amigo: o convite novo substitui o anterior dele.
-            setInvites((list) => [...list.filter((i) => i.fromId !== invite.fromId), invite]),
-          );
+            setInvites((list) => [...list.filter((i) => i.fromId !== invite.fromId), invite]);
+          });
           joined.onLeave(() => {
             room = undefined;
             if (!stopped) schedule();
