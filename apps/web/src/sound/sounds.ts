@@ -11,10 +11,15 @@ export type GameSound = 'snap' | 'solved' | 'win' | 'lose' | 'draw' | 'end' | 'i
 const KEY = 'quebra-cabeca:som';
 const COUNTDOWN_URL = '/sounds/countdown.mp3';
 /**
- * Onde fica o "zero" no arquivo (s): bipes a cada segundo até 7,87 s e o som final em 8,87 s;
- * depois, ~2 s de silêncio. É esse ponto que se alinha com o fim da contagem do jogo.
+ * O arquivo da contagem em dois trechos, cada um com um bipe de referência (`cue`, em s) e o
+ * número do relógio em que ele deve cair (`second`): 5 bipes de 1 em 1 s (0,03 s a 4,03 s) para
+ * 9…5, e 4 bipes mais fortes (4,87 s a 7,87 s) para 4…1 com o som final (8,87 s) no zero. Entre
+ * o 5º e o 6º bipe o arquivo tem só 0,85 s; tocado de uma vez, a primeira metade adiantaria.
  */
-const COUNTDOWN_ZERO_AT = 8.87;
+const COUNTDOWN_PARTS = [
+  { from: 0, to: 4.8, cue: 0.025, second: 9 },
+  { from: 4.8, to: Infinity, cue: 4.872, second: 4 },
+];
 const VOLUME = 0.6;
 
 let enabled = loadEnabled();
@@ -87,32 +92,39 @@ export function preloadCountdown() {
 }
 
 /**
- * Toca a contagem de modo que o "zero" do arquivo caia no zero do jogo, daqui a `leftMs`: com
- * pouco tempo, começa do meio do arquivo (no "3, 2, 1", os três últimos bipes e o som final);
- * com mais tempo do que o arquivo tem antes do zero, espera um pouco para começar.
- * Devolve a função que interrompe (saiu da sala no meio).
+ * Toca a contagem com cada bipe no segundo certo, sabendo que o zero é daqui a `leftMs`: no
+ * "3, 2, 1", só os três últimos bipes e o som final no "Já!"; nos últimos 10 s, os dois trechos.
+ * O que já passou fica de fora e o que ainda não chegou espera. Devolve a função que interrompe
+ * (saiu da sala no meio).
  */
 export function playCountdown(leftMs: number): () => void {
   const sound = enabled ? audio() : undefined;
   if (!sound) return () => {};
   const { ctx, out } = sound;
   const requestedAt = performance.now();
-  let source: AudioBufferSourceNode | undefined;
+  const sources: AudioBufferSourceNode[] = [];
   let stopped = false;
   void loadCountdown(ctx).then((buffer) => {
     // O tempo que levou para baixar já passou no relógio do jogo.
     const left = (leftMs - (performance.now() - requestedAt)) / 1000;
     if (stopped || !buffer || left < 0.2) return;
-    source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(out);
-    const offset = COUNTDOWN_ZERO_AT - left;
-    if (offset >= 0) source.start(0, offset);
-    else source.start(ctx.currentTime - offset);
+    const now = ctx.currentTime;
+    for (const part of COUNTDOWN_PARTS) {
+      const to = Math.min(part.to, buffer.duration);
+      // Daqui a quanto tempo o ponto `from` do arquivo deve tocar (negativo = já passou).
+      const delay = left - part.second + part.from - part.cue;
+      const skip = Math.max(0, -delay);
+      if (part.from + skip >= to) continue;
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(out);
+      source.start(now + Math.max(0, delay), part.from + skip, to - part.from - skip);
+      sources.push(source);
+    }
   });
   return () => {
     stopped = true;
-    source?.stop();
+    for (const source of sources) source.stop();
   };
 }
 
