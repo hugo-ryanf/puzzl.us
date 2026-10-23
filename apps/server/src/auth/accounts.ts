@@ -1,8 +1,8 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
-import { and, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, lt, sql } from 'drizzle-orm';
 import type { AvatarPreset, AvatarStyle, ProfileUpdate } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
-import { gamePlayers, games, players, sessions, users } from '../db/schema';
+import { battleResultPlayers, gamePlayers, games, players, sessions, users } from '../db/schema';
 
 /** Quanto tempo o login dura sem precisar entrar de novo. */
 export const SESSION_DAYS = 30;
@@ -195,6 +195,26 @@ export function createAccountStore(db: AppDatabase): AccountStore {
             })
             .where(eq(games.id, gameId));
         }
+        // As batalhas do convidado também passam (na mesma batalha dos dois: fica a da conta).
+        const battles = await tx
+          .select({ resultId: battleResultPlayers.resultId })
+          .from(battleResultPlayers)
+          .where(eq(battleResultPlayers.playerId, mine.id));
+        const shared = battles.map((row) => row.resultId);
+        if (shared.length > 0) {
+          await tx
+            .delete(battleResultPlayers)
+            .where(
+              and(
+                eq(battleResultPlayers.playerId, guest.id),
+                inArray(battleResultPlayers.resultId, shared),
+              ),
+            );
+        }
+        await tx
+          .update(battleResultPlayers)
+          .set({ playerId: mine.id })
+          .where(eq(battleResultPlayers.playerId, guest.id));
         await tx.delete(players).where(eq(players.id, guest.id));
       });
     },
