@@ -38,6 +38,13 @@ const REVEAL_DURATION_MS = 900;
 const TOOLBAR_SPACE = 64;
 /** Pontos do fundo nunca ficam mais juntos que isso (px na tela); mais longe, viram ruído. */
 const MIN_DOT_SPACING = 14;
+/** Brilho do contorno do grupo logo depois de um encaixe. */
+const FLASH_MS = 320;
+const FLASH_COLOR = '#fff4c2';
+/** Peça dourada (Bullet e batalha por tempo): contorno largo e brilhante até ser encaixada. */
+const GOLDEN_COLOR = '#f5a300';
+/** Ao entrar, o estado inteiro chega de uma vez: encaixes antigos não brilham. */
+const FLASH_SETTLE_MS = 800;
 
 interface Bounds {
   left: number;
@@ -60,6 +67,7 @@ export interface AttachOptions {
 }
 
 interface PieceSprite {
+  id: number;
   graphics: Graphics;
   path: EdgePath;
   /** Desloca a imagem para que o (0,0) local da peça mostre o pixel certo da foto. */
@@ -99,6 +107,11 @@ export class BoardScene {
   private membersDirty = true;
   /** Grupos cujas peças ainda estão deslizando até a posição do servidor. */
   private readonly animating = new Set<number>();
+  /** Grupos que acabaram de receber peças: fim do brilho e se o contorno já foi trocado. */
+  private readonly flashes = new Map<number, { until: number; drawn: boolean }>();
+  private flashFrom = Infinity;
+  /** Peça dourada da mesa (-1: nenhuma). */
+  private goldenPiece = -1;
   /** Grupos que eu soltei e cuja confirmação (heldBy = "") ainda não chegou → prazo. */
   private readonly awaitingRelease = new Map<number, number>();
 
@@ -164,6 +177,7 @@ export class BoardScene {
 
     this.pieces = puzzle.pieces.map((piece) => {
       const sprite: PieceSprite = {
+        id: piece.id,
         graphics: new Graphics(),
         path: piecePath(puzzle, piece),
         textureMatrix: new Matrix().translate(-piece.x, -piece.y),
@@ -230,6 +244,7 @@ export class BoardScene {
       this.revealFinishedImage();
     };
 
+    this.flashFrom = performance.now() + FLASH_SETTLE_MS;
     this.unsubscribers.push(
       callbacks.onAdd(source, 'groups', (group, key) => {
         const groupId = Number(key);
@@ -245,6 +260,9 @@ export class BoardScene {
       callbacks.onChange(source, 'pieceGroup', (_pieceId, groupId) => {
         this.membersDirty = true;
         this.handleGroupMoved(groupId);
+        const now = performance.now();
+        if (now > this.flashFrom)
+          this.flashes.set(groupId, { until: now + FLASH_MS, drawn: false });
       }),
       callbacks.onAdd('players', (player, sessionId) => {
         if (sessionId === me) return;
@@ -262,6 +280,16 @@ export class BoardScene {
         : callbacks.listen(source as BoardSource & { done: boolean }, 'done', (done) => {
             if (done) reveal();
           }),
+      // Peça dourada: só os tabuleiros dos modos novos têm.
+      ...(source === room.state
+        ? []
+        : [
+            callbacks.listen(source as BoardSource & { golden: number }, 'golden', (golden) => {
+              const previous = this.goldenPiece;
+              this.goldenPiece = golden;
+              for (const pieceId of [previous, golden]) this.redrawPiece(pieceId);
+            }),
+          ]),
       // Só os cursores deste tabuleiro (na Batalha, o adversário mexe no dele).
       room.onMessage('cursor', ({ sessionId, x, y, board }: CursorBroadcast) => {
         if (board === this.boardKey) this.cursors.setTarget(sessionId, x, y);
@@ -305,6 +333,9 @@ export class BoardScene {
     // Peças só se mexem com o relógio correndo (no lobby, no "3, 2, 1" e depois do fim, travadas).
     if (!room || this.readOnly || room.state.phase !== 'playing' || event.button !== 0) return;
     if (room.state.countdown > 0) return;
+    // Congelado por um poder do adversário (o servidor recusa de qualquer jeito).
+    const frozenUntil = (this.source as { frozenUntil?: number }).frozenUntil ?? 0;
+    if (frozenUntil > room.state.elapsedMs) return;
     if (this.source!.done) return;
     const groupId = this.source!.pieceGroup[pieceId]!;
     const heldBy = this.serverGroup(groupId)?.heldBy;
@@ -436,6 +467,7 @@ export class BoardScene {
       if (!group || this.slideGroup(groupId, group, smoothing)) this.animating.delete(groupId);
     }
 
+    this.updateFlashes(now);
     this.cursors.update(smoothing, (p) => this.world.toGlobal(p));
     this.syncDots();
 
@@ -469,6 +501,25 @@ export class BoardScene {
     const offset = (value: number) => (((value - spacing / 2) % spacing) + spacing) % spacing;
     this.host.style.backgroundSize = `${spacing}px ${spacing}px`;
     this.host.style.backgroundPosition = `${offset(x)}px ${offset(y)}px`;
+  }
+
+  /** Contorno dourado no grupo que acabou de encaixar; no fim, volta ao normal (ou à cor de quem segura). */
+  private updateFlashes(now: number): void {
+    for (const [groupId, flash] of this.flashes) {
+      const ended = now >= flash.until;
+      if (flash.drawn && !ended) continue;
+      const heldBy = this.serverGroup(groupId)?.heldBy;
+      const color = ended
+        ? heldBy
+          ? this.room!.state.players.get(heldBy)?.color
+          : undefined
+        : FLASH_COLOR;
+      for (const pieceId of this.members.get(groupId) ?? []) {
+        this.drawPiece(this.pieces[pieceId]!, color);
+      }
+      if (ended) this.flashes.delete(groupId);
+      else flash.drawn = true;
+    }
   }
 
   /** Aproxima as peças do grupo da posição do servidor. Devolve true quando chegaram. */
@@ -520,20 +571,35 @@ export class BoardScene {
   }
 
   /** Contorno da peça preenchido com a imagem; a borda ganha a cor de quem está segurando. */
-  private drawPiece({ graphics, path, textureMatrix }: PieceSprite, heldColor?: string): void {
+  /** Redesenha uma peça com a cor de quem segura o grupo dela (ou o contorno normal). */
+  private redrawPiece(pieceId: number): void {
+    const sprite = this.pieces[pieceId];
+    if (!sprite || !this.source) return;
+    const heldBy = this.serverGroup(this.source.pieceGroup[pieceId]!)?.heldBy;
+    this.drawPiece(sprite, heldBy ? this.room?.state.players.get(heldBy)?.color : undefined);
+  }
+
+  private drawPiece({ id, graphics, path, textureMatrix }: PieceSprite, heldColor?: string): void {
     graphics.clear().moveTo(path.from.x, path.from.y);
     for (const { c1, c2, to } of path.segments) {
       graphics.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y);
     }
     graphics
       .closePath()
-      .fill({ texture: this.texture!, textureSpace: 'global', matrix: textureMatrix })
-      .stroke(
-        heldColor
-          ? { width: this.strokeWidth * 3, color: heldColor }
-          : // Mais forte que no tema escuro: no fundo claro, peças de céu claro sumiriam.
-            { width: this.strokeWidth * 1.4, color: 0x15171c, alpha: 0.6 },
-      );
+      .fill({ texture: this.texture!, textureSpace: 'global', matrix: textureMatrix });
+    if (!heldColor && id === this.goldenPiece) {
+      // Halo largo e translúcido por baixo de um contorno firme: brilha de longe.
+      graphics
+        .stroke({ width: this.strokeWidth * 7, color: GOLDEN_COLOR, alpha: 0.35 })
+        .stroke({ width: this.strokeWidth * 2.6, color: GOLDEN_COLOR });
+      return;
+    }
+    graphics.stroke(
+      heldColor
+        ? { width: this.strokeWidth * 3, color: heldColor }
+        : // Mais forte que no tema escuro: no fundo claro, peças de céu claro sumiriam.
+          { width: this.strokeWidth * 1.4, color: 0x15171c, alpha: 0.6 },
+    );
   }
 
   /** Enquadra a área onde as peças foram espalhadas (2× o tamanho da imagem). */
