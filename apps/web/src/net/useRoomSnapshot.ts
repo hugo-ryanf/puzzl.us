@@ -10,6 +10,8 @@ export interface PlayerView {
   connected: boolean;
   /** Encaixes feitos por este jogador (contribuição no resultado). */
   snaps: number;
+  /** Bullet e Batalha: encaixes seguidos dentro do prazo (2+ = combo). */
+  combo: number;
   /** Lado na Batalha ('' nos outros modos). */
   team: BattleTeam | '';
 }
@@ -21,6 +23,15 @@ export interface BoardView {
   seed: string;
   /** Batalha por tempo: quantos este lado já montou. */
   solved: number;
+  /** Peça dourada ainda por encaixar (-1: nenhuma) e se é rodada relâmpago. */
+  golden: number;
+  lightning: boolean;
+  /** Batalha com poderes: energia, escudo, recarga e efeitos recebidos (ms do relógio). */
+  energy: number;
+  shield: boolean;
+  powerReadyAt: number;
+  fogUntil: number;
+  frozenUntil: number;
   pieces: number;
   placed: number;
   done: boolean;
@@ -60,6 +71,15 @@ export interface RoomSnapshot {
   remainingMs: number;
   /** "3, 2, 1" antes de valer (Bullet e batalha por tempo); 0 = valendo. */
   countdown: number;
+  /** Bullet: tempo ganho em bônus (o relógio conta timeLimitMs + bonusMs) e ímãs guardados. */
+  bonusMs: number;
+  helpers: number;
+  /** Bullet: a corrida gravada bateu o recorde da equipe. */
+  record: boolean;
+  /** Batalha: poderes ligados. */
+  powers: boolean;
+  /** Batalha por tempo empatada: mais um quebra-cabeça, quem montar primeiro ganha. */
+  suddenDeath: boolean;
   round: number;
   solved: number;
   partial: number;
@@ -85,6 +105,13 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
       imageId: board.config.imageId,
       seed: board.config.seed,
       solved: board.solved,
+      golden: board.golden,
+      energy: board.energy,
+      shield: board.shield,
+      powerReadyAt: board.powerReadyAt,
+      fogUntil: board.fogUntil,
+      frozenUntil: board.frozenUntil,
+      lightning: board.lightning,
       pieces: board.pieceGroup.length,
       placed: countPlaced(board.pieceGroup),
       done: board.done,
@@ -103,6 +130,7 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
       color: p.color,
       connected: p.connected,
       snaps: p.snaps,
+      combo: p.combo,
       team: p.team as BattleTeam | '',
     })),
     hostId: state.hostId,
@@ -126,6 +154,11 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     timeLimitMs: state.timeLimitMs,
     remainingMs: state.remainingMs,
     countdown: state.countdown,
+    bonusMs: state.bonusMs,
+    record: state.record,
+    helpers: state.helpers,
+    powers: state.powers,
+    suddenDeath: state.suddenDeath,
     round: state.round,
     solved: state.solved,
     partial: state.partial,
@@ -158,6 +191,12 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
         unsubscribers.push(
           callbacks.onRemove(board, 'groups', refresh),
           callbacks.listen(board, 'done', refresh),
+          callbacks.listen(board, 'golden', refresh),
+          callbacks.listen(board, 'energy', refresh),
+          callbacks.listen(board, 'shield', refresh),
+          callbacks.listen(board, 'powerReadyAt', refresh),
+          callbacks.listen(board, 'fogUntil', refresh),
+          callbacks.listen(board, 'frozenUntil', refresh),
           callbacks.listen(board, 'solved', refresh),
         );
         refresh();
@@ -177,6 +216,10 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
           'teamSize',
           'remainingMs',
           'countdown',
+          'bonusMs',
+          'helpers',
+          'suddenDeath',
+          'record',
           'round',
           'solved',
           'partial',
