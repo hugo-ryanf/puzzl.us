@@ -5,12 +5,16 @@ import {
   CATALOG,
   CreateBulletOptions,
   GrabMessage,
+  LIGHTNING_PIECES,
+  MAGNET_PIECES,
+  MAX_HELPERS,
   MoveMessage,
   PuzzleConfigSchema,
   PuzzleEngine,
   RoomState,
   generatePuzzle,
   gridForPieceCount,
+  isLightningRound,
   type GamePhase,
   type GameMode,
   type RankStatus,
@@ -24,6 +28,11 @@ import { uniqueRoomCode } from './roomCode';
 export const NEXT_ROUND_DELAY_MS = 900;
 /** O Bullet só tem um tabuleiro por vez. */
 const BOARD = 'main';
+/** Bônus de tempo: encaixar a peça dourada e montar um quebra-cabeça antes da meta. */
+export const GOLDEN_BONUS_MS = 5000;
+export const FAST_BONUS_MS = 5000;
+/** Meta para o bônus de montar rápido, por peça (12 peças: 40 s; 24: 80 s). */
+const FAST_MS_PER_PIECE = 40_000 / 12;
 
 /**
  * Bullet: contra o relógio, a equipe monta quantos quebra-cabeças pequenos conseguir. Montou um,
@@ -40,6 +49,9 @@ export class BulletRoom extends BaseGameRoom {
   private deck: string[] = [];
   private endTimer?: Delayed;
   private nextRoundTimer?: Delayed;
+  /** Quebra-cabeças desta partida (o 4º, o 8º… são relâmpago) e quando o da vez apareceu. */
+  private puzzlesInGame = 0;
+  private roundShownAt = 0;
 
   messages = {
     ...this.commonMessages(),
@@ -53,6 +65,7 @@ export class BulletRoom extends BaseGameRoom {
       if (this.canPlay(message.board)) this.board.move(client.sessionId, message);
     }),
     drop: validate(MoveMessage, (client, message) => this.drop(client, message)),
+    magnet: () => this.useMagnet(),
     scatter: () => {
       if (this.canPlay(BOARD)) this.board.scatter();
     },
@@ -101,12 +114,30 @@ export class BulletRoom extends BaseGameRoom {
     if (this.phase !== 'lobby') return;
     this.state.phase = 'playing' satisfies GamePhase;
     this.startAfterCountdown(() => {
-      const limit = this.state.timeLimitMs;
       this.startClock(Date.now(), 0, () => {
-        this.state.remainingMs = Math.max(0, limit - this.elapsed());
+        this.state.remainingMs = Math.max(0, this.limit() - this.elapsed());
       });
-      this.endTimer = this.clock.setTimeout(() => this.timeUp(), limit);
+      this.roundShownAt = 0;
+      this.scheduleEnd();
     });
+  }
+
+  /** Tempo total da partida: o escolhido mais os bônus. */
+  private limit(): number {
+    return this.state.timeLimitMs + this.state.bonusMs;
+  }
+
+  private scheduleEnd() {
+    this.endTimer?.clear();
+    this.endTimer = this.clock.setTimeout(() => this.timeUp(), this.limit() - this.elapsed());
+  }
+
+  /** Bônus de tempo (só com o relógio correndo): o fim da partida anda junto. */
+  private addTime(ms: number) {
+    if (this.phase !== 'playing' || this.state.countdown > 0) return;
+    this.state.bonusMs += ms;
+    this.state.remainingMs = Math.max(0, this.limit() - this.elapsed());
+    this.scheduleEnd();
   }
 
   /** "Jogar novamente" (anfitrião, depois do fim): placar e relógio zerados, na mesma sala. */
@@ -116,6 +147,9 @@ export class BulletRoom extends BaseGameRoom {
     Object.assign(this.state, {
       phase: 'lobby' satisfies GamePhase,
       remainingMs: this.state.timeLimitMs,
+      bonusMs: 0,
+      helpers: 0,
+      record: false,
       elapsedMs: 0,
       durationMs: 0,
       solved: 0,
@@ -125,7 +159,8 @@ export class BulletRoom extends BaseGameRoom {
       rankToday: 0,
       teamSize: 0,
     });
-    for (const player of this.state.players.values()) player.snaps = 0;
+    this.resetSnaps();
+    this.puzzlesInGame = 0;
     this.nextRound();
     await this.unlock();
     if (this.options.maxPlayers === 1) this.startPlaying();
@@ -146,7 +181,9 @@ export class BulletRoom extends BaseGameRoom {
   protected nextRound() {
     const imageId = this.drawImage();
     const { width, height } = CATALOG.find((image) => image.id === imageId)!;
-    const { rows, cols } = gridForPieceCount(this.options.pieces, width / height);
+    const lightning = isLightningRound(this.puzzlesInGame++);
+    const pieces = lightning ? LIGHTNING_PIECES : this.options.pieces;
+    const { rows, cols } = gridForPieceCount(pieces, width / height);
     const seed = randomUUID().slice(0, 8);
     const settings = {
       imageId,
@@ -158,7 +195,12 @@ export class BulletRoom extends BaseGameRoom {
       pieceCount: this.options.pieces,
       maxPlayers: this.options.maxPlayers,
     };
-    const board = new BoardSchema({ config: new PuzzleConfigSchema(settings) });
+    const board = new BoardSchema({
+      config: new PuzzleConfigSchema(settings),
+      lightning,
+      // O relâmpago já é curto: sem dourada.
+      golden: lightning ? -1 : Math.floor(Math.random() * rows * cols),
+    });
     this.board = new BoardRuntime(
       PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height })),
       board,
@@ -167,18 +209,41 @@ export class BulletRoom extends BaseGameRoom {
     this.state.config = new PuzzleConfigSchema(settings); // a raiz mostra o quebra-cabeça da vez
     this.state.boards.set(BOARD, board);
     this.state.round += 1;
+    this.roundShownAt = this.state.countdown > 0 || this.phase !== 'playing' ? 0 : this.elapsed();
+  }
+
+  /** Ímã: gasta uma ajuda e encaixa sozinho algumas peças da mesa da vez. */
+  private useMagnet() {
+    if (!this.canPlay(BOARD) || this.state.helpers === 0) return;
+    this.state.helpers -= 1;
+    this.afterSnaps(this.board.magnet(MAGNET_PIECES));
   }
 
   private drop(client: Client, message: MoveMessage) {
     if (message.board !== BOARD) return;
     const result = this.board.drop(client.sessionId, message);
     if (!result) return;
-    const player = this.state.players.get(client.sessionId);
-    if (player) player.snaps += result.snaps;
-    if (!result.completed || this.phase !== 'playing') return;
+    this.countSnaps(client.sessionId, result.snaps);
+    this.afterSnaps(result);
+  }
 
-    this.state.boards.get(BOARD)!.done = true;
+  /** Depois de encaixes (da mão de alguém ou do ímã): dourada, quebra-cabeça montado e bônus. */
+  private afterSnaps(result: { snaps: number; completed: boolean }) {
+    if (result.snaps === 0 || this.phase !== 'playing') return;
+    const board = this.state.boards.get(BOARD)!;
+    if (board.golden >= 0 && this.board.isSnapped(board.golden)) {
+      board.golden = -1;
+      this.addTime(GOLDEN_BONUS_MS);
+    }
+    if (!result.completed) return;
+
+    board.done = true;
     this.state.solved += 1;
+    if (board.lightning) {
+      this.state.helpers = Math.min(MAX_HELPERS, this.state.helpers + 1);
+    } else if (this.elapsed() - this.roundShownAt <= FAST_MS_PER_PIECE * this.options.pieces) {
+      this.addTime(FAST_BONUS_MS);
+    }
     this.nextRoundTimer = this.clock.setTimeout(() => {
       if (this.phase === 'playing') this.nextRound();
     }, NEXT_ROUND_DELAY_MS);
@@ -195,7 +260,7 @@ export class BulletRoom extends BaseGameRoom {
     for (const sessionId of this.state.players.keys()) this.board.releaseHeldBy(sessionId);
     this.state.phase = 'completed' satisfies GamePhase;
     this.state.remainingMs = 0;
-    this.state.durationMs = this.state.elapsedMs = this.state.timeLimitMs;
+    this.state.durationMs = this.state.elapsedMs = this.limit();
     this.state.partial = board.done ? 0 : this.board.placed();
     const team = this.team();
     this.state.teamSize = new Set(team.map(identityKey)).size;
@@ -217,9 +282,10 @@ export class BulletRoom extends BaseGameRoom {
         finishedAt: new Date(finishedAt),
         players: team,
       })
-      .then(({ rank, rankToday }) => {
+      .then(({ rank, rankToday, record }) => {
         this.state.rank = rank;
         this.state.rankToday = rankToday;
+        this.state.record = record;
         this.state.rankStatus = 'saved' satisfies RankStatus;
       })
       .catch((error: unknown) => {
