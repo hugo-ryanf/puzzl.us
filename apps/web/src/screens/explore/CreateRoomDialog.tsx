@@ -19,6 +19,7 @@ import { DIFFICULTY_NAMES, Pips, difficultyOf } from '../../ui/difficulty';
 import { Dialog } from '../../ui/Dialog';
 import {
   ArrowRightIcon,
+  BoltIcon,
   CameraIcon,
   CheckIcon,
   CloseIcon,
@@ -81,6 +82,7 @@ export function CreateRoomDialog({
   const [format, setFormat] = useState<BattleFormat>('1v1');
   /** Batalha por tempo (quem monta mais) em vez de corrida (quem monta primeiro). */
   const [battleTimed, setBattleTimed] = useState(false);
+  const [powers, setPowers] = useState(true);
   const [players, setPlayers] = useState(2);
   const [randomImage, setRandomImage] = useState(false);
   const [uploaded, setUploaded] = useState<UploadedImage>();
@@ -150,6 +152,7 @@ export function CreateRoomDialog({
             imageId: RANDOM_IMAGE,
             format,
             minutes,
+            powers,
           }),
         );
       } catch (e) {
@@ -165,7 +168,7 @@ export function CreateRoomDialog({
     setError(undefined);
     try {
       if (mode === 'battle') {
-        onCreated(await createBattleRoom({ name: trimmed, pieceCount, imageId, format }));
+        onCreated(await createBattleRoom({ name: trimmed, pieceCount, imageId, format, powers }));
         return;
       }
       const maxPlayers = mode === 'solo' ? 1 : players;
@@ -326,6 +329,18 @@ export function CreateRoomDialog({
                   ))}
                 </fieldset>
                 {timeAndPieces}
+                {/* Duplas contra duplas no estilo Bullet = batalha por tempo 2v2. */}
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={() => {
+                    setMode('battle');
+                    setBattleTimed(true);
+                    setFormat('2v2');
+                  }}
+                >
+                  Contra outra dupla? Bullet 2v2 →
+                </button>
               </div>
             )}
 
@@ -369,6 +384,30 @@ export function CreateRoomDialog({
                       {value}
                     </label>
                   ))}
+                </fieldset>
+                <fieldset className="choice-row">
+                  <legend>Poderes</legend>
+                  <label className="radio-chip">
+                    <input
+                      type="radio"
+                      name="battle-powers"
+                      className="sr-only"
+                      checked={powers}
+                      onChange={() => setPowers(true)}
+                    />
+                    <BoltIcon size={16} />
+                    Com poderes
+                  </label>
+                  <label className="radio-chip">
+                    <input
+                      type="radio"
+                      name="battle-powers"
+                      className="sr-only"
+                      checked={!powers}
+                      onChange={() => setPowers(false)}
+                    />
+                    Sem
+                  </label>
                 </fieldset>
                 {timedBattle && timeAndPieces}
                 {!custom && !timedBattle && (
