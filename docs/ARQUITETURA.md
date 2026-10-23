@@ -299,7 +299,10 @@ mostrar; entrar pelo código funciona para qualquer modo.
     recebem a mesma sequência de fotos sorteadas, com as mesmas posições (`rounds`, gerada conforme
     o lado mais rápido avança). Montou um, `solved` da mesa sobe e ~0,9 s depois entra o próximo
     (cada lado no seu ritmo; o cliente remonta a mesa pela `seed`). No fim do tempo ganha quem
-    montou mais; empate, mais peças encaixadas no que ficou pela metade; senão `winner = 'draw'`.
+    montou mais; empate, mais peças encaixadas no que ficou pela metade; empatando também,
+    **morte súbita** (`suddenDeath`): o relógio para, os dois lados recebem o mesmo quebra-cabeça
+    seguinte da sequência e quem montar primeiro ganha. No criar sala, "Bullet 2v2" (na opção
+    Bullet) é atalho para a batalha por tempo 2v2.
 - **"3, 2, 1"** (Bullet e batalha por tempo): no "Começar" a fase já vira `playing`, mas
   `countdown` conta 3 → 0 no servidor (`startAfterCountdown` na `BaseGameRoom`); até chegar a 0
   as peças ficam travadas (servidor e cliente) e o relógio não anda. Nos últimos 10 s, o cliente
@@ -312,6 +315,50 @@ mostrar; entrar pelo código funciona para qualquer modo.
   montado, fim (vitória, derrota, empate; sino no fim do Bullet) e convite de amigo
   (`useGameSounds` na sala; o convite na presença). O botão de alto-falante no cabeçalho da sala
   liga e desliga tudo, lembrado neste navegador (`quebra-cabeca:som`).
+- **Pressão na tela** (Bullet e Batalha):
+  - **Combo**: encaixes do mesmo jogador a menos de 3 s um do outro sobem `combo` no
+    `PlayerSchema` (até 9; `countSnaps` na `BaseGameRoom`). O cliente mostra "Combo xN" na mesa
+    (`ComboBurst`) e o som do encaixe sobe de tom.
+  - **Brilho dourado** no grupo que acabou de receber peças (`BoardScene`).
+  - **Cabo de guerra** (`TugOfWar`) no alto da linha do meio da batalha: o nó pende para quem está
+    na frente (montados + fração da mesa, ou % na corrida).
+  - **Avisos** (`EventFeed`): alguém montou, virada e "falta pouco", deduzidos das mudanças do
+    estado.
+  - **Últimos 10 s**: o relógio pega fogo (chama e brasas em CSS) e a borda da mesa pulsa; o nó
+    do cabo de guerra também queima.
+- **Bônus** (Bullet e batalha por tempo), sempre ligados:
+  - **Peça dourada** (`BoardSchema.golden`, -1 depois de encaixada): uma por quebra-cabeça, a
+    mesma nos dois lados da batalha (vai no `Round`). No Bullet vale +5 s; na batalha, por
+    enquanto só brilha (vira energia com os poderes).
+  - **Montar rápido** (Bullet): abaixo de ~3,3 s por peça (40 s para 12) vale +5 s. O tempo
+    ganho vai em `bonusMs`; o relógio conta `timeLimitMs + bonusMs` e o ranking continua pela
+    categoria escolhida.
+  - **Rodada relâmpago** (`isLightningRound`: o 4º, 8º… quebra-cabeça da partida, 6 peças, sem
+    dourada). No Bullet, montá-la dá um **Ímã** (`helpers`, até 2): a mensagem `magnet` encaixa
+    sozinha 3 peças soltas no maior bloco vizinho (`BoardRuntime.magnet`). Na batalha, enche a
+    energia.
+- **Poderes da batalha** (`powers` ao criar, ligado por padrão; `state.powers`):
+  - **Energia** do lado (`BoardSchema.energy`, 0–100; passa para o quebra-cabeça seguinte junto
+    com escudo e efeitos): +4 por encaixe e +2 por nível de combo, +25 da dourada, +30 por montado
+    (por tempo) e +100 pela rodada relâmpago.
+  - Mensagem `usePower` (`BATTLE_POWERS`, custo em `POWER_COST`, recarga de 6 s por lado em
+    `powerReadyAt`): **Escudo** arma `shield` no próprio lado e anula o próximo poder recebido;
+    **Neblina** põe `fogUntil` no adversário (5 s, o cliente desfoca a mesa); **Congelar** põe
+    `frozenUntil` (3 s; o servidor recusa pegar/soltar e solta o que estava na mão); **Embaralhar**
+    reespalha as peças soltas do adversário. Os tempos são do relógio da partida (`elapsed()`).
+  - O servidor avisa todo mundo (`power`: lado, poder, se foi anulado); o cliente mostra no
+    `EventFeed`, toca o som do poder e desenha a barra (`PowerBar`, teclas 1 a 4) e a energia de
+    cada lado no cabeçalho.
+- **Progresso**:
+  - **Recorde do Bullet**: `saveRun` diz se a corrida superou a melhor da mesma equipe na
+    categoria (`state.record` → "Novo recorde!" e som); `GET /api/ranking/bullet/me` devolve a
+    melhor corrida de quem está vendo ("Seu melhor" no cabeçalho do Bullet).
+  - **Placar das batalhas**: `battle_results` + `battle_result_players` (migração
+    `0014_batalhas`), gravados no fim de toda batalha com vencedor pelo `battleStore`, com a
+    escalação do começo (quem sai no meio continua contando) e `comeback` (o vencedor estava atrás
+    a 10 s do fim). O `linkGuest` também passa as batalhas do convidado para a conta.
+  - **Perfil**: vitórias, derrotas, maior sequência de vitórias e quem mais enfrentou
+    (`ProfileStats`), e as conquistas Primeira vitória, 5 seguidas e Virada!.
 - Os modos novos não têm snapshot nem "Salvar e sair": se o servidor reiniciar no meio, a
   partida acaba.
 - **Jogar novamente** (mensagem `playAgain`, só o anfitrião, depois do fim e com o resultado já
