@@ -4,4 +4,5 @@ export * from './grid';
 export * from './protocol';
 export * from './puzzle';
 export * from './random';
+export * from './sliding';
 export * from './state';
