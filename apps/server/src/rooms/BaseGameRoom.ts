@@ -28,6 +28,9 @@ const RECONNECT_SECONDS = 30;
 export const CLOCK_UPDATE_MS = 1000;
 /** Segundos do "3, 2, 1" antes do Bullet e da batalha por tempo (os testes zeram). */
 export const COUNTDOWN = { seconds: 3 };
+/** Encaixes a menos disso um do outro (do mesmo jogador) formam combo. */
+export const COMBO_WINDOW_MS = 3000;
+const MAX_COMBO = 9;
 
 /** Quem é a pessoa: a conta (vale em qualquer aparelho) ou, sem login, o convidado do navegador. */
 export interface Identity {
@@ -69,6 +72,8 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
   protected clockOrigin = 0;
   protected clockTimer?: Delayed;
   protected countdownTimer?: Delayed;
+  /** Hora do último encaixe de cada sessão (para o combo). */
+  private readonly lastSnapAt = new Map<string, number>();
 
   /** Mensagens que valem em qualquer modo; cada sala junta as dela. */
   protected commonMessages() {
@@ -188,6 +193,26 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
       this.countdownTimer?.clear();
       go();
     }, 1000);
+  }
+
+  /** Soma os encaixes do jogador e atualiza o combo dele (Bullet e Batalha). */
+  protected countSnaps(sessionId: string, snaps: number) {
+    const player = this.state.players.get(sessionId);
+    if (!player || snaps === 0) return;
+    player.snaps += snaps;
+    const now = Date.now();
+    const quick = now - (this.lastSnapAt.get(sessionId) ?? 0) <= COMBO_WINDOW_MS;
+    player.combo = quick ? Math.min(MAX_COMBO, player.combo + 1) : 1;
+    this.lastSnapAt.set(sessionId, now);
+  }
+
+  /** Partida nova (jogar novamente, revanche): encaixes e combos do zero. */
+  protected resetSnaps() {
+    for (const player of this.state.players.values()) {
+      player.snaps = 0;
+      player.combo = 0;
+    }
+    this.lastSnapAt.clear();
   }
 
   /** Partida acabou antes de a contagem terminar (W.O.): para a contagem. */
