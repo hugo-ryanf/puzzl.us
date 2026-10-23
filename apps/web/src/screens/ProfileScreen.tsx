@@ -24,6 +24,8 @@ import {
   PlusIcon,
   PuzzleIcon,
   StarIcon,
+  SwordsIcon,
+  TrophyIcon,
   UsersIcon,
 } from '../ui/icons';
 
@@ -42,6 +44,8 @@ const dateFormat = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'nume
 /** Os dias da barrinha da sequência (a conquista é uma semana seguida). */
 const STREAK_GOAL = 7;
 const PIECES_GOAL = 100;
+/** Vitórias seguidas na batalha para a conquista. */
+const WIN_STREAK_GOAL = 5;
 const PRESET_NAMES: Record<AvatarPreset, string> = {
   petroleo: 'Petróleo',
   gelo: 'Gelo',
@@ -328,6 +332,23 @@ function Overview({
         <Stat value={stats.friends} label="Amigos" onClick={onOpenFriends} />
       </div>
 
+      <section className="profile-battles" aria-labelledby="profile-battles-title">
+        <h2 id="profile-battles-title">
+          <SwordsIcon size={18} /> Batalhas
+        </h2>
+        <div className="profile-numbers">
+          <Stat value={stats.battleWins} label="Vitórias" />
+          <Stat value={stats.battleLosses} label="Derrotas" />
+          <Stat value={stats.battleBestStreak} label="Maior sequência de vitórias" />
+        </div>
+        {stats.rival && (
+          <p className="profile-hint">
+            Quem mais enfrentou: <strong>{stats.rival.name}</strong> ({stats.rival.battles}{' '}
+            {stats.rival.battles === 1 ? 'batalha' : 'batalhas'})
+          </p>
+        )}
+      </section>
+
       <section className="profile-badges" aria-labelledby="profile-badges-title">
         <div className="profile-badges-head">
           <h2 id="profile-badges-title">Conquistas</h2>
@@ -401,6 +422,27 @@ function achievements(stats: ProfileStats): Array<{
       doneText: 'Montou um quebra-cabeça em equipe',
       progressText: 'Monte um quebra-cabeça em dupla',
       pct: pct(stats.teamPuzzles, 1),
+    },
+    {
+      icon: <SwordsIcon size={22} />,
+      title: 'Primeira vitória',
+      doneText: 'Ganhou a primeira batalha',
+      progressText: 'Ganhe uma batalha',
+      pct: pct(stats.battleWins, 1),
+    },
+    {
+      icon: <TrophyIcon size={22} />,
+      title: `${WIN_STREAK_GOAL} seguidas`,
+      doneText: `${WIN_STREAK_GOAL} batalhas ganhas seguidas`,
+      progressText: `${Math.min(stats.battleBestStreak, WIN_STREAK_GOAL)} de ${WIN_STREAK_GOAL} vitórias seguidas`,
+      pct: pct(stats.battleBestStreak, WIN_STREAK_GOAL),
+    },
+    {
+      icon: <BoltIcon size={22} />,
+      title: 'Virada!',
+      doneText: 'Ganhou uma batalha estando atrás a 10 s do fim',
+      progressText: 'Vire uma batalha por tempo nos últimos 10 s',
+      pct: pct(stats.battleComebacks, 1),
     },
   ];
 }
