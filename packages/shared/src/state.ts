@@ -52,6 +52,8 @@ export const GroupSchema = schema(
   {
     x: t.float32(),
     y: t.float32(),
+    /** Quartos de volta (0–3) no sentido do relógio; só encaixa com a mesma rotação. */
+    rotation: t.uint8().default(0),
     /** sessionId de quem está arrastando; "" quando livre. */
     heldBy: t.string().default(''),
   },
@@ -94,6 +96,17 @@ export const BoardSchema = schema(
   'BoardSchema',
 );
 export type BoardSchema = SchemaType<typeof BoardSchema>;
+
+/** Relâmpago de deslizar: a grade de um lado (tiles[posição] = peça; ver sliding.ts). */
+export const SlideSchema = schema(
+  {
+    tiles: t.array('uint8'),
+    /** Casas deslizadas (o cliente toca um som a cada uma). */
+    moves: t.uint16().default(0),
+  },
+  'SlideSchema',
+);
+export type SlideSchema = SchemaType<typeof SlideSchema>;
 
 export const RoomState = schema(
   {
@@ -148,6 +161,15 @@ export const RoomState = schema(
     helpers: t.uint8().default(0),
     /** Batalha: poderes ligados nesta sala. */
     powers: t.boolean().default(false),
+    /**
+     * Relâmpago de deslizar em andamento: a grade de cada lado ('a'/'b' na batalha, 'main' no
+     * Bullet). Vazio fora do relâmpago.
+     */
+    slides: t.map(SlideSchema),
+    /** Batalha: segundos que faltam para o relâmpago acabar sem ninguém montar. */
+    slideSeconds: t.uint8().default(0),
+    /** Batalha: quem montou o relâmpago primeiro ('a'/'b'), 'none' se o prazo acabou; '' antes. */
+    slideWinner: t.string().default(''),
     /**
      * Batalha por tempo empatada no fim do tempo: os dois lados recebem mais um quebra-cabeça e
      * quem montar primeiro ganha. Fica true até a revanche (o resultado diz como foi).
