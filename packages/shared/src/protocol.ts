@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SLIDE_TILES } from './sliding';
 import { findCatalogImage } from './catalog';
 import { PIECE_COUNT_PRESETS } from './grid';
 
@@ -131,6 +132,9 @@ const boardKey = z.enum(['main', 'a', 'b']).optional();
 
 export const GrabMessage = z.object({ groupId, board: boardKey });
 export type GrabMessage = z.infer<typeof GrabMessage>;
+
+/** Gira o grupo um quarto de volta (livre ou na mão de quem pede). */
+export const RotateMessage = GrabMessage;
 
 /** Usado tanto para mover quanto para soltar (o drop leva a posição final). */
 export const MoveMessage = z.object({ groupId, x: coordinate, y: coordinate, board: boardKey });
@@ -664,9 +668,9 @@ export const POWER_COST: Record<BattlePower, number> = {
   freeze: 40,
   shuffle: 60,
 };
-export const POWER_COOLDOWN_MS = 6000;
-export const FOG_MS = 5000;
-export const FREEZE_MS = 3000;
+export const POWER_COOLDOWN_MS = 12_000;
+export const FOG_MS = 8000;
+export const FREEZE_MS = 5000;
 export const MAX_ENERGY = 100;
 /** Energia ganha: por encaixe (mais por nível de combo), dourada, montado e relâmpago. */
 export const ENERGY_PER_SNAP = 4;
@@ -676,6 +680,18 @@ export const ENERGY_SOLVED = 30;
 export const ENERGY_LIGHTNING = 100;
 
 export const UsePowerMessage = z.object({ power: z.enum(BATTLE_POWERS) });
+
+/** Relâmpago de deslizar: a posição da peça que vai para o vazio. */
+export const SlideMessage = z.object({
+  index: z
+    .number()
+    .int()
+    .min(0)
+    .max(SLIDE_TILES - 1),
+});
+/** Batalha: quanto tempo o relâmpago dura no máximo e quanto o resultado fica na tela. */
+export const SLIDE_LIMIT_SECONDS = 60;
+export const SLIDE_RESULT_MS = 1500;
 
 /** Aviso 'power' para todos: quem usou, qual e se o escudo do outro lado anulou. */
 export interface PowerBroadcast {
