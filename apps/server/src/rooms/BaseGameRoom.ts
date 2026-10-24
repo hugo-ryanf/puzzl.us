@@ -28,6 +28,8 @@ const RECONNECT_SECONDS = 30;
 export const CLOCK_UPDATE_MS = 1000;
 /** Segundos do "3, 2, 1" antes do Bullet e da batalha por tempo (os testes zeram). */
 export const COUNTDOWN = { seconds: 3 };
+/** Peças espalhadas viradas (todos os modos); os testes de sala desligam para montar fácil. */
+export const ROTATION = { enabled: true };
 /** Encaixes a menos disso um do outro (do mesmo jogador) formam combo. */
 export const COMBO_WINDOW_MS = 3000;
 const MAX_COMBO = 9;
