@@ -3,13 +3,34 @@ import { createRandom, uniform, type Random } from './random';
 
 /**
  * Peças encaixadas andam juntas. Como dentro de um grupo todas estão na posição relativa
- * correta, o grupo guarda só um deslocamento: posição da peça = posição correta + (x, y).
+ * correta, o grupo guarda só um deslocamento e uma rotação (em quartos de volta, no sentido do
+ * relógio): posição da peça = girar(posição correta, rotação) + (x, y). Sem rotação, é a posição
+ * correta + (x, y).
  */
 export interface GroupState {
   id: number;
   x: number;
   y: number;
+  /** 0, 1, 2 ou 3 quartos de volta. */
+  rotation: number;
   pieceIds: number[];
+}
+
+/** Grupo vindo de fora (snapshot antigo): sem rotação, vale 0. */
+export type GroupInput = Omit<GroupState, 'rotation'> & { rotation?: number };
+
+/** Gira um ponto em volta da origem, em quartos de volta no sentido do relógio (y para baixo). */
+export function rotatePoint({ x, y }: Point, rotation: number): Point {
+  switch (((rotation % 4) + 4) % 4) {
+    case 1:
+      return { x: -y, y: x };
+    case 2:
+      return { x: -x, y: -y };
+    case 3:
+      return { x: y, y: -x };
+    default:
+      return { x, y };
+  }
 }
 
 export interface DropResult {
@@ -39,6 +60,15 @@ function scatterOffset(puzzle: Puzzle, random: Random, piece: PieceDef): Point {
   };
 }
 
+/**
+ * Deslocamento de uma peça virada para o canto dela cair onde `offset` poria a peça de pé (o
+ * espalhamento sorteia lugares pensando nas peças de pé).
+ */
+function turnedOffset(piece: PieceDef, offset: Point, rotation: number): Point {
+  const turned = rotatePoint(piece, rotation);
+  return { x: piece.x + offset.x - turned.x, y: piece.y + offset.y - turned.y };
+}
+
 function overlaps(a: Rect, b: Rect): boolean {
   return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
@@ -48,10 +78,14 @@ export class PuzzleEngine {
   private readonly groups = new Map<number, GroupState>();
   private readonly pieceGroup: number[];
 
-  /** `offsets[i]` é o deslocamento inicial da peça i; cada peça começa no próprio grupo. */
+  /**
+   * `offsets[i]` é o deslocamento inicial da peça i e `rotations[i]` a rotação dela (sem: todas
+   * de pé); cada peça começa no próprio grupo.
+   */
   constructor(
     readonly puzzle: Puzzle,
     offsets: Point[],
+    rotations: number[] = [],
   ) {
     if (offsets.length !== puzzle.pieces.length) {
       throw new RangeError(
@@ -62,22 +96,34 @@ export class PuzzleEngine {
     this.pieceGroup = puzzle.pieces.map((piece) => piece.id);
     for (const piece of puzzle.pieces) {
       const { x, y } = offsets[piece.id]!;
-      this.groups.set(piece.id, { id: piece.id, x, y, pieceIds: [piece.id] });
+      const rotation = rotations[piece.id] ?? 0;
+      this.groups.set(piece.id, { id: piece.id, x, y, rotation, pieceIds: [piece.id] });
     }
   }
 
-  /** Espalha as peças numa área 2× maior que a imagem, de forma reproduzível pelo seed. */
-  static scattered(puzzle: Puzzle): PuzzleEngine {
-    const random = createRandom(`${puzzle.seed}:scatter`);
-    const offsets = puzzle.pieces.map((piece) => scatterOffset(puzzle, random, piece));
-    return new PuzzleEngine(puzzle, offsets);
+  /**
+   * Espalha as peças numa área 2× maior que a imagem, de forma reproduzível pelo seed. Com `salt`
+   * (o lado da batalha), o mesmo quebra-cabeça sai espalhado de outro jeito; com `rotate`, cada
+   * peça cai virada para um lado sorteado.
+   */
+  static scattered(
+    puzzle: Puzzle,
+    { salt, rotate = false }: { salt?: string; rotate?: boolean } = {},
+  ): PuzzleEngine {
+    const random = createRandom(`${puzzle.seed}:scatter${salt ? `:${salt}` : ''}`);
+    // Virada, o canto da peça fica onde ela cairia de pé.
+    const rotations = puzzle.pieces.map(() => (rotate ? Math.floor(random() * 4) : 0));
+    const offsets = puzzle.pieces.map((piece) =>
+      turnedOffset(piece, scatterOffset(puzzle, random, piece), rotations[piece.id]!),
+    );
+    return new PuzzleEngine(puzzle, offsets, rotations);
   }
 
   /**
    * Remonta a mesa a partir de grupos já formados (snapshot de uma sala salva). Cada peça tem
    * que aparecer em exatamente um grupo; os ids dos grupos são preservados.
    */
-  static fromGroups(puzzle: Puzzle, groups: readonly GroupState[]): PuzzleEngine {
+  static fromGroups(puzzle: Puzzle, groups: readonly GroupInput[]): PuzzleEngine {
     const seen = new Set<number>();
     for (const group of groups) {
       for (const pieceId of group.pieceIds) {
@@ -96,8 +142,8 @@ export class PuzzleEngine {
       puzzle.pieces.map(() => ({ x: 0, y: 0 })),
     );
     engine.groups.clear();
-    for (const { id, x, y, pieceIds } of groups) {
-      engine.groups.set(id, { id, x, y, pieceIds: [...pieceIds] });
+    for (const { id, x, y, rotation = 0, pieceIds } of groups) {
+      engine.groups.set(id, { id, x, y, rotation, pieceIds: [...pieceIds] });
       for (const pieceId of pieceIds) engine.pieceGroup[pieceId] = id;
     }
     return engine;
@@ -116,13 +162,17 @@ export class PuzzleEngine {
     for (const group of groups) {
       if (group.pieceIds.length > 1 || !canMove(group)) continue;
       const piece = this.puzzle.pieces[group.pieceIds[0]!]!;
-      let offset = scatterOffset(this.puzzle, random, piece);
+      // A peça continua virada como estava; só muda de lugar.
+      const place = () =>
+        turnedOffset(piece, scatterOffset(this.puzzle, random, piece), group.rotation);
+      let offset = place();
       for (
         let tries = 1;
-        tries < SCATTER_TRIES && blocks.some((b) => overlaps(b, this.pieceRect(piece, offset)));
+        tries < SCATTER_TRIES &&
+        blocks.some((b) => overlaps(b, this.pieceRect(piece, offset, group.rotation)));
         tries++
       ) {
-        offset = scatterOffset(this.puzzle, random, piece);
+        offset = place();
       }
       group.x = offset.x;
       group.y = offset.y;
@@ -153,11 +203,42 @@ export class PuzzleEngine {
     return group;
   }
 
-  /** Posição atual (canto superior esquerdo) da peça. */
+  /** Posição atual do canto da peça (o canto de cima à esquerda quando ela está de pé). */
   piecePosition(pieceId: number): Point {
     const piece = this.puzzle.pieces[pieceId]!;
     const group = this.groupOf(pieceId);
-    return { x: piece.x + group.x, y: piece.y + group.y };
+    const turned = rotatePoint(piece, group.rotation);
+    return { x: turned.x + group.x, y: turned.y + group.y };
+  }
+
+  /** Gira o grupo um quarto de volta (sentido do relógio) sem tirar o centro dele do lugar. */
+  rotateGroup(groupId: number): void {
+    const group = this.getGroup(groupId);
+    const { pieceWidth, pieceHeight } = this.puzzle;
+    // Centro das peças na foto (de pé); girado + deslocamento = centro na mesa.
+    const pieces = group.pieceIds.map((id) => this.puzzle.pieces[id]!);
+    const center = {
+      x: pieces.reduce((sum, p) => sum + p.x, 0) / pieces.length + pieceWidth / 2,
+      y: pieces.reduce((sum, p) => sum + p.y, 0) / pieces.length + pieceHeight / 2,
+    };
+    const before = rotatePoint(center, group.rotation);
+    group.rotation = (group.rotation + 1) % 4;
+    const after = rotatePoint(center, group.rotation);
+    group.x += before.x - after.x;
+    group.y += before.y - after.y;
+  }
+
+  /** Gira até ficar de pé (a foto montada aparece certa). */
+  straighten(groupId: number): void {
+    while (this.getGroup(groupId).rotation !== 0) this.rotateGroup(groupId);
+  }
+
+  /** Põe o grupo na rotação e no deslocamento de outro (o ímã: alinhado para encaixar). */
+  alignTo(groupId: number, target: GroupState): void {
+    const group = this.getGroup(groupId);
+    group.rotation = target.rotation;
+    group.x = target.x;
+    group.y = target.y;
   }
 
   moveGroup(groupId: number, x: number, y: number): void {
@@ -197,27 +278,34 @@ export class PuzzleEngine {
       for (const neighborId of neighborsOf(this.puzzle, pieceId)) {
         const other = this.groupOf(neighborId);
         if (other.id === group.id || !canAbsorb(other)) continue;
+        // Virados de jeitos diferentes não encaixam (com a mesma rotação, alinhado = mesmo x, y).
+        if (other.rotation !== group.rotation) continue;
         if (Math.hypot(other.x - group.x, other.y - group.y) <= this.snapDistance) return other;
       }
     }
     return undefined;
   }
 
-  /** Retângulo da peça (sem as abas) se o grupo dela estivesse no deslocamento dado. */
-  private pieceRect(piece: PieceDef, offset: Point): Rect {
-    const left = piece.x + offset.x;
-    const top = piece.y + offset.y;
+  /** Retângulo da peça (sem as abas) se o grupo dela estivesse no deslocamento e rotação dados. */
+  private pieceRect(piece: PieceDef, offset: Point, rotation = 0): Rect {
+    const { pieceWidth, pieceHeight } = this.puzzle;
+    const corners = [
+      { x: piece.x, y: piece.y },
+      { x: piece.x + pieceWidth, y: piece.y + pieceHeight },
+    ].map((corner) => rotatePoint(corner, rotation));
     return {
-      left,
-      top,
-      right: left + this.puzzle.pieceWidth,
-      bottom: top + this.puzzle.pieceHeight,
+      left: Math.min(corners[0]!.x, corners[1]!.x) + offset.x,
+      top: Math.min(corners[0]!.y, corners[1]!.y) + offset.y,
+      right: Math.max(corners[0]!.x, corners[1]!.x) + offset.x,
+      bottom: Math.max(corners[0]!.y, corners[1]!.y) + offset.y,
     };
   }
 
   /** Retângulo que envolve todas as peças do grupo. */
   private bounds(group: GroupState): Rect {
-    const rects = group.pieceIds.map((id) => this.pieceRect(this.puzzle.pieces[id]!, group));
+    const rects = group.pieceIds.map((id) =>
+      this.pieceRect(this.puzzle.pieces[id]!, group, group.rotation),
+    );
     return {
       left: Math.min(...rects.map((r) => r.left)),
       top: Math.min(...rects.map((r) => r.top)),
