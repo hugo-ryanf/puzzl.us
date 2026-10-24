@@ -1,5 +1,5 @@
 import { and, eq, gt, lt } from 'drizzle-orm';
-import type { GroupState } from '@puzzle/shared';
+import type { GroupInput } from '@puzzle/shared';
 import type { AppDatabase } from '../db/database';
 import { roomSnapshots } from '../db/schema';
 
@@ -34,7 +34,8 @@ export interface RoomSnapshot {
    * pessoa em duas abas vira uma entrada só.
    */
   players: Array<{ guestId: string; name: string; color: string; snaps: number }>;
-  groups: GroupState[];
+  /** Snapshots de antes da rotação não têm `rotation`: as peças voltam de pé. */
+  groups: GroupInput[];
   /** Conta de quem criou a sala (o único que pode salvar e retomar). Sem conta, ausente. */
   ownerUserId?: string;
   /** A partida salva de onde a sala veio (retomada): ao terminar ou salvar de novo, é ela. */
