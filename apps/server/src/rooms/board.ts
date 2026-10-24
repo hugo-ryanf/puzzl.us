@@ -23,7 +23,10 @@ export class BoardRuntime {
   /** Copia grupos e posições do engine para o estado (tabuleiro novo ou restaurado). */
   mirror(): void {
     for (const group of this.engine.allGroups()) {
-      this.target.groups.set(String(group.id), new GroupSchema({ x: group.x, y: group.y }));
+      this.target.groups.set(
+        String(group.id),
+        new GroupSchema({ x: group.x, y: group.y, rotation: group.rotation }),
+      );
     }
     this.target.pieceGroup.push(
       ...this.engine.puzzle.pieces.map((p) => this.engine.groupOf(p.id).id),
@@ -36,6 +39,21 @@ export class BoardRuntime {
     if (!group || group.heldBy !== '') return;
     this.releaseHeldBy(sessionId); // um grupo por vez por jogador
     group.heldBy = sessionId;
+  }
+
+  /**
+   * Gira o grupo um quarto de volta em volta do centro dele: livre, ou na mão de quem pede.
+   * Devolve se girou.
+   */
+  rotate(sessionId: string, groupId: number): boolean {
+    const group = this.target.groups.get(String(groupId));
+    if (!group || (group.heldBy !== '' && group.heldBy !== sessionId)) return false;
+    this.engine.rotateGroup(groupId);
+    const turned = this.engine.getGroup(groupId);
+    group.x = turned.x;
+    group.y = turned.y;
+    group.rotation = turned.rotation;
+    return true;
   }
 
   /** Devolve se mexeu (só quem está segurando move). */
@@ -64,6 +82,8 @@ export class BoardRuntime {
     );
 
     group.heldBy = '';
+    // Montado: a foto fica de pé para a revelação.
+    if (completed) this.engine.straighten(groupId);
     this.syncMerge(groupId, absorbedGroupIds);
     return { snaps: absorbedGroupIds.length, completed };
   }
@@ -74,6 +94,7 @@ export class BoardRuntime {
     const group = this.target.groups.get(String(groupId))!;
     group.x = merged.x;
     group.y = merged.y;
+    group.rotation = merged.rotation;
     for (const id of absorbedGroupIds) this.target.groups.delete(String(id));
     for (const pieceId of merged.pieceIds) {
       if (this.target.pieceGroup[pieceId] !== groupId) this.target.pieceGroup[pieceId] = groupId;
@@ -104,9 +125,10 @@ export class BoardRuntime {
         }
       }
       if (!best) break;
-      // Mesmo deslocamento do vizinho = a peça no lugar certo em relação a ele.
-      this.engine.moveGroup(best.loose.id, best.target.x, best.target.y);
-      const { absorbedGroupIds } = this.engine.dropGroup(best.loose.id, free);
+      // Mesma rotação e deslocamento do vizinho = a peça no lugar certo em relação a ele.
+      this.engine.alignTo(best.loose.id, best.target);
+      const { absorbedGroupIds, completed } = this.engine.dropGroup(best.loose.id, free);
+      if (completed) this.engine.straighten(best.loose.id);
       this.syncMerge(best.loose.id, absorbedGroupIds);
       snaps += absorbedGroupIds.length;
     }
