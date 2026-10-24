@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PuzzleEngine } from './engine';
+import { PuzzleEngine, rotatePoint } from './engine';
 import { generatePuzzle } from './puzzle';
 import { createRandom } from './random';
 
@@ -71,9 +71,10 @@ describe('PuzzleEngine', () => {
   describe('scatterLoose', () => {
     // Grade 4×4: dá espaço para ter um bloco montado e várias peças soltas.
     const big = generatePuzzle({ seed: 'espalhar', rows: 4, cols: 4, width: 400, height: 400 });
-    /** Peças 0 e 1 encaixadas num bloco; o resto solto. */
+    /** Peças 0 e 1 encaixadas num bloco; o resto solto (tudo de pé, para medir fácil). */
     const withBlock = () => {
       const engine = PuzzleEngine.scattered(big);
+      for (const group of [...engine.allGroups()]) engine.straighten(group.id);
       engine.moveGroup(1, engine.getGroup(0).x, engine.getGroup(0).y);
       engine.dropGroup(1);
       return engine;
@@ -139,5 +140,61 @@ describe('PuzzleEngine', () => {
         ]),
       ).toThrow(RangeError);
     });
+  });
+});
+
+describe('peças girando', () => {
+  // Grade 2×2: 0 1 / 2 3. Deslocamento zero = cada peça no lugar certo (se estiver de pé).
+  const small = generatePuzzle({ seed: 'girar', rows: 2, cols: 2, width: 200, height: 200 });
+  const atHome = () => small.pieces.map(() => ({ x: 0, y: 0 }));
+
+  it('só encaixa com a mesma rotação', () => {
+    const engine = new PuzzleEngine(small, atHome(), [0, 1, 0, 0]);
+    // As de pé (2, embaixo, e depois a 3) encaixam; a 1 (virada) não, mesmo estando no lugar.
+    expect(engine.dropGroup(0).absorbedGroupIds).toEqual([2, 3]);
+    expect(engine.groupOf(1).id).toBe(1);
+
+    // Desvirada (3 quartos de volta) e posta no alinhamento do bloco, encaixa.
+    for (let i = 0; i < 3; i++) engine.rotateGroup(1);
+    expect(engine.getGroup(1).rotation).toBe(0);
+    const block = engine.groupOf(0);
+    engine.moveGroup(1, block.x, block.y);
+    expect(engine.dropGroup(1).absorbedGroupIds).toContain(block.id);
+  });
+
+  it('girar mantém o centro do grupo e quatro giros voltam ao começo', () => {
+    const engine = new PuzzleEngine(small, atHome());
+    engine.moveGroup(3, 40, -10);
+    const start = { ...engine.getGroup(3) };
+    const center = () => {
+      const { x, y } = engine.piecePosition(3);
+      const { rotation } = engine.getGroup(3);
+      // Centro = canto + metade da peça girada junto.
+      const half = rotatePoint({ x: small.pieceWidth / 2, y: small.pieceHeight / 2 }, rotation);
+      return { x: x + half.x, y: y + half.y };
+    };
+    const before = center();
+    engine.rotateGroup(3);
+    expect(center().x).toBeCloseTo(before.x);
+    expect(center().y).toBeCloseTo(before.y);
+    for (let i = 0; i < 3; i++) engine.rotateGroup(3);
+    expect(engine.getGroup(3).x).toBeCloseTo(start.x);
+    expect(engine.getGroup(3).y).toBeCloseTo(start.y);
+  });
+
+  it('endireitar deixa o grupo de pé', () => {
+    const engine = new PuzzleEngine(small, atHome(), [2, 0, 0, 0]);
+    engine.straighten(0);
+    expect(engine.getGroup(0).rotation).toBe(0);
+  });
+
+  it('o espalhar sorteia rotações; grupos sem rotação (snapshot antigo) ficam de pé', () => {
+    const rotations = [...PuzzleEngine.scattered(small).allGroups()].map((g) => g.rotation);
+    expect(rotations.every((r) => [0, 1, 2, 3].includes(r))).toBe(true);
+    const restored = PuzzleEngine.fromGroups(
+      small,
+      small.pieces.map((p) => ({ id: p.id, x: 0, y: 0, pieceIds: [p.id] })),
+    );
+    expect([...restored.allGroups()].every((g) => g.rotation === 0)).toBe(true);
   });
 });
