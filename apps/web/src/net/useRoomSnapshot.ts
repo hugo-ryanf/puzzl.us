@@ -78,6 +78,13 @@ export interface RoomSnapshot {
   record: boolean;
   /** Batalha: poderes ligados. */
   powers: boolean;
+  /** Relâmpago de deslizar: a grade de cada lado ('a'/'b'; 'main' no Bullet). */
+  slides: Partial<Record<string, { tiles: number[]; moves: number }>>;
+  /** Batalha: segundos que faltam no relâmpago e quem levou ('none': ninguém; '' em andamento). */
+  slideSeconds: number;
+  slideWinner: string;
+  /** Batalha com relâmpago em andamento: as mesas e o relógio estão pausados. */
+  paused: boolean;
   /** Batalha por tempo empatada: mais um quebra-cabeça, quem montar primeiro ganha. */
   suddenDeath: boolean;
   round: number;
@@ -158,6 +165,15 @@ function readSnapshot(room: PuzzleRoom): RoomSnapshot {
     record: state.record,
     helpers: state.helpers,
     powers: state.powers,
+    slides: Object.fromEntries(
+      [...state.slides.entries()].map(([key, grid]) => [
+        key,
+        { tiles: [...grid.tiles], moves: grid.moves },
+      ]),
+    ),
+    slideSeconds: state.slideSeconds,
+    slideWinner: state.slideWinner,
+    paused: state.mode === 'battle' && state.slides.size > 0,
     suddenDeath: state.suddenDeath,
     round: state.round,
     solved: state.solved,
@@ -202,6 +218,15 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
         refresh();
       }),
       callbacks.onRemove('boards', refresh),
+      // Relâmpago de deslizar: cada casa que anda.
+      callbacks.onAdd('slides', (grid) => {
+        unsubscribers.push(
+          callbacks.onChange(grid, 'tiles', refresh),
+          callbacks.listen(grid, 'moves', refresh),
+        );
+        refresh();
+      }),
+      callbacks.onRemove('slides', refresh),
       ...(
         [
           'phase',
@@ -219,6 +244,8 @@ export function useRoomSnapshot(room: PuzzleRoom): RoomSnapshot {
           'bonusMs',
           'helpers',
           'suddenDeath',
+          'slideSeconds',
+          'slideWinner',
           'record',
           'round',
           'solved',
