@@ -25,6 +25,7 @@ import { createVoiceTokenIssuer, voiceRoomName } from '../voice';
 import type { PuzzleRoom } from './PuzzleRoom';
 import { createSavedGameStore, type SavedGameStore } from './savedGames';
 import { createSnapshotStore, type SnapshotStore } from './snapshots';
+import { ROTATION } from './BaseGameRoom';
 
 let colyseus: ColyseusTestServer;
 let db: AppDatabase;
@@ -39,6 +40,7 @@ const voiceConfig = {
 };
 
 beforeAll(async () => {
+  ROTATION.enabled = false; // peças de pé: os testes montam soltando no lugar
   db = await createMemoryDatabase();
   const store = createGameStore(db);
   const uploads = createUploadStore(db);
