@@ -12,7 +12,7 @@ import {
   type PowerBroadcast,
 } from '@puzzle/shared';
 import { createGameServer } from '../app';
-import { COUNTDOWN } from './BaseGameRoom';
+import { COUNTDOWN, ROTATION } from './BaseGameRoom';
 import type { BattleRoom } from './BattleRoom';
 
 const PORT = 2575;
@@ -21,6 +21,7 @@ const sdk = new ColyseusSDK(`ws://127.0.0.1:${PORT}`);
 let server: Server;
 beforeAll(async () => {
   COUNTDOWN.seconds = 0; // sem o "3, 2, 1" (tem teste próprio)
+  ROTATION.enabled = false; // peças de pé: os testes montam soltando no lugar
   server = createGameServer();
   await server.listen(PORT);
 });
@@ -29,11 +30,14 @@ afterAll(() => server.gracefullyShutdown(false));
 const player = (name: string) => ({ name, guestId: randomUUID() });
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Espera a condição valer (as mensagens dos clientes chegam pela rede). */
-async function until(check: () => boolean) {
-  for (let i = 0; i < 100 && !check(); i++) await wait(10);
+/** Espera a condição valer (as mensagens dos clientes chegam pela rede); `tries` × 10 ms. */
+async function until(check: () => boolean, tries = 100) {
+  for (let i = 0; i < tries && !check(); i++) await wait(10);
   return check();
 }
+
+/** Grade de deslizar a um movimento de resolver: a peça 7 está no lugar do vazio. */
+const NEARLY_SOLVED = [0, 1, 2, 3, 4, 5, 6, 8, 7];
 
 /**
  * Batalha com Ana (lado A, anfitriã) e Bia (lado B); `extra` entram depois. `minutes`: batalha
@@ -89,14 +93,15 @@ async function snapOne(client: ClientRoom, board: BoardSchema, key: 'a' | 'b', p
 }
 
 describe('BattleRoom', () => {
-  it('cada um cai num lado e as duas mesas começam idênticas', async () => {
+  it('cada um cai num lado; o mesmo quebra-cabeça, espalhado diferente em cada mesa', async () => {
     const { ana, bia, state, board, team } = await setup();
     expect(state.mode).toBe('battle');
     expect([team(ana), team(bia)]).toEqual(['a', 'b']);
     expect(board('a').config.seed).toBe(board('b').config.seed);
     const positions = (key: 'a' | 'b') =>
       [...board(key).groups.entries()].map(([id, g]) => [id, g.x, g.y]);
-    expect(positions('a')).toEqual(positions('b'));
+    expect(positions('a')).not.toEqual(positions('b'));
+    expect(board('a').pieceGroup.length).toBe(board('b').pieceGroup.length);
     await ana.leave();
     await bia.leave();
   });
@@ -189,14 +194,14 @@ describe('BattleRoom', () => {
       expect(state.phase).toBe('playing'); // montar um não acaba a partida
       expect(board('b').config.seed).toBe(first);
 
-      // Bia chega no segundo: é o mesmo que a Ana recebeu, nas mesmas posições.
+      // Bia chega no segundo: o mesmo que a Ana recebeu, espalhado de outro jeito.
       const second = board('a').config.seed;
       const layout = (key: 'a' | 'b') =>
         [...board(key).groups.entries()].map(([id, g]) => [id, g.x, g.y]);
       const secondLayout = layout('a');
       await solve(bia, board('b'), 'b');
       expect(await until(() => board('b').config.seed === second)).toBe(true);
-      expect(layout('b')).toEqual(secondLayout);
+      expect(layout('b')).not.toEqual(secondLayout);
       await ana.leave();
       await bia.leave();
     });
@@ -259,22 +264,52 @@ describe('BattleRoom', () => {
       }
     });
 
-    it('dourada e rodada relâmpago iguais para os dois lados', async () => {
-      const { ana, bia, room, board } = await setup('1v1', [], 3);
+    it('a peça dourada é a mesma nos dois lados', async () => {
+      const { ana, bia, board } = await setup('1v1', [], 3);
       expect(board('a').golden).toBeGreaterThanOrEqual(0);
       expect(board('a').golden).toBe(board('b').golden);
-      const roundAt = (index: number) =>
-        (room as unknown as { roundAt(i: number): { lightning: boolean } }).roundAt(index);
-      expect([0, 1, 2, 3, 7].map((i) => roundAt(i).lightning)).toEqual([
-        false,
-        false,
-        false,
-        true,
-        true,
-      ]);
       await ana.leave();
       await bia.leave();
     });
+
+    it('relâmpago: pausa as mesas, mesma grade para os dois, quem monta primeiro leva', async () => {
+      const { ana, bia, room, state, board } = await setup('1v1', [], 3);
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      const lightning = () => (room as unknown as { startLightning(): void }).startLightning();
+      lightning();
+      expect(state.slides.size).toBe(2);
+      expect([...state.slides.get('a')!.tiles]).toEqual([...state.slides.get('b')!.tiles]);
+
+      // Mesas travadas e relógio parado enquanto dura.
+      const groupId = board('a').pieceGroup[1]!;
+      ana.send('grab', { groupId, board: 'a' });
+      const remaining = state.remainingMs;
+      await wait(1200);
+      expect(board('a').groups.get(String(groupId))!.heldBy).toBe('');
+      expect(state.remainingMs).toBe(remaining);
+
+      const grid = state.slides.get('b')!;
+      NEARLY_SOLVED.forEach((tile, position) => (grid.tiles[position] = tile));
+      bia.send('slide', { index: 8 });
+      expect(await until(() => state.slideWinner === 'b')).toBe(true);
+      expect(board('b').energy).toBe(100);
+      ana.send('slide', { index: 7 }); // depois do vencedor, nada mais vale
+      expect(await until(() => state.slides.size === 0, 300)).toBe(true);
+
+      // As mesas voltam a valer.
+      ana.send('grab', { groupId, board: 'a' });
+      expect(await until(() => board('a').groups.get(String(groupId))!.heldBy !== '')).toBe(true);
+
+      // Prazo acabando sem ninguém montar: ninguém leva, e a partida segue.
+      lightning();
+      state.slideSeconds = 1;
+      expect(await until(() => state.slideWinner === 'none', 300)).toBe(true);
+      expect(await until(() => state.slides.size === 0, 300)).toBe(true);
+      expect(state.phase).toBe('playing');
+      await ana.leave();
+      await bia.leave();
+    }, 15_000); // espera os 1,5 s do resultado duas vezes
 
     it('poderes: energia por encaixe, custo, recarga, congelar e escudo', async () => {
       const { ana, bia, state, board } = await setup('1v1', [], 3);
@@ -299,6 +334,14 @@ describe('BattleRoom', () => {
       expect(board('b').groups.get(String(groupId))!.heldBy).toBe('');
       expect(board('a').energy).toBe(100 - POWER_COST.freeze);
       expect(board('b').fogUntil).toBe(0);
+
+      // Congelada, a Bia também não usa poder.
+      board('b').energy = 100;
+      bia.send('usePower', { power: 'shield' });
+      await wait(100);
+      expect(board('b').shield).toBe(false);
+      expect(board('b').energy).toBe(100);
+      board('b').frozenUntil = 0;
 
       // Escudo da Bia anula a neblina da Ana.
       board('b').energy = 100;
