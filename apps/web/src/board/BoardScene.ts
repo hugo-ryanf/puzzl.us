@@ -12,6 +12,7 @@ import { Callbacks } from '@colyseus/sdk';
 import {
   generatePuzzle,
   piecePath,
+  rotatePoint,
   type CursorBroadcast,
   type EdgePath,
   type Point,
@@ -38,6 +39,11 @@ const REVEAL_DURATION_MS = 900;
 const TOOLBAR_SPACE = 64;
 /** Pontos do fundo nunca ficam mais juntos que isso (px na tela); mais longe, viram ruído. */
 const MIN_DOT_SPACING = 14;
+/** Dois toques na mesma peça dentro disso (celular) giram a peça. */
+const DOUBLE_TAP_MS = 300;
+/** Onde um grupo está: deslocamento e rotação (quartos de volta), como no engine. */
+type Placement = Point & { rotation?: number };
+
 /** Brilho do contorno do grupo logo depois de um encaixe. */
 const FLASH_MS = 320;
 const FLASH_COLOR = '#fff4c2';
@@ -115,7 +121,18 @@ export class BoardScene {
   /** Grupos que eu soltei e cuja confirmação (heldBy = "") ainda não chegou → prazo. */
   private readonly awaitingRelease = new Map<number, number>();
 
-  private drag?: { groupId: number; grabOffset: Point; x: number; y: number };
+  private drag?: {
+    groupId: number;
+    grabOffset: Point;
+    x: number;
+    y: number;
+    /** Rotação do grupo na mão (prevista na hora ao girar com R). */
+    rotation: number;
+    /** Último ponto do mouse na mesa (para girar sem o grupo pular). */
+    pointer: Point;
+  };
+  /** Último toque numa peça (celular): o segundo toque logo depois gira. */
+  private lastTap?: { groupId: number; at: number };
   private pan?: { last: Point };
   private readonly unsubscribers: Array<() => void> = [];
 
@@ -138,6 +155,9 @@ export class BoardScene {
     app.stage.on('pointerup', this.handlePointerUp);
     app.stage.on('pointerupoutside', this.handlePointerUp);
     app.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+    // Clique direito gira a peça: sem o menu do navegador por cima.
+    app.canvas.addEventListener('contextmenu', this.preventMenu);
+    window.addEventListener('keydown', this.handleKey);
     app.ticker.add(this.update);
   }
 
@@ -201,6 +221,8 @@ export class BoardScene {
     this.sendCursor.cancel();
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.app.canvas.removeEventListener('wheel', this.handleWheel);
+    this.app.canvas.removeEventListener('contextmenu', this.preventMenu);
+    window.removeEventListener('keydown', this.handleKey);
     this.app.destroy(true, { children: true, texture: true, textureSource: true });
   }
 
@@ -252,6 +274,12 @@ export class BoardScene {
           callbacks.onChange(group, () => this.handleGroupMoved(groupId)),
           callbacks.listen(group, 'heldBy', (heldBy, previous) => {
             if (heldBy !== (previous ?? '')) this.handleHeldByChange(groupId, heldBy);
+          }),
+          // Girou: vai direto para a posição nova (deslizar girando ficaria torto no meio).
+          callbacks.listen(group, 'rotation', () => {
+            if (this.drag?.groupId === groupId) return; // na minha mão: já está previsto
+            if (this.membersDirty) this.rebuildMembers();
+            this.placeGroup(groupId);
           }),
         );
       }),
@@ -331,25 +359,46 @@ export class BoardScene {
   private handlePieceDown(pieceId: number, event: FederatedPointerEvent): void {
     const room = this.room;
     // Peças só se mexem com o relógio correndo (no lobby, no "3, 2, 1" e depois do fim, travadas).
-    if (!room || this.readOnly || room.state.phase !== 'playing' || event.button !== 0) return;
+    if (!room || this.readOnly || room.state.phase !== 'playing') return;
+    if (event.button !== 0 && event.button !== 2) return;
     if (room.state.countdown > 0) return;
     // Congelado por um poder do adversário (o servidor recusa de qualquer jeito).
     const frozenUntil = (this.source as { frozenUntil?: number }).frozenUntil ?? 0;
     if (frozenUntil > room.state.elapsedMs) return;
     if (this.source!.done) return;
     const groupId = this.source!.pieceGroup[pieceId]!;
-    const heldBy = this.serverGroup(groupId)?.heldBy;
+    const server = this.serverGroup(groupId);
+    const heldBy = server?.heldBy;
     if (heldBy === undefined || (heldBy !== '' && heldBy !== room.sessionId)) return;
+
+    // Girar: clique direito, ou dois toques seguidos na mesma peça (celular).
+    if (event.button === 2) {
+      this.rotate(groupId);
+      return;
+    }
+    if (event.pointerType === 'touch') {
+      const now = performance.now();
+      if (this.lastTap?.groupId === groupId && now - this.lastTap.at < DOUBLE_TAP_MS) {
+        this.lastTap = undefined;
+        this.rotate(groupId);
+        return;
+      }
+      this.lastTap = { groupId, at: now };
+    }
 
     // Predição: começamos a arrastar já, sem esperar a resposta do servidor.
     const piece = this.puzzle!.pieces[pieceId]!;
     const graphics = this.pieces[pieceId]!.graphics;
-    const offset = { x: graphics.x - piece.x, y: graphics.y - piece.y };
+    const rotation = server!.rotation;
+    const turned = rotatePoint(piece, rotation);
+    const offset = { x: graphics.x - turned.x, y: graphics.y - turned.y };
     const pointer = this.world.toLocal(event.global);
     this.drag = {
       groupId,
       grabOffset: { x: pointer.x - offset.x, y: pointer.y - offset.y },
       ...offset,
+      rotation,
+      pointer: { x: pointer.x, y: pointer.y },
     };
     this.animating.delete(groupId);
     this.awaitingRelease.delete(groupId);
@@ -369,6 +418,7 @@ export class BoardScene {
 
     if (this.drag) {
       const { groupId, grabOffset } = this.drag;
+      this.drag.pointer = { x: pointer.x, y: pointer.y };
       this.drag.x = pointer.x - grabOffset.x;
       this.drag.y = pointer.y - grabOffset.y;
       this.placeGroup(groupId, this.drag);
@@ -391,6 +441,40 @@ export class BoardScene {
     this.drag = undefined;
     this.pan = undefined;
   };
+
+  private preventMenu = (event: MouseEvent): void => event.preventDefault();
+
+  /** R gira a peça que está na mão. */
+  private handleKey = (event: KeyboardEvent): void => {
+    if (event.key.toLowerCase() !== 'r' || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (this.drag) this.rotate(this.drag.groupId);
+  };
+
+  /**
+   * Gira o grupo um quarto de volta. Na minha mão, o giro aparece na hora (mantendo o centro
+   * no lugar, como o servidor faz); solto, espera o servidor confirmar.
+   */
+  private rotate(groupId: number): void {
+    if (!this.room || this.readOnly) return;
+    const drag = this.drag;
+    if (drag?.groupId === groupId) {
+      if (this.membersDirty) this.rebuildMembers();
+      const { pieceWidth, pieceHeight, pieces } = this.puzzle!;
+      const members = this.members.get(groupId) ?? [];
+      const center = {
+        x: members.reduce((sum, id) => sum + pieces[id]!.x, 0) / members.length + pieceWidth / 2,
+        y: members.reduce((sum, id) => sum + pieces[id]!.y, 0) / members.length + pieceHeight / 2,
+      };
+      const before = rotatePoint(center, drag.rotation);
+      drag.rotation = (drag.rotation + 1) % 4;
+      const after = rotatePoint(center, drag.rotation);
+      drag.x += before.x - after.x;
+      drag.y += before.y - after.y;
+      drag.grabOffset = { x: drag.pointer.x - drag.x, y: drag.pointer.y - drag.y };
+      this.placeGroup(groupId, drag);
+    }
+    this.room.send('rotate', this.withBoard({ groupId }));
+  }
 
   /** Zoom pela roda do mouse mantendo fixo o ponto sob o cursor. */
   private handleWheel = (event: WheelEvent): void => {
@@ -522,16 +606,23 @@ export class BoardScene {
     }
   }
 
+  /** Onde fica o canto da peça com o grupo nessa posição e rotação (como no engine). */
+  private pieceAt(pieceId: number, at: Placement): Point {
+    const turned = rotatePoint(this.puzzle!.pieces[pieceId]!, at.rotation ?? 0);
+    return { x: turned.x + at.x, y: turned.y + at.y };
+  }
+
   /** Aproxima as peças do grupo da posição do servidor. Devolve true quando chegaram. */
-  private slideGroup(groupId: number, offset: Point, smoothing: number): boolean {
+  private slideGroup(groupId: number, offset: Placement, smoothing: number): boolean {
     let arrived = true;
     for (const pieceId of this.members.get(groupId) ?? []) {
-      const piece = this.puzzle!.pieces[pieceId]!;
       const graphics = this.pieces[pieceId]!.graphics;
-      const dx = piece.x + offset.x - graphics.x;
-      const dy = piece.y + offset.y - graphics.y;
+      const target = this.pieceAt(pieceId, offset);
+      graphics.rotation = ((offset.rotation ?? 0) * Math.PI) / 2;
+      const dx = target.x - graphics.x;
+      const dy = target.y - graphics.y;
       if (Math.abs(dx) + Math.abs(dy) < 0.5) {
-        graphics.position.set(piece.x + offset.x, piece.y + offset.y);
+        graphics.position.set(target.x, target.y);
       } else {
         graphics.position.set(graphics.x + dx * smoothing, graphics.y + dy * smoothing);
         arrived = false;
@@ -551,12 +642,17 @@ export class BoardScene {
     return this.boardKey ? { ...payload, board: this.boardKey } : payload;
   }
 
-  /** Posiciona o grupo na hora (sem animação), no deslocamento dado ou no do servidor. */
-  private placeGroup(groupId: number, offset: Point | undefined = this.serverGroup(groupId)): void {
+  /** Posiciona o grupo na hora (sem animação), no lugar dado ou no do servidor. */
+  private placeGroup(
+    groupId: number,
+    offset: Placement | undefined = this.serverGroup(groupId),
+  ): void {
     if (!offset) return;
     for (const pieceId of this.members.get(groupId) ?? []) {
-      const piece = this.puzzle!.pieces[pieceId]!;
-      this.pieces[pieceId]!.graphics.position.set(piece.x + offset.x, piece.y + offset.y);
+      const graphics = this.pieces[pieceId]!.graphics;
+      const { x, y } = this.pieceAt(pieceId, offset);
+      graphics.position.set(x, y);
+      graphics.rotation = ((offset.rotation ?? 0) * Math.PI) / 2;
     }
   }
 
