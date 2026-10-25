@@ -5,11 +5,19 @@ import {
   CATALOG,
   CreateBulletOptions,
   GrabMessage,
+  RotateMessage,
   LIGHTNING_PIECES,
   MAGNET_PIECES,
   MAX_HELPERS,
   MoveMessage,
   PuzzleConfigSchema,
+  SlideMessage,
+  SlideSchema,
+  EMPTY_TILE,
+  canSlide,
+  isSolved,
+  scrambleTiles,
+  slide,
   PuzzleEngine,
   RoomState,
   generatePuzzle,
@@ -20,7 +28,7 @@ import {
   type RankStatus,
 } from '@puzzle/shared';
 import type { BulletStore } from '../db/bulletStore';
-import { BaseGameRoom, identityKey } from './BaseGameRoom';
+import { BaseGameRoom, ROTATION, identityKey } from './BaseGameRoom';
 import { BoardRuntime } from './board';
 import { uniqueRoomCode } from './roomCode';
 
@@ -61,11 +69,15 @@ export class BulletRoom extends BaseGameRoom {
     grab: validate(GrabMessage, (client, { groupId, board }) => {
       if (this.canPlay(board)) this.board.grab(client.sessionId, groupId);
     }),
+    rotate: validate(RotateMessage, (client, { groupId, board }) => {
+      if (this.canPlay(board)) this.board.rotate(client.sessionId, groupId);
+    }),
     move: validate(MoveMessage, (client, message) => {
       if (this.canPlay(message.board)) this.board.move(client.sessionId, message);
     }),
     drop: validate(MoveMessage, (client, message) => this.drop(client, message)),
     magnet: () => this.useMagnet(),
+    slide: validate(SlideMessage, (_client, { index }) => this.slideTile(index)),
     scatter: () => {
       if (this.canPlay(BOARD)) this.board.scatter();
     },
@@ -107,6 +119,7 @@ export class BulletRoom extends BaseGameRoom {
 
   private canPlay(board: string | undefined): boolean {
     if (this.phase !== 'playing' || this.state.countdown > 0 || board !== BOARD) return false;
+    if (this.state.slides.size > 0) return false; // rodada relâmpago: a mesa é a grade
     return !this.state.boards.get(BOARD)?.done;
   }
 
@@ -202,12 +215,21 @@ export class BulletRoom extends BaseGameRoom {
       golden: lightning ? -1 : Math.floor(Math.random() * rows * cols),
     });
     this.board = new BoardRuntime(
-      PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height })),
+      PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height }), {
+        rotate: ROTATION.enabled,
+      }),
       board,
     );
     this.board.mirror();
     this.state.config = new PuzzleConfigSchema(settings); // a raiz mostra o quebra-cabeça da vez
     this.state.boards.set(BOARD, board);
+    this.state.slides.clear();
+    if (lightning) {
+      // Relâmpago: no lugar das peças, a grade de deslizar (a mesa fica guardada por baixo).
+      const grid = new SlideSchema({ moves: 0 });
+      grid.tiles.push(...scrambleTiles(Math.random));
+      this.state.slides.set(BOARD, grid);
+    }
     this.state.round += 1;
     this.roundShownAt = this.state.countdown > 0 || this.phase !== 'playing' ? 0 : this.elapsed();
   }
@@ -235,8 +257,29 @@ export class BulletRoom extends BaseGameRoom {
       board.golden = -1;
       this.addTime(GOLDEN_BONUS_MS);
     }
-    if (!result.completed) return;
+    if (result.completed) this.roundSolved();
+  }
 
+  /** Relâmpago: desliza uma casa (qualquer jogador da sala); montou, conta como montado. */
+  private slideTile(index: number) {
+    const grid = this.state.slides.get(BOARD);
+    const board = this.state.boards.get(BOARD);
+    if (!grid || !board || board.done || this.phase !== 'playing' || this.state.countdown > 0) {
+      return;
+    }
+    const tiles = [...grid.tiles];
+    if (!canSlide(tiles, index)) return;
+    const empty = tiles.indexOf(EMPTY_TILE);
+    const next = slide(tiles, index);
+    grid.tiles[empty] = next[empty]!;
+    grid.tiles[index] = next[index]!;
+    grid.moves += 1;
+    if (isSolved(next)) this.roundSolved();
+  }
+
+  /** Quebra-cabeça da vez montado (ou a grade do relâmpago): conta, bônus e o próximo. */
+  private roundSolved() {
+    const board = this.state.boards.get(BOARD)!;
     board.done = true;
     this.state.solved += 1;
     if (board.lightning) {
@@ -257,6 +300,7 @@ export class BulletRoom extends BaseGameRoom {
     this.endTimer?.clear();
     this.nextRoundTimer?.clear();
     const board = this.state.boards.get(BOARD)!;
+    this.state.slides.clear();
     for (const sessionId of this.state.players.keys()) this.board.releaseHeldBy(sessionId);
     this.state.phase = 'completed' satisfies GamePhase;
     this.state.remainingMs = 0;
