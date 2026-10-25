@@ -13,7 +13,7 @@ import { createGameServer } from '../app';
 import { createBulletStore, type BulletStore } from '../db/bulletStore';
 import type { AppDatabase } from '../db/database';
 import { clearDatabase, createMemoryDatabase } from '../db/memoryDatabase';
-import { COUNTDOWN } from './BaseGameRoom';
+import { COUNTDOWN, ROTATION } from './BaseGameRoom';
 import type { BulletRoom } from './BulletRoom';
 
 const PORT = 2574;
@@ -24,6 +24,7 @@ let bullet: BulletStore;
 let server: Server;
 beforeAll(async () => {
   COUNTDOWN.seconds = 0; // sem o "3, 2, 1" (tem teste próprio)
+  ROTATION.enabled = false; // peças de pé: os testes montam soltando no lugar
   db = await createMemoryDatabase();
   bullet = createBulletStore(db);
   server = createGameServer({ bullet });
@@ -41,6 +42,9 @@ async function until(check: () => boolean) {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Grade de deslizar a um movimento de resolver: a peça 7 está no lugar do vazio. */
+const NEARLY_SOLVED = [0, 1, 2, 3, 4, 5, 6, 8, 7];
 
 /** Sala de Bullet (por padrão solo, que já começa) e acesso à sala do lado do servidor. */
 async function create(options: { maxPlayers?: number; pieces?: 12 | 24 } = {}) {
@@ -178,18 +182,21 @@ describe('BulletRoom', () => {
     await game.client.leave();
   });
 
-  it('a rodada relâmpago (4º quebra-cabeça) dá um ímã, que encaixa peças sozinho', async () => {
+  it('a rodada relâmpago (4º) é a grade de deslizar e dá um ímã, que encaixa peças', async () => {
     const game = await create();
     for (let round = 1; round <= 3; round++) {
-      expect(game.board().lightning).toBe(false);
+      expect(game.state.slides.size).toBe(0);
       await solve(game);
       expect(await until(() => game.state.round === round + 1)).toBe(true);
     }
-    expect(game.board().lightning).toBe(true);
-    expect(game.board().pieceGroup.length).toBeLessThanOrEqual(8); // ~6 peças
-    expect(game.board().golden).toBe(-1);
-    await solve(game);
-    expect(game.state.helpers).toBe(1);
+    const grid = game.state.slides.get('main')!;
+    expect(grid.tiles).toHaveLength(9);
+    // As peças da mesa ficam travadas; a grade, a um movimento de resolver, se resolve deslizando.
+    NEARLY_SOLVED.forEach((tile, position) => (grid.tiles[position] = tile));
+    game.client.send('slide', { index: 0 }); // não encosta no vazio: ignorado
+    game.client.send('slide', { index: 8 });
+    expect(await until(() => game.state.helpers === 1)).toBe(true);
+    expect(game.state.solved).toBe(4);
     expect(await until(() => game.state.round === 5)).toBe(true);
 
     const groups = () => game.board().groups.size;
@@ -199,6 +206,33 @@ describe('BulletRoom', () => {
     expect(groups()).toBeLessThan(before);
     await game.client.leave();
   }, 20_000); // monta 4 quebra-cabeças em sequência
+
+  it('com as peças viradas: girar e encaixar só com a mesma rotação', async () => {
+    ROTATION.enabled = true;
+    try {
+      const { client, board } = await create();
+      const groups = () => [...board().groups.values()];
+      expect(groups().some((group) => group.rotation !== 0)).toBe(true); // 12 peças sorteadas
+
+      const anchorId = board().pieceGroup[0]!;
+      const groupId = board().pieceGroup[1]!;
+      const group = () => board().groups.get(String(groupId))!;
+      const anchor = board().groups.get(String(anchorId))!;
+      client.send('grab', { groupId, board: 'main' });
+      await until(() => group().heldBy === client.sessionId);
+      // Gira (na mão) até ficar como a vizinha; aí, solta alinhada e encaixa.
+      while (group().rotation !== anchor.rotation) {
+        const before = group().rotation;
+        client.send('rotate', { groupId, board: 'main' });
+        expect(await until(() => group().rotation === (before + 1) % 4)).toBe(true);
+      }
+      client.send('drop', { groupId, x: anchor.x, y: anchor.y, board: 'main' });
+      expect(await until(() => board().pieceGroup[1] === board().pieceGroup[0])).toBe(true);
+      await client.leave();
+    } finally {
+      ROTATION.enabled = false;
+    }
+  });
 
   it('encaixes seguidos formam combo', async () => {
     const game = await create();
