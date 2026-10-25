@@ -12,6 +12,7 @@ import {
   CATALOG,
   CreateRoomOptions,
   GrabMessage,
+  RotateMessage,
   MoveMessage,
   PuzzleConfigSchema,
   PuzzleEngine,
@@ -26,7 +27,7 @@ import {
   type RankStatus,
 } from '@puzzle/shared';
 import type { GameResult } from '../db/gameStore';
-import { BaseGameRoom, identityKey, type Identity } from './BaseGameRoom';
+import { BaseGameRoom, ROTATION, identityKey, type Identity } from './BaseGameRoom';
 import { BoardRuntime } from './board';
 import { uniqueRoomCode } from './roomCode';
 import { SNAPSHOT_VERSION, type RoomSnapshot } from './snapshots';
@@ -80,6 +81,11 @@ export class PuzzleRoom extends BaseGameRoom {
     grab: validate(GrabMessage, (client, { groupId }) => {
       if (this.phase === 'playing') this.board.grab(client.sessionId, groupId);
     }),
+    rotate: validate(RotateMessage, (client, { groupId }) => {
+      if (this.phase === 'playing' && this.board.rotate(client.sessionId, groupId)) {
+        this.dirty = true;
+      }
+    }),
     move: validate(MoveMessage, (client, message) => {
       if (this.board.move(client.sessionId, message)) this.dirty = true;
     }),
@@ -131,7 +137,11 @@ export class PuzzleRoom extends BaseGameRoom {
         maxPlayers,
       }),
     });
-    this.setBoard(PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height })));
+    this.setBoard(
+      PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height }), {
+        rotate: ROTATION.enabled,
+      }),
+    );
     this.awaitingCreator = true;
   }
 
@@ -218,7 +228,11 @@ export class PuzzleRoom extends BaseGameRoom {
     });
     this.state.groups.clear();
     this.state.pieceGroup.clear();
-    this.setBoard(PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height })));
+    this.setBoard(
+      PuzzleEngine.scattered(generatePuzzle({ seed, rows, cols, width, height }), {
+        rotate: ROTATION.enabled,
+      }),
+    );
     Object.assign(this.state, {
       phase: 'lobby' satisfies GamePhase,
       elapsedMs: 0,
@@ -503,10 +517,11 @@ export class PuzzleRoom extends BaseGameRoom {
       ownerUserId: this.ownerUserId,
       savedId: this.savedId,
       players: [...players.values()],
-      groups: [...this.board.engine.allGroups()].map(({ id, x, y, pieceIds }) => ({
+      groups: [...this.board.engine.allGroups()].map(({ id, x, y, rotation, pieceIds }) => ({
         id,
         x,
         y,
+        rotation,
         pieceIds: [...pieceIds],
       })),
     };
