@@ -33,7 +33,7 @@ export function BonusBurst({ bonusMs }: { bonusMs: number }) {
 export function LightningBanner() {
   return (
     <div className="lightning-banner" role="status">
-      <BoltIcon size={18} /> Relâmpago! Monte para ganhar um Ímã
+      <BoltIcon size={18} /> Relâmpago! Deslize as peças para montar: vale um Ímã
     </div>
   );
 }
