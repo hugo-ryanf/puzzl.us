@@ -1,5 +1,12 @@
 import { useEffect } from 'react';
-import { BATTLE_POWERS, MAX_ENERGY, POWER_COST, type BattlePower } from '@puzzle/shared';
+import {
+  BATTLE_POWERS,
+  FOG_MS,
+  FREEZE_MS,
+  MAX_ENERGY,
+  POWER_COST,
+  type BattlePower,
+} from '@puzzle/shared';
 import type { PuzzleRoom } from '../../net/connection';
 import type { BoardView } from '../../net/useRoomSnapshot';
 import { CloudFogIcon, ShieldIcon, ShuffleIcon, SnowflakeIcon } from '../../ui/icons';
@@ -13,8 +20,8 @@ export const POWER_LABELS: Record<BattlePower, string> = {
 
 const POWER_HINTS: Record<BattlePower, string> = {
   shield: 'Protege o seu lado: anula o próximo poder do adversário',
-  fog: 'Desfoca a mesa do adversário por 5 s',
-  freeze: 'O adversário não pega peças por 3 s',
+  fog: `Desfoca a mesa do adversário por ${FOG_MS / 1000} s`,
+  freeze: `O adversário não pega peças nem usa poderes por ${FREEZE_MS / 1000} s`,
   shuffle: 'Espalha de novo as peças soltas do adversário',
 };
 
@@ -62,7 +69,10 @@ export function PowerBar({
 }) {
   const energy = board?.energy ?? 0;
   const cooling = Math.max(0, (board?.powerReadyAt ?? 0) - now);
-  const usable = (power: BattlePower) => active && cooling === 0 && energy >= POWER_COST[power];
+  // Congelado pelo adversário: os poderes também ficam travados.
+  const frozen = (board?.frozenUntil ?? 0) > now;
+  const usable = (power: BattlePower) =>
+    active && !frozen && cooling === 0 && energy >= POWER_COST[power];
 
   useEffect(() => {
     if (!active) return;
