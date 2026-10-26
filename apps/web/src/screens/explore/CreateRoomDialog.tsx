@@ -329,18 +329,6 @@ export function CreateRoomDialog({
                   ))}
                 </fieldset>
                 {timeAndPieces}
-                {/* Duplas contra duplas no estilo Bullet = batalha por tempo 2v2. */}
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() => {
-                    setMode('battle');
-                    setBattleTimed(true);
-                    setFormat('2v2');
-                  }}
-                >
-                  Contra outra dupla? Bullet 2v2 →
-                </button>
               </div>
             )}
 
