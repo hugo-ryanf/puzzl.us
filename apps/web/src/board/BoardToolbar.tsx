@@ -127,6 +127,9 @@ export function BoardToolbar({ scene, image, canScatter, onScatter }: BoardToolb
               <ShuffleIcon size={18} />
               Espalhar
             </button>
+            <span className="tool-divider" aria-hidden="true" />
+            {/* As peças vêm viradas: como desvirar. */}
+            <span className="tool-hint">Girar: clique direito, R arrastando ou dois toques</span>
           </div>
         )}
         <button
