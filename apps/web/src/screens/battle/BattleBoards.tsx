@@ -9,6 +9,7 @@ import { useGameTime } from '../GameClock';
 import { ComboBurst } from '../room/ComboBurst';
 import { FinalSeconds, useFinalSeconds } from '../room/FinalSeconds';
 import { EventFeed } from './EventFeed';
+import { SlideOverlay } from './SlideOverlay';
 import { EnergyMeter, PowerBar } from './PowerBar';
 import { otherTeam } from './score';
 import { TugOfWar } from './TugOfWar';
@@ -132,7 +133,7 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
     snapshot.phase,
     snapshot.elapsedMs,
     snapshot.durationMs,
-    snapshot.countdown > 0,
+    snapshot.countdown > 0 || snapshot.paused,
   );
   const sides: BattleTeam[] = narrow
     ? [peek ? otherTeam(myTeam) : myTeam]
@@ -164,7 +165,12 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
               <SideBoard room={room} snapshot={snapshot} team={team} mine={mine} now={now} />
               {mine && <ComboBurst combo={me?.combo ?? 0} />}
               {mine && snapshot.powers && snapshot.phase === 'playing' && (
-                <PowerBar room={room} board={snapshot.boards[team]} now={now} active={playing} />
+                <PowerBar
+                  room={room}
+                  board={snapshot.boards[team]}
+                  now={now}
+                  active={playing && !snapshot.paused}
+                />
               )}
             </div>
           </section>
@@ -180,6 +186,9 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
           <TugOfWar snapshot={snapshot} myTeam={myTeam} hot={final.active} />
           <EventFeed room={room} snapshot={snapshot} myTeam={myTeam} />
         </div>
+      )}
+      {snapshot.phase === 'playing' && snapshot.paused && (
+        <SlideOverlay room={room} snapshot={snapshot} myTeam={myTeam} narrow={narrow} />
       )}
       {/* Por tempo: nos últimos 10 s, o relógio grande em cima da linha do meio. */}
       {snapshot.timeLimitMs > 0 && <FinalSeconds snapshot={snapshot} onDivider={!narrow} />}
