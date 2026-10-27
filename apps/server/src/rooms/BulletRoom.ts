@@ -6,6 +6,7 @@ import {
   CreateBulletOptions,
   GrabMessage,
   RotateMessage,
+  LIGHTNING_EVERY,
   LIGHTNING_PIECES,
   MAGNET_PIECES,
   MAX_HELPERS,
@@ -23,6 +24,7 @@ import {
   generatePuzzle,
   gridForPieceCount,
   isLightningRound,
+  type DevAction,
   type GamePhase,
   type GameMode,
   type RankStatus,
@@ -127,12 +129,35 @@ export class BulletRoom extends BaseGameRoom {
     if (this.phase !== 'lobby') return;
     this.state.phase = 'playing' satisfies GamePhase;
     this.startAfterCountdown(() => {
-      this.startClock(Date.now(), 0, () => {
-        this.state.remainingMs = Math.max(0, this.limit() - this.elapsed());
-      });
+      this.startClock(Date.now(), 0, () => this.tick());
       this.roundShownAt = 0;
       this.scheduleEnd();
     });
+  }
+
+  private tick() {
+    this.state.remainingMs = Math.max(0, this.limit() - this.elapsed());
+  }
+
+  protected devCommand(_client: Client, action: DevAction, value?: number) {
+    if (this.phase !== 'playing') return;
+    if (action === 'skipCountdown') this.skipCountdown();
+    if (this.state.countdown > 0) return;
+    if (action === 'time' && value !== undefined) {
+      // Faltando `value` segundos: o relógio pula para lá.
+      const elapsed = Math.max(0, this.limit() - value * 1000);
+      this.startClock(this.startedAt, elapsed, () => this.tick());
+      this.tick();
+      this.scheduleEnd();
+    } else if (action === 'lightning') {
+      this.nextRoundTimer?.clear();
+      this.puzzlesInGame = LIGHTNING_EVERY - 1; // o próximo quebra-cabeça é o relâmpago
+      this.nextRound();
+    } else if (action === 'solve') {
+      this.afterSnaps(this.board.solveAll());
+    } else if (action === 'straighten') {
+      this.board.straightenAll();
+    }
   }
 
   /** Tempo total da partida: o escolhido mais os bônus. */
