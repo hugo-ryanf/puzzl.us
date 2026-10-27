@@ -290,19 +290,18 @@ mostrar; entrar pelo código funciona para qualquer modo.
   entra um tabuleiro novo em `boards.main` (`round` sobe e o cliente remonta a mesa). No fim do
   tempo vale `solved`; empate, `partial` (peças encaixadas no que ficou pela metade). Grava em
   `bullet_runs` e o ranking (`GET /api/ranking/bullet`) usa a melhor corrida de cada equipe.
-- **Batalha** (`BattleRoom`): 1v1 ou 2v2. Um puzzle só, espalhado uma vez; o lado B recebe as
-  mesmas posições do A. Cada um só mexe na mesa do seu lado (`boards.a`/`boards.b`); o primeiro
+- **Batalha** (`BattleRoom`): 1v1 ou 2v2. Um puzzle só (mesma foto e mesmas peças), espalhado de
+  um jeito diferente em cada lado (`PuzzleEngine.scattered(puzzle, lado)`). Cada um só mexe na mesa do seu lado (`boards.a`/`boards.b`); o primeiro
   a montar ganha (`winner`); um lado que sai inteiro perde por W.O. O anfitrião pede revanche
   (mesas novas, mesmos lados). Sem ranking. Na tela, o seu lado à esquerda e o do adversário à
   direita (só assistir); no celular, abas.
   - **Por tempo** (`minutes` nas opções; 3/5/10 min, 12 ou 24 peças, como o Bullet): os dois lados
-    recebem a mesma sequência de fotos sorteadas, com as mesmas posições (`rounds`, gerada conforme
+    recebem a mesma sequência de fotos sorteadas, espalhadas diferente em cada lado (`rounds`, gerada conforme
     o lado mais rápido avança). Montou um, `solved` da mesa sobe e ~0,9 s depois entra o próximo
     (cada lado no seu ritmo; o cliente remonta a mesa pela `seed`). No fim do tempo ganha quem
     montou mais; empate, mais peças encaixadas no que ficou pela metade; empatando também,
     **morte súbita** (`suddenDeath`): o relógio para, os dois lados recebem o mesmo quebra-cabeça
-    seguinte da sequência e quem montar primeiro ganha. No criar sala, "Bullet 2v2" (na opção
-    Bullet) é atalho para a batalha por tempo 2v2.
+    seguinte da sequência e quem montar primeiro ganha.
 - **"3, 2, 1"** (Bullet e batalha por tempo): no "Começar" a fase já vira `playing`, mas
   `countdown` conta 3 → 0 no servidor (`startAfterCountdown` na `BaseGameRoom`); até chegar a 0
   as peças ficam travadas (servidor e cliente) e o relógio não anda. Nos últimos 10 s, o cliente
@@ -333,18 +332,35 @@ mostrar; entrar pelo código funciona para qualquer modo.
   - **Montar rápido** (Bullet): abaixo de ~3,3 s por peça (40 s para 12) vale +5 s. O tempo
     ganho vai em `bonusMs`; o relógio conta `timeLimitMs + bonusMs` e o ranking continua pela
     categoria escolhida.
-  - **Rodada relâmpago** (`isLightningRound`: o 4º, 8º… quebra-cabeça da partida, 6 peças, sem
-    dourada). No Bullet, montá-la dá um **Ímã** (`helpers`, até 2): a mensagem `magnet` encaixa
-    sozinha 3 peças soltas no maior bloco vizinho (`BoardRuntime.magnet`). Na batalha, enche a
-    energia.
+  - **Relâmpago de deslizar** (8-puzzle: a foto fixa `public/relampago/foto.webp` numa grade 3×3
+    com um vazio; regras puras em `packages/shared/src/sliding.ts`, embaralhada com movimentos
+    válidos, então sempre tem solução). Estado em `slides` (a grade de cada lado) e mensagem
+    `slide { index }`.
+    - **Bullet**: o 4º, 8º… quebra-cabeça (`isLightningRound`) é a grade no lugar das peças;
+      qualquer jogador desliza, o relógio continua e montar vale +1 e um **Ímã** (`helpers`, até
+      2): a mensagem `magnet` encaixa sozinha 3 peças soltas no maior bloco vizinho
+      (`BoardRuntime.magnet`).
+    - **Batalha**: aparece para os dois lados ao mesmo tempo, em momentos sorteados (1 em 3 min,
+      2 em 5 ou 10; 1 na corrida, entre 40 s e 100 s). Pausa a partida (`startLightning`: o
+      relógio para e as peças na mão caem), os dois recebem a mesma grade e quem montar primeiro
+      leva energia cheia (`slideWinner`); sem ninguém em 60 s (`slideSeconds`), ninguém leva.
+      Depois de 1,5 s as mesas voltam e o relógio continua de onde parou.
+- **Peças girando** (todas as partidas, sempre; o ranking não muda): cada grupo tem `rotation`
+  (quartos de volta, `GroupState`/`GroupSchema`); a peça fica em `rotatePoint(posição certa,
+rotação) + (x, y)` e só encaixa em grupo com a mesma rotação. O `scattered` sorteia a rotação de
+  cada peça (`rotate`; os testes de sala desligam com `ROTATION.enabled`). Mensagem `rotate`
+  (grupo livre ou na mão de quem pede): gira um quarto de volta mantendo o centro
+  (`rotateGroup`); montado tudo, o servidor endireita o grupo (`straighten`) para a foto aparecer
+  de pé. No cliente: clique direito, R arrastando (previsto na hora) ou dois toques no celular.
+  Snapshots antigos sem `rotation` voltam com as peças de pé.
 - **Poderes da batalha** (`powers` ao criar, ligado por padrão; `state.powers`):
   - **Energia** do lado (`BoardSchema.energy`, 0–100; passa para o quebra-cabeça seguinte junto
     com escudo e efeitos): +4 por encaixe e +2 por nível de combo, +25 da dourada, +30 por montado
     (por tempo) e +100 pela rodada relâmpago.
-  - Mensagem `usePower` (`BATTLE_POWERS`, custo em `POWER_COST`, recarga de 6 s por lado em
+  - Mensagem `usePower` (`BATTLE_POWERS`, custo em `POWER_COST`, recarga de 12 s por lado em
     `powerReadyAt`): **Escudo** arma `shield` no próprio lado e anula o próximo poder recebido;
-    **Neblina** põe `fogUntil` no adversário (5 s, o cliente desfoca a mesa); **Congelar** põe
-    `frozenUntil` (3 s; o servidor recusa pegar/soltar e solta o que estava na mão); **Embaralhar**
+    **Neblina** põe `fogUntil` no adversário (8 s, o cliente desfoca a mesa); **Congelar** põe
+    `frozenUntil` (5 s; o servidor recusa pegar/soltar e poderes, e solta o que estava na mão); **Embaralhar**
     reespalha as peças soltas do adversário. Os tempos são do relógio da partida (`elapsed()`).
   - O servidor avisa todo mundo (`power`: lado, poder, se foi anulado); o cliente mostra no
     `EventFeed`, toca o som do poder e desenha a barra (`PowerBar`, teclas 1 a 4) e a energia de
