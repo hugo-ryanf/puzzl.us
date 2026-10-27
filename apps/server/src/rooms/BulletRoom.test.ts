@@ -234,6 +234,23 @@ describe('BulletRoom', () => {
     }
   });
 
+  it('atalhos de teste: ignorados em produção; com dev-tools, pulam etapas', async () => {
+    const game = await create();
+    game.client.send('dev', { action: 'solve' });
+    await wait(100);
+    expect(game.state.solved).toBe(0); // sem --dev-tools: nada
+
+    (game.room as unknown as { devTools: boolean }).devTools = true;
+    game.client.send('dev', { action: 'solve' });
+    expect(await until(() => game.state.solved === 1)).toBe(true);
+    game.client.send('dev', { action: 'time', value: 15 });
+    expect(await until(() => game.state.remainingMs <= 15_000)).toBe(true);
+    expect(game.state.remainingMs).toBeGreaterThan(13_000);
+    game.client.send('dev', { action: 'lightning' });
+    expect(await until(() => game.state.slides.has('main'))).toBe(true);
+    await game.client.leave();
+  });
+
   it('encaixes seguidos formam combo', async () => {
     const game = await create();
     const me = () => game.state.players.get(game.client.sessionId)!;
