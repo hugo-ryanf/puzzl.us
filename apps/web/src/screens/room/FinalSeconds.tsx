@@ -15,8 +15,8 @@ const EMBERS = [
 
 /** Últimos 10 s do relógio regressivo: se está neles, quantos segundos (inteiros) e em ms. */
 export function useFinalSeconds(snapshot: RoomSnapshot) {
-  const { phase, elapsedMs, durationMs, timeLimitMs, bonusMs, countdown } = snapshot;
-  const elapsed = useGameTime(phase, elapsedMs, durationMs, countdown > 0);
+  const { phase, elapsedMs, durationMs, timeLimitMs, bonusMs, countdown, paused } = snapshot;
+  const elapsed = useGameTime(phase, elapsedMs, durationMs, countdown > 0 || paused);
   // Bônus de tempo (Bullet) entram no limite: o relógio grande pode sumir e voltar.
   const limitMs = timeLimitMs + bonusMs;
   const left = secondsLeft(limitMs, elapsed);
