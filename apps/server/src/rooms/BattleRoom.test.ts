@@ -264,6 +264,23 @@ describe('BattleRoom', () => {
       }
     });
 
+    it('atalhos de teste: energia, efeitos, montar e relâmpago (só com dev-tools)', async () => {
+      const { ana, bia, room, state, board } = await setup('1v1', [], 3);
+      (room as unknown as { devTools: boolean }).devTools = true;
+      ana.send('start');
+      await until(() => state.phase === 'playing');
+      ana.send('dev', { action: 'energy' });
+      expect(await until(() => board('a').energy === 100)).toBe(true);
+      ana.send('dev', { action: 'fogMe' });
+      expect(await until(() => board('a').fogUntil > 0)).toBe(true);
+      ana.send('dev', { action: 'solve' });
+      expect(await until(() => board('a').solved === 1)).toBe(true);
+      ana.send('dev', { action: 'lightning' });
+      expect(await until(() => state.slides.size === 2)).toBe(true);
+      await ana.leave();
+      await bia.leave();
+    });
+
     it('a peça dourada é a mesma nos dois lados', async () => {
       const { ana, bia, board } = await setup('1v1', [], 3);
       expect(board('a').golden).toBeGreaterThanOrEqual(0);
