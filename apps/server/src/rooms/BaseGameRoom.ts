@@ -1,6 +1,7 @@
 import { Room, validate, type AuthContext, type Client, type Delayed } from '@colyseus/core';
 import {
   CursorMessage,
+  DevMessage,
   JoinOptions,
   MAX_PLAYERS,
   PLAYER_COLORS,
@@ -9,6 +10,7 @@ import {
   findCatalogImage,
   uploadIdOf,
   type CursorBroadcast,
+  type DevAction,
   type GamePhase,
   type VoiceTokenResponse,
 } from '@puzzle/shared';
@@ -74,6 +76,10 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
   protected clockOrigin = 0;
   protected clockTimer?: Delayed;
   protected countdownTimer?: Delayed;
+  /** O que fazer quando a contagem chegar a 0 (guardado para o atalho de pular). */
+  private countdownGo?: () => void;
+  /** Atalhos de teste ligados (`pnpm dev:local`); injetado por createGameServer. */
+  protected devTools = false;
   /** Hora do último encaixe de cada sessão (para o combo). */
   private readonly lastSnapAt = new Map<string, number>();
 
@@ -86,8 +92,14 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
       }),
       // Usado com room.request(): o valor retornado vira a resposta para o cliente.
       voiceToken: (client: Client) => this.voiceToken(client),
+      dev: validate(DevMessage, (client, { action, value }) => {
+        if (this.devTools) this.devCommand?.(client, action, value);
+      }),
     };
   }
+
+  /** Atalho de teste (só com `devTools`); cada sala faz os que fazem sentido nela. */
+  protected devCommand?(client: Client, action: DevAction, value?: number): void;
 
   /** Solta o que este jogador estiver segurando (em qualquer tabuleiro da sala). */
   protected abstract releaseHeldBy(sessionId: string): void;
@@ -189,12 +201,22 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
     this.countdownTimer?.clear();
     this.state.countdown = COUNTDOWN.seconds;
     if (this.state.countdown === 0) return go();
+    this.countdownGo = go;
     this.countdownTimer = this.clock.setInterval(() => {
       this.state.countdown -= 1;
       if (this.state.countdown > 0) return;
-      this.countdownTimer?.clear();
-      go();
+      this.skipCountdown();
     }, 1000);
+  }
+
+  /** Termina a contagem agora (no fim natural dela, ou pelo atalho de teste). */
+  protected skipCountdown() {
+    const go = this.countdownGo;
+    if (!go) return;
+    this.countdownGo = undefined;
+    this.countdownTimer?.clear();
+    this.state.countdown = 0;
+    go();
   }
 
   /** Soma os encaixes do jogador e atualiza o combo dele (Bullet e Batalha). */
@@ -219,6 +241,7 @@ export abstract class BaseGameRoom extends Room<{ state: RoomState }> {
 
   /** Partida acabou antes de a contagem terminar (W.O.): para a contagem. */
   protected stopCountdown() {
+    this.countdownGo = undefined;
     this.countdownTimer?.clear();
     this.state.countdown = 0;
   }
