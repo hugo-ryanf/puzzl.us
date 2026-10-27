@@ -48,6 +48,8 @@ export interface GameServerOptions {
   bullet?: BulletStore;
   /** Placar das batalhas (perfil). Sem banco, a batalha não fica registrada. */
   battles?: BattleStore;
+  /** Atalhos de teste nas salas (`pnpm dev:local`). Nunca em produção. */
+  devTools?: boolean;
   /**
    * Contas (login com Google). Sem banco fica undefined: todo mundo joga como convidado e o
    * /api/me responde que não há login.
@@ -77,6 +79,7 @@ export function createGameServer({
   community,
   bullet,
   battles,
+  devTools = false,
   auth,
   webDist,
   trustProxy = false,
@@ -229,6 +232,7 @@ export function createGameServer({
     .define(
       ROOM_NAME,
       class extends PuzzleRoom {
+        protected override devTools = devTools;
         protected override store = store;
         protected override uploads = uploads;
         protected override voice = voice;
@@ -243,6 +247,7 @@ export function createGameServer({
   server.define(
     BULLET_ROOM,
     class extends BulletRoom {
+      protected override devTools = devTools;
       protected override bullet = bullet;
       protected override voice = voice;
       protected override snapshots = snapshots;
@@ -253,6 +258,7 @@ export function createGameServer({
   server.define(
     BATTLE_ROOM,
     class extends BattleRoom {
+      protected override devTools = devTools;
       protected override battles = battles;
       protected override uploads = uploads;
       protected override voice = voice;
