@@ -16,10 +16,21 @@ export function useGameSounds(selfId: string, snapshot: RoomSnapshot) {
   const atMyTable = players.filter((p) => !battle || p.team === myTeam);
   const snaps = new Map(atMyTable.map((p) => [p.sessionId, p.snaps]));
   const combos = new Map(atMyTable.map((p) => [p.sessionId, p.combo]));
-  const myBoard = snapshot.boards[battle ? myTeam || 'a' : 'main'];
-  const lightning = myBoard?.lightning ?? false;
+  // Relâmpago de deslizar: começou, e as casas da minha grade andando.
+  const lightning = Object.keys(snapshot.slides).length > 0;
+  const slideMoves = snapshot.slides[battle ? myTeam || 'a' : 'main']?.moves ?? 0;
   const { bonusMs, helpers, suddenDeath, record } = snapshot;
-  const last = useRef({ snaps, solved, phase, lightning, bonusMs, helpers, suddenDeath, record });
+  const last = useRef({
+    snaps,
+    solved,
+    phase,
+    lightning,
+    slideMoves,
+    bonusMs,
+    helpers,
+    suddenDeath,
+    record,
+  });
 
   useEffect(() => {
     if (timeLimitMs > 0) preloadCountdown();
@@ -27,7 +38,17 @@ export function useGameSounds(selfId: string, snapshot: RoomSnapshot) {
 
   useEffect(() => {
     const before = last.current;
-    last.current = { snaps, solved, phase, lightning, bonusMs, helpers, suddenDeath, record };
+    last.current = {
+      snaps,
+      solved,
+      phase,
+      lightning,
+      slideMoves,
+      bonusMs,
+      helpers,
+      suddenDeath,
+      record,
+    };
     // O recorde chega depois do fim (quando o ranking grava a corrida).
     if (record && !before.record) {
       playSound('record');
@@ -45,6 +66,7 @@ export function useGameSounds(selfId: string, snapshot: RoomSnapshot) {
     if (helpers < before.helpers) playSound('magnet');
     if (bonusMs > before.bonusMs) playSound('bonus');
     if (lightning && !before.lightning) playSound('lightning');
+    if (slideMoves > before.slideMoves) playSound('snap');
     if (solved > before.solved) {
       playSound('solved');
       return;
