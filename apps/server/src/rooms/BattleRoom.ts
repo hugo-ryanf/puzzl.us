@@ -38,6 +38,7 @@ import {
   generatePuzzle,
   gridForPieceCount,
   type BattlePower,
+  type DevAction,
   type BattleTeam,
   type PowerBroadcast,
   type Puzzle,
@@ -448,15 +449,24 @@ export class BattleRoom extends BaseGameRoom {
     if (!result) return;
     const player = this.state.players.get(client.sessionId)!;
     this.countSnaps(client.sessionId, result.snaps);
-    const team = player.team as BattleTeam;
+    this.afterSnaps(player.team as BattleTeam, runtime!, result, player.combo);
+  }
+
+  /** Depois de encaixes num lado: energia, dourada e, montado, o fim ou o próximo. */
+  private afterSnaps(
+    team: BattleTeam,
+    runtime: BoardRuntime,
+    result: { snaps: number; completed: boolean },
+    combo: number,
+  ) {
     const board = this.state.boards.get(team)!;
     if (result.snaps > 0) {
       this.gainEnergy(
         board,
-        result.snaps * ENERGY_PER_SNAP + (player.combo - 1) * ENERGY_PER_COMBO,
+        result.snaps * ENERGY_PER_SNAP + Math.max(0, combo - 1) * ENERGY_PER_COMBO,
       );
     }
-    if (board.golden >= 0 && runtime!.isSnapped(board.golden)) {
+    if (board.golden >= 0 && runtime.isSnapped(board.golden)) {
       board.golden = -1;
       this.gainEnergy(board, ENERGY_GOLDEN);
     }
@@ -478,6 +488,33 @@ export class BattleRoom extends BaseGameRoom {
         if (this.phase === 'playing') this.placeRound(team, this.position.get(team)! + 1, solved);
       }, NEXT_ROUND_DELAY_MS),
     );
+  }
+
+  protected devCommand(client: Client, action: DevAction, value?: number) {
+    const team = this.state.players.get(client.sessionId)?.team as BattleTeam | '';
+    if (!team || this.phase !== 'playing') return;
+    if (action === 'skipCountdown') this.skipCountdown();
+    if (this.state.countdown > 0) return;
+    const board = this.state.boards.get(team)!;
+    const runtime = this.boards.get(team)!;
+    if (action === 'lightning') {
+      this.startLightning();
+    } else if (action === 'time' && value !== undefined && this.timed) {
+      if (this.state.slides.size > 0 || this.state.suddenDeath) return;
+      this.runClock(this.startedAt, Math.max(0, this.state.timeLimitMs - value * 1000));
+      this.tick();
+    } else if (action === 'energy') {
+      board.energy = MAX_ENERGY;
+      board.powerReadyAt = 0;
+    } else if (action === 'fogMe') {
+      board.fogUntil = this.elapsed() + FOG_MS;
+    } else if (action === 'freezeMe') {
+      board.frozenUntil = this.elapsed() + FREEZE_MS;
+    } else if (action === 'straighten') {
+      runtime.straightenAll();
+    } else if (action === 'solve' && this.state.slides.size === 0 && !board.done) {
+      this.afterSnaps(team, runtime, runtime.solveAll(), 1);
+    }
   }
 
   private gainEnergy(board: BoardSchema, amount: number) {
