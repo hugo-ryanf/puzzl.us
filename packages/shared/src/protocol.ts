@@ -681,6 +681,27 @@ export const ENERGY_LIGHTNING = 100;
 
 export const UsePowerMessage = z.object({ power: z.enum(BATTLE_POWERS) });
 
+/**
+ * Atalhos de teste (só com o servidor de `pnpm dev:local`, que liga `--dev-tools`): pular etapas
+ * para ver uma parte do jogo sem jogar a partida inteira. Em produção a mensagem é ignorada.
+ */
+export const DEV_ACTIONS = [
+  'skipCountdown',
+  'time',
+  'lightning',
+  'solve',
+  'straighten',
+  'energy',
+  'fogMe',
+  'freezeMe',
+] as const;
+export type DevAction = (typeof DEV_ACTIONS)[number];
+export const DevMessage = z.object({
+  action: z.enum(DEV_ACTIONS),
+  /** 'time': quantos segundos devem faltar. */
+  value: z.number().int().min(0).max(3600).optional(),
+});
+
 /** Relâmpago de deslizar: a posição da peça que vai para o vazio. */
 export const SlideMessage = z.object({
   index: z
