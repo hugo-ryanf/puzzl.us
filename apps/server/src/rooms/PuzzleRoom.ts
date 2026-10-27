@@ -23,6 +23,7 @@ import {
   generatePuzzle,
   gridForPieceCount,
   uploadIdOf,
+  type DevAction,
   type GamePhase,
   type RankStatus,
 } from '@puzzle/shared';
@@ -347,6 +348,13 @@ export class PuzzleRoom extends BaseGameRoom {
     if (player) player.snaps += result.snaps;
     this.dirty = true;
     if (result.completed) this.finish();
+  }
+
+  protected devCommand(_client: Client, action: DevAction) {
+    if (this.phase !== 'playing') return;
+    if (action === 'straighten') this.board.straightenAll();
+    if (action === 'solve' && this.board.solveAll().completed) this.finish();
+    this.dirty = true;
   }
 
   /** Reespalha as peças soltas pela mesa (para todos); blocos montados e peças na mão ficam. */
