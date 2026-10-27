@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
   CATALOG,
   type BulletRankingQuery,
@@ -29,6 +29,9 @@ import { SavedScreen } from './screens/SavedScreen';
 import { AppShell, type Section } from './ui/AppShell';
 import { ArrowLeftIcon } from './ui/icons';
 import { InviteToasts } from './ui/InviteToasts';
+
+/** Laboratório (/lab): só no ambiente de desenvolvimento; some do build de produção. */
+const LabScreen = import.meta.env.DEV ? lazy(() => import('./screens/lab/LabScreen')) : null;
 
 /** O link de convite é só o código no caminho: https://site/K7QF2 */
 function codeFromUrl(): string {
@@ -138,6 +141,14 @@ export function App() {
 
   // Página fixa (o Google exige o link da política de privacidade para liberar o login).
   if (location.pathname === '/privacidade') return <PrivacyScreen />;
+  // Laboratório de testes: só no `pnpm dev` (no build de produção, LabScreen nem existe).
+  if (LabScreen && location.pathname === '/lab') {
+    return (
+      <Suspense fallback={<p className="loading">Carregando o laboratório…</p>}>
+        <LabScreen />
+      </Suspense>
+    );
+  }
   if (resuming) return <p className="loading">Voltando para a sala…</p>;
   if (room) {
     // Ranking aberto do fim da partida: sem barra lateral (o "Explorar" voltaria para a sala).
