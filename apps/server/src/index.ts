@@ -24,6 +24,9 @@ import { createUploadStore, type UploadStore } from './uploads/uploadStore';
 import { createVoiceTokenIssuer, voiceConfigFromEnv } from './voice';
 
 const PORT = Number(process.env.PORT ?? 2567);
+/** `pnpm dev:local` passa --dev-tools: atalhos de teste nas salas (pular contagem, relâmpago…). */
+const devTools = process.argv.includes('--dev-tools');
+if (devTools) console.warn('[server] atalhos de teste ligados (--dev-tools): não use em produção');
 // Funciona tanto em src/index.ts (dev) quanto em dist/index.js (build): ambos a um nível de drizzle/.
 const MIGRATIONS = fileURLToPath(new URL('../drizzle', import.meta.url));
 /** Site compilado (pnpm --filter @puzzle/web build). Existindo, este servidor também o entrega. */
@@ -92,6 +95,7 @@ await createGameServer({
   community,
   bullet,
   battles,
+  devTools,
   auth,
   webDist,
   trustProxy: process.env.TRUST_PROXY === '1',
