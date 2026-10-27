@@ -101,6 +101,30 @@ export class BoardRuntime {
     }
   }
 
+  /** Teste: monta a mesa inteira de uma vez (alinha tudo na peça 0 e encaixa). */
+  solveAll(): { snaps: number; completed: boolean } {
+    for (const group of this.target.groups.values()) group.heldBy = '';
+    const target = this.engine.groupOf(0);
+    for (const group of [...this.engine.allGroups()]) {
+      if (group.id !== target.id) this.engine.alignTo(group.id, target);
+    }
+    const { absorbedGroupIds, completed } = this.engine.dropGroup(target.id);
+    if (completed) this.engine.straighten(target.id);
+    this.syncMerge(target.id, absorbedGroupIds);
+    return { snaps: absorbedGroupIds.length, completed };
+  }
+
+  /** Teste: todas as peças de pé (cada grupo gira em volta do próprio centro). */
+  straightenAll(): void {
+    for (const group of this.engine.allGroups()) {
+      this.engine.straighten(group.id);
+      const schema = this.target.groups.get(String(group.id))!;
+      schema.x = group.x;
+      schema.y = group.y;
+      schema.rotation = group.rotation;
+    }
+  }
+
   /** A peça já está encaixada em alguma outra (todas começam soltas). */
   isSnapped(pieceId: number): boolean {
     return this.engine.groupOf(pieceId).pieceIds.length > 1;
