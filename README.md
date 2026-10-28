@@ -23,6 +23,7 @@ Arquitetura e roadmap: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
 ```sh
 pnpm install       # instala tudo
 pnpm dev           # sobe web (http://localhost:5173) e server (http://localhost:2567)
+pnpm dev:local     # igual, mas longe da produção e com atalhos de teste (ver abaixo)
 pnpm test          # testes (Vitest)
 pnpm typecheck     # checagem de tipos em todos os pacotes
 pnpm lint          # ESLint
@@ -30,6 +31,27 @@ pnpm format        # Prettier
 pnpm build         # build de produção
 pnpm --filter @puzzle/server db:generate   # cria migração após mudar src/db/schema.ts
 ```
+
+## Ambiente de teste
+
+Para mexer e testar sem tocar na produção: `pnpm dev:local`.
+
+- **Não lê o `apps/server/.env`** (o da produção). Sem banco, todo mundo é convidado: salas,
+  Bullet, batalha, poderes, relâmpago, cronômetro e sons funcionam; ranking, perfil, amigos e
+  login ficam de fora. Para ter isso também, crie um banco de teste (no Neon, uma _branch_
+  "dev" do banco: é grátis e não mexe no de produção) e ponha em `apps/server/.env.local` só
+  `DATABASE_URL=...` dele (o `.env.local` não vai para o git).
+- **Laboratório** em <http://localhost:5173/lab>: cada parte sozinha, com controles. Grade de
+  deslizar, contagem "3, 2, 1", últimos segundos com o fogo e o som (escolhendo quantos
+  segundos faltam), barra de poderes e os efeitos, combo, bônus, cabo de guerra e todos os sons.
+- **Painel "Testes"** no canto da sala: pular a contagem, montar o quebra-cabeça da vez, deixar
+  as peças de pé, "faltam 15 s / 5 s", relâmpago agora e, na batalha, energia cheia e neblina
+  ou congelado em você. Para a batalha, abra duas abas (um lado em cada).
+- O laboratório e o painel só existem no `pnpm dev` (o build de produção remove), e o servidor
+  só obedece aos atalhos quando sobe com `--dev-tools` (o que o `dev:local` faz).
+
+Depois de validar: `pnpm test`, `pnpm lint`, `pnpm typecheck` e `pnpm build`; aí commit e push no
+`main` (o Render publica sozinho).
 
 ## Catálogo de imagens
 
