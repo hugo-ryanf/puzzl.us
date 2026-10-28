@@ -35,6 +35,7 @@ import {
   isSolved,
   scrambleTiles,
   slide,
+  solvedTiles,
   generatePuzzle,
   gridForPieceCount,
   type BattlePower,
@@ -493,27 +494,85 @@ export class BattleRoom extends BaseGameRoom {
   protected devCommand(client: Client, action: DevAction, value?: number) {
     const team = this.state.players.get(client.sessionId)?.team as BattleTeam | '';
     if (!team || this.phase !== 'playing') return;
-    if (action === 'skipCountdown') this.skipCountdown();
+    if (action === 'skipCountdown') return this.skipCountdown();
     if (this.state.countdown > 0) return;
+    const other = otherTeam(team);
     const board = this.state.boards.get(team)!;
-    const runtime = this.boards.get(team)!;
-    if (action === 'lightning') {
-      this.startLightning();
-    } else if (action === 'time' && value !== undefined && this.timed) {
-      if (this.state.slides.size > 0 || this.state.suddenDeath) return;
-      this.runClock(this.startedAt, Math.max(0, this.state.timeLimitMs - value * 1000));
-      this.tick();
-    } else if (action === 'energy') {
-      board.energy = MAX_ENERGY;
-      board.powerReadyAt = 0;
-    } else if (action === 'fogMe') {
-      board.fogUntil = this.elapsed() + FOG_MS;
-    } else if (action === 'freezeMe') {
-      board.frozenUntil = this.elapsed() + FREEZE_MS;
-    } else if (action === 'straighten') {
-      runtime.straightenAll();
-    } else if (action === 'solve' && this.state.slides.size === 0 && !board.done) {
-      this.afterSnaps(team, runtime, runtime.solveAll(), 1);
+    const theirs = this.state.boards.get(other)!;
+    const sliding = this.state.slides.size > 0;
+    const solveSide = (side: BattleTeam) => {
+      const target = this.state.boards.get(side)!;
+      if (sliding || target.done) return;
+      const runtime = this.boards.get(side)!;
+      this.afterSnaps(side, runtime, runtime.solveAll(), 1);
+    };
+    switch (action) {
+      case 'restartCountdown': {
+        if (sliding) return;
+        // O relógio para, o "3, 2, 1" volta e a partida continua de onde estava.
+        const elapsed = this.elapsed();
+        this.clockTimer?.clear();
+        this.endTimer?.clear();
+        this.leaderTimer?.clear();
+        this.startAfterCountdown(() => this.runClock(this.startedAt, elapsed));
+        return;
+      }
+      case 'time':
+        if (value === undefined || !this.timed || sliding || this.state.suddenDeath) return;
+        this.runClock(this.startedAt, Math.max(0, this.state.timeLimitMs - value * 1000));
+        return this.tick();
+      case 'endNow':
+        // Por tempo: o fim normal (pode dar morte súbita); corrida: o meu lado ganha.
+        if (sliding) return;
+        return this.timed && !this.state.suddenDeath ? this.timeUp() : this.finish(team);
+      case 'suddenDeath':
+        if (!this.timed || sliding || this.state.suddenDeath) return;
+        this.endTimer?.clear();
+        this.state.remainingMs = 0;
+        return this.suddenDeath();
+      case 'lightning':
+        return this.startLightning();
+      case 'slideSolve': {
+        const grid = this.state.slides.get(team);
+        if (!grid || this.state.slideWinner !== '') return;
+        solvedTiles().forEach((tile, position) => (grid.tiles[position] = tile));
+        return this.endLightning(team);
+      }
+      case 'slideTime':
+        if (sliding && this.state.slideWinner === '' && value !== undefined) {
+          this.state.slideSeconds = Math.max(1, Math.min(SLIDE_LIMIT_SECONDS, value));
+        }
+        return;
+      case 'solve':
+        return solveSide(team);
+      case 'solveThem':
+        return solveSide(other);
+      case 'straighten':
+        return this.boards.get(team)!.straightenAll();
+      case 'combo': {
+        const player = this.state.players.get(client.sessionId)!;
+        player.combo = Math.min(9, Math.max(1, player.combo) + 1);
+        return;
+      }
+      case 'energy':
+        board.energy = MAX_ENERGY;
+        board.powerReadyAt = 0;
+        return;
+      case 'shieldMe':
+        board.shield = true;
+        return;
+      case 'fogMe':
+        board.fogUntil = this.elapsed() + FOG_MS;
+        return;
+      case 'freezeMe':
+        board.frozenUntil = this.elapsed() + FREEZE_MS;
+        return;
+      case 'fogThem':
+        theirs.fogUntil = this.elapsed() + FOG_MS;
+        return;
+      case 'freezeThem':
+        theirs.frozenUntil = this.elapsed() + FREEZE_MS;
+        return;
     }
   }
 

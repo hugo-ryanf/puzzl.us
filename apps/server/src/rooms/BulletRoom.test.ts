@@ -248,6 +248,12 @@ describe('BulletRoom', () => {
     expect(game.state.remainingMs).toBeGreaterThan(13_000);
     game.client.send('dev', { action: 'lightning' });
     expect(await until(() => game.state.slides.has('main'))).toBe(true);
+    game.client.send('dev', { action: 'slideSolve' });
+    expect(await until(() => game.state.solved === 2 && game.state.helpers === 1)).toBe(true);
+    game.client.send('dev', { action: 'bonus' });
+    expect(await until(() => game.state.bonusMs >= 5000)).toBe(true);
+    game.client.send('dev', { action: 'endNow' });
+    expect(await until(() => game.state.phase === 'completed')).toBe(true);
     await game.client.leave();
   });
 

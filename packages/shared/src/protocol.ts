@@ -686,19 +686,36 @@ export const UsePowerMessage = z.object({ power: z.enum(BATTLE_POWERS) });
  * para ver uma parte do jogo sem jogar a partida inteira. Em produção a mensagem é ignorada.
  */
 export const DEV_ACTIONS = [
+  // Contagem e tempo
+  'restartCountdown',
   'skipCountdown',
   'time',
-  'lightning',
+  'bonus',
+  'endNow',
+  // Mesa
   'solve',
   'straighten',
+  'combo',
+  // Relâmpago
+  'lightning',
+  'slideSolve',
+  'slideTime',
+  // Bullet
+  'helper',
+  // Batalha
   'energy',
+  'shieldMe',
   'fogMe',
   'freezeMe',
+  'fogThem',
+  'freezeThem',
+  'solveThem',
+  'suddenDeath',
 ] as const;
 export type DevAction = (typeof DEV_ACTIONS)[number];
 export const DevMessage = z.object({
   action: z.enum(DEV_ACTIONS),
-  /** 'time': quantos segundos devem faltar. */
+  /** 'time' e 'slideTime': quantos segundos devem faltar. */
   value: z.number().int().min(0).max(3600).optional(),
 });
 

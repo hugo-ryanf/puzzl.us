@@ -139,24 +139,54 @@ export class BulletRoom extends BaseGameRoom {
     this.state.remainingMs = Math.max(0, this.limit() - this.elapsed());
   }
 
-  protected devCommand(_client: Client, action: DevAction, value?: number) {
+  protected devCommand(client: Client, action: DevAction, value?: number) {
     if (this.phase !== 'playing') return;
-    if (action === 'skipCountdown') this.skipCountdown();
+    if (action === 'skipCountdown') return this.skipCountdown();
     if (this.state.countdown > 0) return;
-    if (action === 'time' && value !== undefined) {
-      // Faltando `value` segundos: o relógio pula para lá.
-      const elapsed = Math.max(0, this.limit() - value * 1000);
-      this.startClock(this.startedAt, elapsed, () => this.tick());
-      this.tick();
-      this.scheduleEnd();
-    } else if (action === 'lightning') {
-      this.nextRoundTimer?.clear();
-      this.puzzlesInGame = LIGHTNING_EVERY - 1; // o próximo quebra-cabeça é o relâmpago
-      this.nextRound();
-    } else if (action === 'solve') {
-      this.afterSnaps(this.board.solveAll());
-    } else if (action === 'straighten') {
-      this.board.straightenAll();
+    switch (action) {
+      case 'restartCountdown': {
+        // O relógio para, o "3, 2, 1" volta e a partida continua de onde estava.
+        const elapsed = this.elapsed();
+        this.clockTimer?.clear();
+        this.endTimer?.clear();
+        this.startAfterCountdown(() => {
+          this.startClock(this.startedAt, elapsed, () => this.tick());
+          this.scheduleEnd();
+        });
+        return;
+      }
+      case 'time': {
+        if (value === undefined) return;
+        // Faltando `value` segundos: o relógio pula para lá.
+        const elapsed = Math.max(0, this.limit() - value * 1000);
+        this.startClock(this.startedAt, elapsed, () => this.tick());
+        this.tick();
+        this.scheduleEnd();
+        return;
+      }
+      case 'bonus':
+        return this.addTime(FAST_BONUS_MS);
+      case 'endNow':
+        return this.timeUp();
+      case 'lightning':
+        this.nextRoundTimer?.clear();
+        this.puzzlesInGame = LIGHTNING_EVERY - 1; // o próximo quebra-cabeça é o relâmpago
+        return this.nextRound();
+      case 'slideSolve':
+        if (this.state.slides.has(BOARD) && !this.state.boards.get(BOARD)?.done) this.roundSolved();
+        return;
+      case 'solve':
+        return this.afterSnaps(this.board.solveAll());
+      case 'straighten':
+        return this.board.straightenAll();
+      case 'helper':
+        this.state.helpers = Math.min(MAX_HELPERS, this.state.helpers + 1);
+        return;
+      case 'combo': {
+        const player = this.state.players.get(client.sessionId);
+        if (player) player.combo = Math.min(9, Math.max(1, player.combo) + 1);
+        return;
+      }
     }
   }
 

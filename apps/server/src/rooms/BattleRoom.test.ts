@@ -275,11 +275,21 @@ describe('BattleRoom', () => {
       expect(await until(() => board('a').fogUntil > 0)).toBe(true);
       ana.send('dev', { action: 'solve' });
       expect(await until(() => board('a').solved === 1)).toBe(true);
+      ana.send('dev', { action: 'shieldMe' });
+      ana.send('dev', { action: 'freezeThem' });
+      expect(await until(() => board('a').shield && board('b').frozenUntil > 0)).toBe(true);
+      ana.send('dev', { action: 'solveThem' });
+      expect(await until(() => board('b').solved === 1)).toBe(true);
       ana.send('dev', { action: 'lightning' });
       expect(await until(() => state.slides.size === 2)).toBe(true);
+      ana.send('dev', { action: 'slideSolve' });
+      expect(await until(() => state.slideWinner === 'a')).toBe(true);
+      expect(await until(() => state.slides.size === 0, 300)).toBe(true);
+      ana.send('dev', { action: 'suddenDeath' });
+      expect(await until(() => state.suddenDeath)).toBe(true);
       await ana.leave();
       await bia.leave();
-    });
+    }, 15_000);
 
     it('a peça dourada é a mesma nos dois lados', async () => {
       const { ana, bia, board } = await setup('1v1', [], 3);
