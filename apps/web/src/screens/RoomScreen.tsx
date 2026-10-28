@@ -18,6 +18,7 @@ import { BulletResult } from './bullet/BulletResult';
 import type { RankingOpen } from './RankingScreen';
 import { CompletedModal } from './room/CompletedModal';
 import { PlayerAvatars } from './room/PlayerAvatars';
+import { DevPanel } from './room/DevPanel';
 import { RoomHeader } from './room/RoomHeader';
 import { StartCountdown } from './room/StartCountdown';
 import { useGameSounds } from './room/useGameSounds';
@@ -144,6 +145,8 @@ export function RoomScreen({
           <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>
         )}
         <StartCountdown countdown={snapshot.countdown} />
+        {/* Atalhos de teste: só no `pnpm dev` (o build de produção remove). */}
+        {import.meta.env.DEV && <DevPanel room={room} snapshot={snapshot} />}
         {!solo && (
           <PlayerAvatars
             players={snapshot.players}
