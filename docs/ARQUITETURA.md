@@ -347,8 +347,8 @@ mostrar; entrar pelo código funciona para qualquer modo.
       Depois de 1,5 s as mesas voltam e o relógio continua de onde parou.
 - **Peças girando** (todas as partidas, sempre; o ranking não muda): cada grupo tem `rotation`
   (quartos de volta, `GroupState`/`GroupSchema`); a peça fica em `rotatePoint(posição certa,
-rotação) + (x, y)` e só encaixa em grupo com a mesma rotação. O `scattered` sorteia a rotação de
-  cada peça (`rotate`; os testes de sala desligam com `ROTATION.enabled`). Mensagem `rotate`
+rotação) + (x, y)` e só encaixa em grupo com a mesma rotação. O `scattered` vira só algumas peças, sorteadas
+  (entre 10% e 25%, pelo menos uma; `turnedPieces`) (`rotate`; os testes de sala desligam com `ROTATION.enabled`). Mensagem `rotate`
   (grupo livre ou na mão de quem pede): gira um quarto de volta mantendo o centro
   (`rotateGroup`); montado tudo, o servidor endireita o grupo (`straighten`) para a foto aparecer
   de pé. No cliente: clique direito, R arrastando (previsto na hora) ou dois toques no celular.

@@ -60,6 +60,29 @@ function scatterOffset(puzzle: Puzzle, random: Random, piece: PieceDef): Point {
   };
 }
 
+/** Quantas peças vêm viradas: uma parte pequena e sorteada (pelo menos uma). */
+export const TURNED_MIN = 0.1;
+export const TURNED_MAX = 0.25;
+
+/**
+ * Rotação de cada peça ao espalhar: só algumas, sorteadas (entre TURNED_MIN e TURNED_MAX do
+ * total), vêm viradas (1 a 3 quartos de volta); o resto, de pé.
+ */
+function turnedPieces(total: number, random: Random): number[] {
+  const min = Math.max(1, Math.round(total * TURNED_MIN));
+  const max = Math.max(min, Math.round(total * TURNED_MAX));
+  const count = min + Math.floor(random() * (max - min + 1));
+  // Embaralha os ids (Fisher-Yates) e vira os primeiros `count`.
+  const ids = Array.from({ length: total }, (_, i) => i);
+  for (let i = total - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+  }
+  const rotations = new Array<number>(total).fill(0);
+  for (const id of ids.slice(0, count)) rotations[id] = 1 + Math.floor(random() * 3);
+  return rotations;
+}
+
 /**
  * Deslocamento de uma peça virada para o canto dela cair onde `offset` poria a peça de pé (o
  * espalhamento sorteia lugares pensando nas peças de pé).
@@ -111,10 +134,10 @@ export class PuzzleEngine {
     { salt, rotate = false }: { salt?: string; rotate?: boolean } = {},
   ): PuzzleEngine {
     const random = createRandom(`${puzzle.seed}:scatter${salt ? `:${salt}` : ''}`);
+    const rotations = rotate ? turnedPieces(puzzle.pieces.length, random) : [];
     // Virada, o canto da peça fica onde ela cairia de pé.
-    const rotations = puzzle.pieces.map(() => (rotate ? Math.floor(random() * 4) : 0));
     const offsets = puzzle.pieces.map((piece) =>
-      turnedOffset(piece, scatterOffset(puzzle, random, piece), rotations[piece.id]!),
+      turnedOffset(piece, scatterOffset(puzzle, random, piece), rotations[piece.id] ?? 0),
     );
     return new PuzzleEngine(puzzle, offsets, rotations);
   }

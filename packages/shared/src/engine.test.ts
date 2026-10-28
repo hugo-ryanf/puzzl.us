@@ -182,6 +182,24 @@ describe('peças girando', () => {
     expect(engine.getGroup(3).y).toBeCloseTo(start.y);
   });
 
+  it('só uma parte pequena das peças vem virada (entre 10% e 25%, pelo menos uma)', () => {
+    for (const [rows, cols] of [
+      [3, 4],
+      [10, 10],
+      [20, 25],
+    ] as const) {
+      const grid = generatePuzzle({ seed: `virar-${rows}`, rows, cols, width: 800, height: 600 });
+      const engine = PuzzleEngine.scattered(grid, { rotate: true });
+      const turned = [...engine.allGroups()].filter((g) => g.rotation !== 0).length;
+      const total = rows * cols;
+      expect(turned).toBeGreaterThanOrEqual(Math.max(1, Math.round(total * 0.1)));
+      expect(turned).toBeLessThanOrEqual(Math.max(1, Math.round(total * 0.25)));
+    }
+    // Sem `rotate`, todas de pé.
+    const plain = PuzzleEngine.scattered(small);
+    expect([...plain.allGroups()].every((g) => g.rotation === 0)).toBe(true);
+  });
+
   it('endireitar deixa o grupo de pé', () => {
     const engine = new PuzzleEngine(small, atHome(), [2, 0, 0, 0]);
     engine.straighten(0);
