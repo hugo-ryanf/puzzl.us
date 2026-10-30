@@ -7,7 +7,8 @@ e os três montam o quebra-cabeça ao vivo. Precisa do site de demonstração co
   PORT=2570 LIVEKIT_URL=ws://127.0.0.1:7880 LIVEKIT_API_KEY=devkey LIVEKIT_API_SECRET=secret npx tsx src/dev/demoServer.ts
   VITE_SERVER_URL=http://localhost:2570 npx vite --port 5181
 
-  python record_sala.py <pasta das câmeras .webm>  → footage/sala.webm, footage/frames/sala/NNNN.jpg, info.json
+  python record_sala.py <pasta das câmeras .webm> [en]  → footage/sala.webm, footage/frames/sala/NNNN.jpg, info.json
+  com "en": o site em inglês (rode o demoServer com DEMO_LANG=en) → footage_en/…
 
 Os quatro ficam num navegador só (quatro Chromiums não cabem na memória): cada contexto troca o
 getUserMedia por um vídeo do seu camaleão em laço.
@@ -26,7 +27,15 @@ from playwright.async_api import async_playwright
 
 BASE = 'http://localhost:5181'
 CAMS = sys.argv[1]
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'footage')
+EN = len(sys.argv) > 2 and sys.argv[2] == 'en'
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'footage_en' if EN else 'footage')
+# os textos do site que o script procura
+TXT = {'card': "Grandma's street", 'create': 'Create room', 'camera': 'Turn on camera', 'start': 'Start'} if EN else \
+      {'card': 'Rua da minha avó', 'create': 'Criar sala', 'camera': 'Ligar a câmera', 'start': 'Começar'}
+# o idioma do site (a escolha salva no navegador) e o painel de testes escondido
+SETUP = (("try { localStorage.setItem('quebra-cabeca:idioma', 'en'); } catch {}" if EN else '') +
+         "addEventListener('DOMContentLoaded', () => { const s = document.createElement('style');"
+         " s.textContent = '.dev-panel { display: none !important; }'; document.head.appendChild(s); });")
 W, H = 1920, 1080
 RECORD_S = 16
 MARK = """(()=>{const d=document.createElement('div');d.style.cssText='position:fixed;left:0;bottom:0;width:24px;height:24px;background:#ff00ff;z-index:99999;pointer-events:none';document.body.appendChild(d);setTimeout(()=>d.remove(),140);})()"""
@@ -90,7 +99,8 @@ def log(*a):
 
 
 async def context(browser, cam, **kw):
-    c = await browser.new_context(permissions=['camera', 'microphone'], **kw)
+    c = await browser.new_context(permissions=['camera', 'microphone'], locale='en-US' if EN else 'pt-BR', **kw)
+    await c.add_init_script(SETUP)
     data = base64.b64encode(open(f'{CAMS}/{cam}.webm', 'rb').read()).decode()
     await c.add_init_script(f'{CAMERA}("data:video/webm;base64,{data}")')
     return c
@@ -98,7 +108,7 @@ async def context(browser, cam, **kw):
 
 async def turn_camera_on(page):
     for _ in range(40):
-        button = page.get_by_role('button', name='Ligar a câmera')
+        button = page.get_by_role('button', name=TXT['camera'])
         if await button.count():
             await button.first.click()
             return True
@@ -116,7 +126,7 @@ async def main():
         ana.set_default_timeout(30000)
         await ana.goto(BASE + '/', wait_until='networkidle'); await ana.wait_for_timeout(1200)
         # a foto da comunidade → Multiplayer, 4 jogadores → Começar
-        card = ana.get_by_text('Rua da minha avó', exact=True)
+        card = ana.get_by_text(TXT['card'], exact=True)
         await card.scroll_into_view_if_needed(); await ana.wait_for_timeout(400)
         box = await card.bounding_box()
         await ana.mouse.click(box['x'] + 120, box['y'] - 160)   # a foto do card, acima do título
@@ -127,7 +137,7 @@ async def main():
         if await four.count(): await four.first.click()
         await ana.get_by_role('textbox').last.fill('Ana')
         await ana.screenshot(path=f'{OUT}/debug_multi.png')
-        await ana.get_by_role('button', name='Criar sala').last.click()   # o do diálogo (a barra lateral tem outro)
+        await ana.get_by_role('button', name=TXT['create']).last.click()   # o do diálogo (a barra lateral tem outro)
         await ana.wait_for_function('window.__puzzleRoom && window.__puzzleRoom.roomId', timeout=20000)
         code = await ana.evaluate('window.__puzzleRoom.roomId')
         log('sala', code)
@@ -149,7 +159,7 @@ async def main():
         await ana.screenshot(path=f'{OUT}/debug_call.png')
         await ana.wait_for_timeout(4000)   # a chamada conecta e os vídeos chegam
         # Ana (anfitriã) começa
-        start = ana.get_by_role('button', name='Começar')
+        start = ana.get_by_role('button', name=TXT['start'])
         if await start.count(): await start.first.click()
         tasks = [asyncio.ensure_future(pg.evaluate(BOT, [i, 3])) for i, (_, pg) in enumerate(bots)]
         await ana.wait_for_function("window.__puzzleRoom.state.phase === 'playing' && window.__puzzleRoom.state.countdown === 0")
