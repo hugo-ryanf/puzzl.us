@@ -22,6 +22,24 @@ canvas{position:absolute;left:0;top:0;width:1920px;height:1080px}
 // __events. Consulta: ?play (ao vivo), ?t=6.4&hud (um quadro).
 // ════════════════════════════════════════════════════════════════════════════════════════════
 const DUR = 51.4;
+// ?lang=en: textos em inglês e as gravações do site em inglês (footage_en/frames). O stills.py
+// acrescenta "?hud=1" ao endereço, por isso o teste é por "lang=en" em qualquer lugar da busca.
+const LANG = /lang=en/.test(location.search) ? 'en' : 'pt';
+const EN = {
+  'Monte': 'Play', 'junto.': 'together.',
+  'Escolha uma foto.': 'Pick a photo.', '…ou uma da comunidade.': '…or one from the community.',
+  'E escolha como jogar.': 'Then choose how to play.',
+  'Chame os amigos.': 'Invite your friends.', 'Todos na mesma mesa, ao mesmo tempo.': 'Same table, same time.',
+  'Com chamada de voz e vídeo.': 'With voice and video chat.',
+  'Contra o relógio.': 'Race the clock.', 'Você': 'You', 'Lado contra lado.': 'Side against side.',
+  'Neblina →': 'Fog →', '← Congelar': '← Freeze', 'Relâmpago.': 'Lightning.',
+  'Gire.': 'Turn.', 'Encaixe.': 'Snap.', 'Vença.': 'Win.', 'Gire. ': 'Turn. ', 'Encaixe. ': 'Snap. ',
+  'Batalha': 'Battle',
+  'Suba no ranking.': 'Climb the ranking.', 'Seu perfil, suas conquistas.': 'Your profile, your achievements.',
+  'quebra-cabeça online, pra montar junto': 'online jigsaw puzzles, to solve together',
+};
+const tr = text => (LANG === 'en' ? EN[text] ?? text : text);
+document.documentElement.lang = LANG === 'en' ? 'en' : 'pt-BR';
 window.__meta = { dur: DUR, fps: 30, w: 1920, h: 1080,
   inFrame: { piece: [0.95, 31.9], mark: [47.7, 51.4, 'whole'] } };
 const { clamp, lerp, sstep, ssstep, seg, spring, ease } = OM;
@@ -42,11 +60,14 @@ const setM = M => g.setTransform(M[0] * DPR, M[1] * DPR, M[2] * DPR, M[3] * DPR,
 const screen = () => g.setTransform(DPR, 0, 0, DPR, 0, 0);
 const img = new Image(); img.src = 'camaleao.webp';
 // gravações do site de demonstração: footage/frames/<nome>/NNNN.jpg a 30 fps; mark = quadro em que o comando começou
-const FOOT = { explorar: { n: 347, mark: 90 }, ranking: { n: 385, mark: 176 }, sala: { n: 2788, mark: 1645 } };
+const FOOT = LANG === 'en'
+  ? { explorar: { n: 442, mark: 182 }, ranking: { n: 456, mark: 246 }, sala: { n: 2567, mark: 1603 } }
+  : { explorar: { n: 347, mark: 90 }, ranking: { n: 385, mark: 176 }, sala: { n: 2788, mark: 1645 } };
+const FRAMES = LANG === 'en' ? 'footage_en/frames' : 'footage/frames';
 const frameCache = new Map();
 let PENDING = [];
 function footFrame(name, f) {
-  const { n } = FOOT[name], k = Math.max(0, Math.min(n - 1, f)), src = `footage/frames/${name}/${String(k + 1).padStart(4, '0')}.jpg`;
+  const { n } = FOOT[name], k = Math.max(0, Math.min(n - 1, f)), src = `${FRAMES}/${name}/${String(k + 1).padStart(4, '0')}.jpg`;
   let im = frameCache.get(src);
   if (!im) { im = new Image(); im.src = src; frameCache.set(src, im); }
   if (!im.complete || !im.naturalWidth) PENDING.push(im.decode().catch(() => {}));
@@ -156,7 +177,7 @@ const T = {
   flash: L(13.5), grid0: L(13.6), grid1: L(14.05), slides: [14.2, 14.55, 14.9].map(L), tileIn: L(15.15), seamOut: L(15.3),
   dive0: L(15.7), dive1: L(16.9), iris0: L(16.95), iris1: L(17.55),
   gire: L(17.55), rot: [17.75, 18.0, 18.25, 18.5, 18.75].map(L), encaixe: L(18.95), hop0: L(19.0), vença: L(19.65),
-  words2: [[L(20.25), 'Solo'], [L(20.7), 'Batalha'], [L(21.15), 'Bullet']], words2End: L(21.75),
+  words2: [[L(20.25), 'Solo'], [L(20.7), tr('Batalha')], [L(21.15), 'Bullet']], words2End: L(21.75),
   gather0: L(20.05), boardDone: L(22.35), seams0: L(22.45), seams1: L(22.95),
   // o tabuleiro se abre na janela do ranking (gravado), o cursor entra no perfil da Ana
   rk0: 31.6, rk1: 32.3, rkFoot: 32.0, rkCap1: 32.45, rkCap2: 35.5,
@@ -304,10 +325,10 @@ function act1(t) {
   });
   // "Monte." / "junto."
   const textOut = T.win0;
-  word('Monte', 800, 610, t, T.monte, { size: 108, align: 'right', out: textOut });
+  word(tr('Monte'), 800, 610, t, T.monte, { size: 108, align: 'right', out: textOut });
   const dotOp = 1 - sstep(T.junto, T.junto + 0.15, t);
   if (t >= T.monte) word('.', 800 + measure('.', 108) * 0.5 + 2, 610, t, T.monte + 0.05, { size: 108, align: 'center', color: C.accent, out: Math.min(textOut, T.junto) });
-  word('junto.', 800, 725, t, T.junto, { size: 108, align: 'right', color: C.accent, out: textOut });
+  word(tr('junto.'), 800, 725, t, T.junto, { size: 108, align: 'right', color: C.accent, out: textOut });
   void dotOp;
 
   // 2 · o bloco vira o relógio do Bullet
@@ -354,7 +375,7 @@ function act1(t) {
     });
     TRACK.piece = { x: cx - rx, y: cy - ry, w: rx * 2, h: ry * 2 };
   }
-  word('Contra o relógio.', 1050, 360, t, T.relogio, { size: 72, align: 'center', out: T.collapse0 - 0.1 });
+  word(tr('Contra o relógio.'), 1050, 360, t, T.relogio, { size: 72, align: 'center', out: T.collapse0 - 0.1 });
 
   // 3 · lado contra lado
   if (t >= T.collapse1 - 0.05 && t < T.grid1 + 0.05) battle(t);
@@ -420,9 +441,9 @@ function explorar(t) {
 }
 const explorarFrame = t => FOOT.explorar.mark - 6 + Math.round((t - T.expFoot) * 30);
 function explorarCaptions(t) {
-  caption('Escolha uma foto.', t, T.cap1, T.cap2 - 0.12);
-  caption('…ou uma da comunidade.', t, T.cap2, T.cap3 - 0.12, C.accent);
-  caption('E escolha como jogar.', t, T.cap3, SA + 0.3);
+  caption(tr('Escolha uma foto.'), t, T.cap1, T.cap2 - 0.12);
+  caption(tr('…ou uma da comunidade.'), t, T.cap2, T.cap3 - 0.12, C.accent);
+  caption(tr('E escolha como jogar.'), t, T.cap3, SA + 0.3);
 }
 
 // ── a sala com os amigos ─────────────────────────────────────────────────────────────────────
@@ -431,18 +452,21 @@ function explorarCaptions(t) {
 const SA = 12.3, DS = 7.9, SB = SA + DS;
 const old = t => (t < SA ? t : t - DS);
 let AFTER_SALA = false;
-// a gravação (record_sala.py): sala de espera (300), Bia (734), Caio (950), Duda (1284), Ana (1356),
-// "Começar" (1540), a partida a 2,5× (1558 em diante)
+// os quadros de cada gravação (record_sala.py): sala de espera, a câmera de Bia, Caio, Duda e Ana,
+// "Começar", a partida (a 2,5× daí em diante) e a marca magenta (mark a markEnd), que é pulada
+const SALA_F = LANG === 'en'
+  ? { lobby: 300, bia: 914, caio: 994, duda: 1284, ana: 1382, start: 1568, game: 1592, mark: 1603, markEnd: 1626 }
+  : { lobby: 300, bia: 734, caio: 950, duda: 1284, ana: 1356, start: 1540, game: 1558, mark: 1645, markEnd: 1662 };
 function salaFrame(t) {
-  const u = t - SA;
-  if (u < 1.3) return 300 + Math.round((u - 0.5) * 30);
-  if (u < 1.9) return 734 + Math.round((u - 1.3) * 30);
-  if (u < 2.5) return 950 + Math.round((u - 1.9) * 30);
-  if (u < 3.0) return 1284 + Math.round((u - 2.5) * 30);
-  if (u < 3.5) return 1356 + Math.round((u - 3.0) * 30);
-  if (u < 4.1) return 1540 + Math.round((u - 3.5) * 30);
-  const f = 1558 + Math.round((u - 4.1) * 75);
-  return f >= 1644 && f <= 1650 ? 1651 : f;   // pula a marca magenta da gravação
+  const u = t - SA, F = SALA_F;
+  if (u < 1.3) return F.lobby + Math.round((u - 0.5) * 30);
+  if (u < 1.9) return F.bia + Math.round((u - 1.3) * 30);
+  if (u < 2.5) return F.caio + Math.round((u - 1.9) * 30);
+  if (u < 3.0) return F.duda + Math.round((u - 2.5) * 30);
+  if (u < 3.5) return F.ana + Math.round((u - 3.0) * 30);
+  if (u < 4.1) return Math.min(F.start + Math.round((u - 3.5) * 30), F.game - 2);
+  const f = F.game + Math.round((u - 4.1) * 75);
+  return f >= F.mark - 1 && f <= F.markEnd ? F.markEnd + 1 : f;
 }
 const SALA_END = salaFrame(SB - 1 / 30);
 const SALA_JOIN = [1.3, 1.9, 2.5, 3.0].map(u => SA + u), SALA_CLICK = [SA + 0.48, SA + 3.5], SALA_GO = SA + 4.1;
@@ -479,9 +503,9 @@ function sala(t) {
   footCursor(t, [[SA - 1, SA - 0.9, 1074, 484], [SA + 0.05, SA + 0.45, 1256, 942], [SA + 2.9, SA + 3.45, 960, 637]],
     SALA_CLICK, t < SA + 3.9);
   explorarCaptions(t);
-  caption('Chame os amigos.', t, SA + 0.8, SA + 3.45);
-  caption('Todos na mesma mesa, ao mesmo tempo.', t, SA + 3.75, SA + 5.8, C.accent);
-  caption('Com chamada de voz e vídeo.', t, SA + 5.95, SB - 0.3);
+  caption(tr('Chame os amigos.'), t, SA + 0.8, SA + 3.45);
+  caption(tr('Todos na mesma mesa, ao mesmo tempo.'), t, SA + 3.75, SA + 5.8, C.accent);
+  caption(tr('Com chamada de voz e vídeo.'), t, SA + 5.95, SB - 0.3);
   TRACK.piece = { x: R.x, y: R.y, w: R.w, h: R.h };
 }
 function seekSala(t) {
@@ -519,7 +543,7 @@ function battle(t) {
   // a divisória
   const lineOp = 1 - sstep(T.grid0, T.grid0 + 0.05, t);
   g.save(); g.fillStyle = C.ink; g.globalAlpha = lineOp; g.fillRect(958, -200, 4, 1480); g.restore();
-  word('Você', 480, 170, t, T.voce, { size: 54, weight: 700, align: 'center' });
+  word(tr('Você'), 480, 170, t, T.voce, { size: 54, weight: 700, align: 'center' });
   word('Bia', 1440, 170, t, T.bia, { size: 54, weight: 700, align: 'center', color: C.friends[0] });
   // os dois tabuleiros enchendo
   SIDE.forEach((b, s) => {
@@ -546,13 +570,13 @@ function battle(t) {
     const wl = measure('Lado contra lado.', 80), op = OM.wordRise(t, T.lado).op;
     g.save(); g.globalAlpha = op; g.fillStyle = C.ground; g.beginPath(); g.roundRect(960 - wl / 2 - 28, 880, wl + 56, 112, 20); g.fill(); g.restore();
   }
-  word('Lado contra lado.', 960, 960, t, T.lado, { size: 80, align: 'center' });
+  word(tr('Lado contra lado.'), 960, 960, t, T.lado, { size: 80, align: 'center' });
   // neblina: atravessa da esquerda para a mesa da Bia
   const fogK = ease.expoOut(seg(t, T.fog, T.fog + 0.7)), fogOp = sstep(T.fog, T.fog + 0.2, t) * (1 - sstep(L(12.7), L(13.1), t));
   if (fogOp > 0) {
     g.save(); g.globalAlpha = fogOp * 0.88; g.filter = `blur(${(26 * DPR * zoomNow).toFixed(1)}px)`; g.fillStyle = '#e9ecf1';
     g.beginPath(); g.ellipse(lerp(560, 1440, fogK), 420, 330, 210, 0, 0, Math.PI * 2); g.fill(); g.restore();
-    word('Neblina →', lerp(700, 1440, fogK), 650, t, T.fog, { size: 34, weight: 700, color: C.mute, align: 'center', out: L(12.6) });
+    word(tr('Neblina →'), lerp(700, 1440, fogK), 650, t, T.fog, { size: 34, weight: 700, color: C.mute, align: 'center', out: L(12.6) });
   }
   // gelo: a Bia congela o meu lado
   const iceOp = sstep(T.ice, T.ice + 0.12, t) * (1 - sstep(L(13.15), L(13.45), t));
@@ -561,7 +585,7 @@ function battle(t) {
     g.save(); g.globalAlpha = iceOp; g.fillStyle = 'rgba(165,216,255,0.42)'; g.strokeStyle = C.ice; g.lineWidth = 8;
     g.beginPath(); g.roundRect(b.x - 24, b.y - 24, b.w + 48, b.h + 48, 18); g.fill(); g.stroke();
     snowflake(b.x + b.w / 2, b.y + b.h / 2, 56); g.restore();
-    word('← Congelar', 480, 650, t, T.ice, { size: 34, weight: 700, color: '#1c7ed6', align: 'center', out: L(13.1) });
+    word(tr('← Congelar'), 480, 650, t, T.ice, { size: 34, weight: 700, color: '#1c7ed6', align: 'center', out: L(13.1) });
   }
   if (dim > 0) { screen(); g.fillStyle = `rgba(230,232,236,${dim})`; g.fillRect(0, 0, W, H); setM(OM.view(CAM)); }
 }
@@ -617,7 +641,7 @@ function lightning(t) {
     const k = sstep(T.dive0 + 0.35, T.dive1 - 0.1, t);
     g.save(); g.globalAlpha = k; g.fillStyle = C.ink; g.beginPath(); g.arc(EYE.x, EYE.y, EYE.r * lerp(1, 1.6, k), 0, Math.PI * 2); g.fill(); g.restore();
   }
-  word('Relâmpago.', 960, 300, t, T.grid1 - 0.1, { size: 64, align: 'center', color: C.ink, out: T.dive0 });
+  word(tr('Relâmpago.'), 960, 300, t, T.grid1 - 0.1, { size: 64, align: 'center', color: C.ink, out: T.dive0 });
   TRACK.piece = { x: m.x, y: Math.max(m.y, 0), w: m.w, h: Math.min(m.h, 1080) };
 }
 
@@ -653,10 +677,10 @@ function act2(t) {
     TRACK.piece = { x: BIG.x, y: BIG.y, w: BIG.w, h: BIG.h };
   }
   // palavras
-  const gw = measure('Gire. ', 72), ew = measure('Encaixe. ', 72), vw = measure('Vença.', 72), x0 = 960 - (gw + ew + vw) / 2;
-  word('Gire.', x0, 960, t, T.gire, { size: 72, out: T.gather0 });
-  word('Encaixe.', x0 + gw, 960, t, T.encaixe, { size: 72, out: T.gather0 });
-  word('Vença.', x0 + gw + ew, 960, t, T.vença, { size: 72, color: C.accent, out: T.gather0 });
+  const gw = measure(tr('Gire. '), 72), ew = measure(tr('Encaixe. '), 72), vw = measure(tr('Vença.'), 72), x0 = 960 - (gw + ew + vw) / 2;
+  word(tr('Gire.'), x0, 960, t, T.gire, { size: 72, out: T.gather0 });
+  word(tr('Encaixe.'), x0 + gw, 960, t, T.encaixe, { size: 72, out: T.gather0 });
+  word(tr('Vença.'), x0 + gw + ew, 960, t, T.vença, { size: 72, color: C.accent, out: T.gather0 });
   const st = OM.staccato(t, T.words2);
   if (st.word && t < T.words2End) { g.save(); g.font = `800 66px ${DISPLAY}`; g.textAlign = 'center'; g.fillStyle = st.i === 2 ? C.accent : C.ink; g.fillText(st.word, 960, 190); g.restore(); }
 
@@ -696,8 +720,8 @@ function ranking(t) {
   const solid = sstep(T.solid0, T.solid1, t);
   if (solid > 0) { g.save(); g.globalAlpha = solid; g.fillStyle = C.accent; g.beginPath(); g.roundRect(R.x, R.y, R.w, R.h, R.r); g.fill(); g.restore(); }
   footCursor(t, T.rkMove, T.rkClick, t >= T.rk1 && t < T.fold0);
-  caption('Suba no ranking.', t, T.rkCap1, T.rkCap2 - 0.15);
-  caption('Seu perfil, suas conquistas.', t, T.rkCap2, T.fold0 - 0.05, C.accent);
+  caption(tr('Suba no ranking.'), t, T.rkCap1, T.rkCap2 - 0.15);
+  caption(tr('Seu perfil, suas conquistas.'), t, T.rkCap2, T.fold0 - 0.05, C.accent);
   TRACK.piece = { x: R.x, y: R.y, w: R.w, h: R.h };
 }
 
@@ -723,7 +747,7 @@ function markDraw(t) {
     g.save(); g.translate(DOT.x, DOT.y + DOT.s * 0.5); g.scale(im.sx, im.sy); g.translate(0, -DOT.s * 0.5);
     g.scale(DOT.s / 120, DOT.s / 120); piecePath(-60, -60, 120, [1, 1, -1, -1]); g.fillStyle = C.accent; g.fill(); g.restore();
   }
-  word('quebra-cabeça online, pra montar junto', 960, MARK.y + 110, t, T.tag, { size: 44, weight: 500, color: C.mute, align: 'center', font: BODY });
+  word(tr('quebra-cabeça online, pra montar junto'), 960, MARK.y + 110, t, T.tag, { size: 44, weight: 500, color: C.mute, align: 'center', font: BODY });
   TRACK.mark = { x: MARK_X.puzzl - 10, y: MARK.y - MARK.size * 0.85, w: MARK_X.us + measure('us', MARK.size) - MARK_X.puzzl + 20, h: MARK.size * 1.1 };
 }
 function drawLetter(ch, x, d) {
