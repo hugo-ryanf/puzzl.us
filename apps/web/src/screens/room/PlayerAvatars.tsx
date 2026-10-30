@@ -102,7 +102,8 @@ export function PlayerAvatars({ players, selfId, hostId, voice }: PlayerAvatarsP
         </ul>
       )}
       {tiles.length > 0 && (
-        <ul className="video-tiles">
+        // ph-no-capture: as câmeras nunca entram na gravação de sessão (PostHog)
+        <ul className="video-tiles ph-no-capture">
           {tiles.map((info) => (
             <li key={info.player.sessionId}>
               <VideoTile info={info} voice={voice} />
