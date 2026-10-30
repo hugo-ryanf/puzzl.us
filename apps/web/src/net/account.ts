@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AccountView, MeResponse, ProfileUpdate } from '@puzzle/shared';
 import { guestId } from './connection';
 import { t, translateServerMessage } from '../i18n';
+import { forget } from './analytics';
 
 /** Marca, por conta, que o histórico de convidado deste navegador já foi passado para ela. */
 const LINKED_KEY = 'quebra-cabeca:convidado-ligado';
@@ -79,6 +80,7 @@ export function useAccount(): Account {
 
   const logout = useCallback(async () => {
     await fetch('/auth/logout', { method: 'POST' });
+    forget();
     setMe((previous) => previous && { ...previous, user: null });
   }, []);
 
