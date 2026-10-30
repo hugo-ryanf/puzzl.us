@@ -8,7 +8,7 @@
  * Arquivo à parte de propósito: o index.ts (produção) não o importa, então o PGlite não entra no
  * build. Os atalhos de teste (--dev-tools) ficam ligados, como no dev:local.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   AVATAR_COLORS,
@@ -217,4 +217,12 @@ console.log(
   `[demo] ${users.length} jogadores, ${room} partidas, ${COMMUNITY.length} fotos da comunidade`,
 );
 console.log(`[demo] perfil de exemplo: ${users[0]!.nick} · código ${users[0]!.code}`);
+
+// DEMO_SESSION_FILE=caminho: já deixa a Ana logada (as gravações do vídeo põem este cookie no
+// navegador). É uma sessão do banco em memória: some quando o servidor para.
+if (process.env.DEMO_SESSION_FILE) {
+  const { token } = await accounts.createSession(users[0]!.id);
+  writeFileSync(process.env.DEMO_SESSION_FILE, token);
+  console.log(`[demo] sessão da ${users[0]!.nick} em ${process.env.DEMO_SESSION_FILE}`);
+}
 console.log(`[demo] ouvindo em http://localhost:${PORT} (site: http://localhost:5173)`);
