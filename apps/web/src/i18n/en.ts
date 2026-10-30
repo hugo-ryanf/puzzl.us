@@ -780,10 +780,8 @@ export const en = {
   'Entardecer na cidade': 'Dusk in the city',
   'Ponte sobre a água na cidade': 'Bridge over the water in the city',
   // Landing
-  Seções: 'Sections',
   Galeria: 'Gallery',
   Apresentação: 'Introduction',
-  'Multiplayer em tempo real': 'Real-time multiplayer',
   'Cada peça se encaixa melhor {group}.': 'Every piece fits better {group}.',
   'em grupo': 'together',
   'Crie uma sala, mande o link e montem o mesmo quebra-cabeça ao mesmo tempo, conversando por voz.':
@@ -792,4 +790,7 @@ export const en = {
   'Ver a galeria': 'See the gallery',
   'Escolha por onde começar': 'Pick where to start',
   Jogar: 'Play',
+  'Quem monta mais rápido?': 'Who solves fastest?',
+  'O tempo é medido pelo servidor, então não tem como trapacear. Dispute por foto, em solo ou em equipe, e suba de nível a cada partida.':
+    'Time is measured by the server, so there is no cheating. Compete per photo, solo or as a team, and level up with every game.',
 } satisfies Record<string, string>;

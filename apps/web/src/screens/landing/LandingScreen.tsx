@@ -1,17 +1,20 @@
-import { CATALOG } from '@puzzle/shared';
+import { CATALOG, type GeneralRankingEntry } from '@puzzle/shared';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import bannerDarkUrl from '../../assets/landing-camaleao-escuro.webp';
 import bannerUrl from '../../assets/landing-camaleao.webp';
 import logoUrl from '../../assets/logo.webp';
 import { catalogThumbUrl, localizedCatalogImage } from '../../board/images';
-import { locale, setLocale, t, tRich } from '../../i18n';
+import { formatNumber, locale, setLocale, t, tRich } from '../../i18n';
+import { fetchGeneralRanking } from '../../net/ranking';
 import {
   ArrowRightIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  GlobeIcon,
   MoonIcon,
   SunIcon,
 } from '../../ui/icons';
+import { Avatar } from '../../ui/UserAvatar';
 import { useTheme } from '../../ui/theme';
 import type { PuzzleChoice } from '../explore/CreateRoomDialog';
 import { DARK_ART, LIGHT_ART, type BannerArt } from './landingArt';
@@ -36,45 +39,34 @@ export interface LandingScreenProps {
 }
 
 /**
- * Página de quem chega sem login: o banner do camaleão com peças sendo montadas, a galeria e o
- * rodapé. O tema claro (verde) e o escuro (neon) trocam pelo CSS, junto com o resto do site.
+ * Página de quem chega sem login: o banner do camaleão com peças sendo montadas (com a marca, o
+ * tema e o idioma por cima), a galeria, o ranking e o rodapé. O tema claro (verde) e o escuro
+ * (neon) trocam pelo CSS, junto com o resto do site.
  */
 export function LandingScreen({ onStart, onShowRanking, googleLogin }: LandingScreenProps) {
   return (
     <div className="landing">
-      <header className="lp-header">
-        <div className="lp-container lp-header-row">
+      <section className="lp-hero" aria-label={t('Apresentação')}>
+        <div className="lp-hero-art">
+          <Banner art={LIGHT_ART} image={bannerUrl} variant="light" />
+          <Banner art={DARK_ART} image={bannerDarkUrl} variant="dark" />
+        </div>
+        {/* a marca, o tema, o idioma e o login ficam soltos sobre o banner */}
+        <header className="lp-topbar">
           <a className="lp-brand" href="/">
             <img src={logoUrl} alt="" width={38} height={38} />
             <span className="lp-wordmark">
               puzzl<span>.us</span>
             </span>
           </a>
-          <nav className="lp-nav" aria-label={t('Seções')}>
-            <a href="#galeria">{t('Galeria')}</a>
-            <button type="button" onClick={onShowRanking}>
-              Ranking
-            </button>
-          </nav>
           <LandingSettings />
           {googleLogin && (
-            <a className="lp-btn lp-btn-ghost lp-btn-small" href="/auth/google">
+            <a className="lp-bare lp-login" href="/auth/google">
               {t('Entrar com Google')}
             </a>
           )}
-        </div>
-      </header>
-
-      <section className="lp-hero" aria-label={t('Apresentação')}>
-        <div className="lp-hero-art">
-          <Banner art={LIGHT_ART} image={bannerUrl} variant="light" />
-          <Banner art={DARK_ART} image={bannerDarkUrl} variant="dark" />
-        </div>
+        </header>
         <div className="lp-hero-copy">
-          <span className="lp-pill">
-            <span className="lp-pill-dot" aria-hidden="true" />
-            {t('Multiplayer em tempo real')}
-          </span>
           <h1>
             {tRich('Cada peça se encaixa melhor {group}.', {
               group: <span className="lp-accent">{t('em grupo')}</span>,
@@ -98,6 +90,7 @@ export function LandingScreen({ onStart, onShowRanking, googleLogin }: LandingSc
       </section>
 
       <Gallery onPlay={onStart} />
+      <RankingSection onShowRanking={onShowRanking} />
 
       <footer className="lp-footer">
         <div className="lp-container lp-footer-row">
@@ -119,8 +112,8 @@ const LIGHT_IMAGE: CSSProperties = { mixBlendMode: 'multiply' };
 const DARK_IMAGE: CSSProperties = { filter: 'drop-shadow(0 0 40px rgba(255, 61, 207, 0.35))' };
 
 /**
- * Tema e idioma, discretos no cabeçalho: o mesmo tema e o mesmo idioma da barra lateral do app
- * (guardados neste navegador). O ícone mostra para onde vai: lua no claro, sol no escuro.
+ * Tema e idioma, só os ícones sobre o banner: o mesmo tema e o mesmo idioma da barra lateral do
+ * app (guardados neste navegador). O ícone mostra para onde vai: lua no claro, sol no escuro.
  */
 function LandingSettings() {
   const [, setTheme] = useTheme();
@@ -134,7 +127,7 @@ function LandingSettings() {
     <div className="lp-settings">
       <button
         type="button"
-        className="lp-icon-btn"
+        className="lp-bare"
         aria-label={t('Tema')}
         title={t('Tema')}
         onClick={toggleTheme}
@@ -148,12 +141,13 @@ function LandingSettings() {
       </button>
       <button
         type="button"
-        className="lp-icon-btn"
+        className="lp-bare"
         lang={other}
         aria-label={other === 'en' ? 'English' : 'Português'}
         title={other === 'en' ? 'English' : 'Português'}
         onClick={() => setLocale(other)}
       >
+        <GlobeIcon size={18} />
         {other === 'en' ? 'EN' : 'PT'}
       </button>
     </div>
@@ -385,5 +379,74 @@ function Backdrop({ variant }: { variant: 'light' | 'dark' }) {
         />
       ))}
     </svg>
+  );
+}
+
+/** As medalhas do pódio: ouro, prata e bronze (do 4º em diante, só o número). */
+const MEDALS = ['lp-medal-1', 'lp-medal-2', 'lp-medal-3'];
+
+/** O ranking por pontos (solo, desde sempre): os cinco primeiros e o caminho para o completo. */
+function RankingSection({ onShowRanking }: { onShowRanking: () => void }) {
+  const [top, setTop] = useState<GeneralRankingEntry[]>([]);
+
+  useEffect(() => {
+    let current = true;
+    fetchGeneralRanking({ players: 1, period: 'all' })
+      .then((page) => current && setTop(page.entries.slice(0, 5)))
+      .catch(() => {
+        // sem ranking (servidor sem banco): a seção fica só com o convite
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  return (
+    <section className="lp-ranking-section" aria-labelledby="lp-ranking-title">
+      <div className="lp-container">
+        <div className="lp-ranking">
+          <div className="lp-ranking-copy">
+            <span className="lp-eyebrow">Ranking</span>
+            <h2 id="lp-ranking-title">{t('Quem monta mais rápido?')}</h2>
+            <p>
+              {t(
+                'O tempo é medido pelo servidor, então não tem como trapacear. Dispute por foto, em solo ou em equipe, e suba de nível a cada partida.',
+              )}
+            </p>
+            <button type="button" className="lp-btn lp-btn-light" onClick={onShowRanking}>
+              {t('Ranking completo')}
+              <ArrowRightIcon size={18} />
+            </button>
+          </div>
+          {top.length > 0 && (
+            <ol className="lp-ranking-list">
+              {top.map((row) => {
+                const name = row.players.join(' & ');
+                return (
+                  <li key={row.position}>
+                    <span className={`lp-medal ${MEDALS[row.position - 1] ?? ''}`}>
+                      {row.position}
+                    </span>
+                    <Avatar
+                      name={row.players[0] ?? name}
+                      url={row.avatars[0]?.url}
+                      color={row.avatars[0]?.color}
+                      size={36}
+                    />
+                    <span className="lp-ranking-name">
+                      <b>{name}</b>
+                      <span>{t('{n} quebra-cabeças', { n: row.puzzles })}</span>
+                    </span>
+                    <span className="lp-ranking-points">
+                      {t('{n} pts', { n: formatNumber(row.points) })}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

@@ -6204,7 +6204,12 @@ button.profile-number:hover {
   --lp-bg: #f6faf7;
   --lp-ink: #10231e;
   --lp-ink-2: #3d5a52;
-  --lp-header-bg: #ffffff;
+  --lp-rank-bg: #0d3b32;
+  --lp-rank-border: transparent;
+  --lp-rank-mute: #cfe3da;
+  --lp-rank-eyebrow: #9ee0bf;
+  --lp-light-bg: #ffffff;
+  --lp-light-fg: #0d3b32;
   --lp-line: #e3ece7;
   --lp-hero-bg: #fdfdfd;
   --lp-brand: #0d3b32;
@@ -6218,11 +6223,6 @@ button.profile-number:hover {
   --lp-ghost-bg: #ffffff;
   --lp-ghost-border: #d5e3db;
   --lp-ghost-hover: #eaf3ee;
-  --lp-pill-bg: rgba(255, 255, 255, 0.7);
-  --lp-pill-border: transparent;
-  --lp-pill-fg: #12513f;
-  --lp-dot: #2fb36e;
-  --lp-dot-glow: 0 0 0 4px rgba(47, 179, 110, 0.18);
   --lp-copy-shadow: none;
   --lp-hole: rgba(11, 42, 35, 0.55);
   --lp-hole-line: rgba(255, 255, 255, 0.9);
@@ -6251,13 +6251,18 @@ button.profile-number:hover {
   --lp-bg: #0b0920;
   --lp-ink: #f4f1ff;
   --lp-ink-2: #f1ecff;
-  --lp-header-bg: #0b0920;
+  --lp-rank-bg: rgba(23, 19, 46, 0.88);
+  --lp-rank-border: rgba(255, 255, 255, 0.09);
+  --lp-rank-mute: #b9b3d6;
+  --lp-rank-eyebrow: #ffffff;
+  --lp-light-bg: #ffffff;
+  --lp-light-fg: #0b0920;
   --lp-line: rgba(255, 255, 255, 0.08);
   --lp-hero-bg: #0b0920;
   --lp-brand: #ffffff;
-  --lp-brand-dot: #ff5ad9;
-  --lp-accent: #7df9ff;
-  --lp-eyebrow: #ff8bea;
+  --lp-brand-dot: #ffffff;
+  --lp-accent: #ffffff;
+  --lp-eyebrow: #ffffff;
   --lp-primary-bg: #ffffff;
   --lp-primary-fg: #0b0920;
   --lp-primary-hover: #ffffff;
@@ -6265,11 +6270,6 @@ button.profile-number:hover {
   --lp-ghost-bg: rgba(11, 9, 32, 0.3);
   --lp-ghost-border: rgba(255, 255, 255, 0.3);
   --lp-ghost-hover: rgba(255, 255, 255, 0.08);
-  --lp-pill-bg: rgba(11, 9, 32, 0.45);
-  --lp-pill-border: rgba(255, 255, 255, 0.18);
-  --lp-pill-fg: #ffffff;
-  --lp-dot: #3df5ff;
-  --lp-dot-glow: 0 0 10px #3df5ff;
   --lp-copy-shadow: 0 2px 24px rgba(11, 9, 32, 0.5);
   --lp-hole: rgba(5, 3, 15, 0.72);
   --lp-hole-line: rgba(255, 255, 255, 0.7);
@@ -6279,7 +6279,7 @@ button.profile-number:hover {
   --lp-card-shadow: 0 24px 50px -24px rgba(122, 31, 208, 0.7);
   --lp-play-bg: rgba(255, 61, 207, 0.16);
   --lp-play-border: rgba(255, 61, 207, 0.4);
-  --lp-play-fg: #ffc4f3;
+  --lp-play-fg: #ffffff;
   --lp-bar-bg: rgba(255, 255, 255, 0.1);
   --lp-bar: #ff3dcf;
   --lp-bar-glow: 0 0 12px #ff3dcf;
@@ -6293,13 +6293,18 @@ button.profile-number:hover {
     --lp-bg: #0b0920;
     --lp-ink: #f4f1ff;
     --lp-ink-2: #f1ecff;
-    --lp-header-bg: #0b0920;
+    --lp-rank-bg: rgba(23, 19, 46, 0.88);
+    --lp-rank-border: rgba(255, 255, 255, 0.09);
+    --lp-rank-mute: #b9b3d6;
+    --lp-rank-eyebrow: #ffffff;
+    --lp-light-bg: #ffffff;
+    --lp-light-fg: #0b0920;
     --lp-line: rgba(255, 255, 255, 0.08);
     --lp-hero-bg: #0b0920;
     --lp-brand: #ffffff;
-    --lp-brand-dot: #ff5ad9;
-    --lp-accent: #7df9ff;
-    --lp-eyebrow: #ff8bea;
+    --lp-brand-dot: #ffffff;
+    --lp-accent: #ffffff;
+    --lp-eyebrow: #ffffff;
     --lp-primary-bg: #ffffff;
     --lp-primary-fg: #0b0920;
     --lp-primary-hover: #ffffff;
@@ -6307,11 +6312,6 @@ button.profile-number:hover {
     --lp-ghost-bg: rgba(11, 9, 32, 0.3);
     --lp-ghost-border: rgba(255, 255, 255, 0.3);
     --lp-ghost-hover: rgba(255, 255, 255, 0.08);
-    --lp-pill-bg: rgba(11, 9, 32, 0.45);
-    --lp-pill-border: rgba(255, 255, 255, 0.18);
-    --lp-pill-fg: #ffffff;
-    --lp-dot: #3df5ff;
-    --lp-dot-glow: 0 0 10px #3df5ff;
     --lp-copy-shadow: 0 2px 24px rgba(11, 9, 32, 0.5);
     --lp-hole: rgba(5, 3, 15, 0.72);
     --lp-hole-line: rgba(255, 255, 255, 0.7);
@@ -6321,7 +6321,7 @@ button.profile-number:hover {
     --lp-card-shadow: 0 24px 50px -24px rgba(122, 31, 208, 0.7);
     --lp-play-bg: rgba(255, 61, 207, 0.16);
     --lp-play-border: rgba(255, 61, 207, 0.4);
-    --lp-play-fg: #ffc4f3;
+    --lp-play-fg: #ffffff;
     --lp-bar-bg: rgba(255, 255, 255, 0.1);
     --lp-bar: #ff3dcf;
     --lp-bar-glow: 0 0 12px #ff3dcf;
@@ -6365,18 +6365,16 @@ button.profile-number:hover {
   padding: 0 24px;
 }
 
-.lp-header {
-  position: relative;
-  z-index: 10;
-  background: var(--lp-header-bg);
-  border-bottom: 1px solid var(--lp-line);
-}
-
-.lp-header-row {
+.lp-topbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
   display: flex;
   align-items: center;
-  gap: 24px;
-  height: 68px;
+  gap: 12px;
+  padding: 16px clamp(16px, 5vw, 80px);
 }
 
 .lp-brand {
@@ -6402,57 +6400,43 @@ button.profile-number:hover {
   color: var(--lp-brand-dot);
 }
 
-.lp-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 24px;
-  margin-left: auto;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.lp-nav a,
-.lp-nav button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--lp-ink-2);
-  font: inherit;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.lp-nav a:hover,
-.lp-nav button:hover {
-  color: var(--lp-ink);
-}
-
 .lp-settings {
   display: flex;
-  gap: 6px;
+  gap: 2px;
+  margin-left: auto;
 }
 
-.lp-icon-btn {
-  display: flex;
+/* ícone (ou texto) solto, sem moldura: só a área de toque */
+.lp-bare {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   min-width: 44px;
   height: 44px;
-  padding: 0 10px;
-  border: 1px solid var(--lp-ghost-border);
+  padding: 0 8px;
+  border: 0;
   border-radius: 12px;
-  background: var(--lp-ghost-bg);
+  background: none;
   color: var(--lp-ink);
   font: inherit;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
+  text-decoration: none;
+  opacity: 0.8;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
-.lp-icon-btn:hover {
-  background: var(--lp-ghost-hover);
+.lp-bare:hover {
+  opacity: 1;
+}
+
+.lp-login {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .lp-btn {
@@ -6475,13 +6459,6 @@ button.profile-number:hover {
     box-shadow 0.15s ease;
 }
 
-.lp-btn-small {
-  height: 44px;
-  padding: 0 16px;
-  border-radius: 12px;
-  font-size: 15px;
-}
-
 .lp-btn-primary {
   background: var(--lp-primary-bg);
   color: var(--lp-primary-fg);
@@ -6498,10 +6475,6 @@ button.profile-number:hover {
   background: var(--lp-ghost-bg);
   color: var(--lp-ink);
   font-weight: 500;
-}
-
-.lp-btn-small.lp-btn-ghost {
-  font-weight: 600;
 }
 
 .lp-btn-ghost:hover {
@@ -6545,34 +6518,12 @@ button.profile-number:hover {
 
 .lp-hero-copy {
   position: absolute;
-  top: clamp(28px, 6vw, 80px);
+  top: clamp(88px, 9vw, 130px);
   right: clamp(16px, 5vw, 80px);
   display: flex;
   flex-direction: column;
   gap: 20px;
   width: min(470px, calc(100% - 32px));
-}
-
-.lp-pill {
-  display: flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 8px;
-  padding: 5px 11px 5px 7px;
-  border: 1px solid var(--lp-pill-border);
-  border-radius: 999px;
-  background: var(--lp-pill-bg);
-  color: var(--lp-pill-fg);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.lp-pill-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lp-dot);
-  box-shadow: var(--lp-dot-glow);
 }
 
 .lp-hero-copy h1 {
@@ -6791,6 +6742,136 @@ button.profile-number:hover {
   box-shadow: var(--lp-bar-glow);
 }
 
+.lp-btn-light {
+  background: var(--lp-light-bg);
+  color: var(--lp-light-fg);
+}
+
+.lp-btn-light:hover {
+  transform: translateY(-1px);
+}
+
+/* ranking: os primeiros por pontos num cartão escuro */
+.lp-ranking-section {
+  padding: 8px 0 96px;
+}
+
+.lp-ranking {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  align-items: center;
+  gap: 48px;
+  padding: clamp(28px, 5vw, 56px);
+  border: 1px solid var(--lp-rank-border);
+  border-radius: 28px;
+  background: var(--lp-rank-bg);
+  color: #ffffff;
+}
+
+.lp-ranking-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.lp-ranking-copy .lp-eyebrow {
+  color: var(--lp-rank-eyebrow);
+}
+
+.lp-ranking-copy h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.6vw, 44px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.lp-ranking-copy p {
+  margin: 0;
+  color: var(--lp-rank-mute);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.lp-ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-ranking-list li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lp-medal {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.lp-medal-1 {
+  border-color: transparent;
+  background: #f7e3a1;
+  color: #6b4e00;
+}
+
+.lp-medal-2 {
+  border-color: transparent;
+  background: #e3e7ec;
+  color: #3f4451;
+}
+
+.lp-medal-3 {
+  border-color: transparent;
+  background: #f3d3b8;
+  color: #7a3e12;
+}
+
+.lp-ranking-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lp-ranking-name b {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-ranking-name span {
+  color: var(--lp-rank-mute);
+  font-size: 13px;
+}
+
+.lp-ranking-points {
+  font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .lp-footer {
   background: var(--lp-footer-bg);
   color: var(--lp-footer-fg);
@@ -6914,12 +6995,28 @@ button.profile-number:hover {
     padding: 28px 16px 40px;
   }
 
-  .lp-nav {
-    display: none;
+  .lp-login {
+    font-size: 14px;
   }
 
-  .lp-settings {
-    margin-left: auto;
+  .lp-ranking {
+    gap: 28px;
+    padding: 24px 16px;
+  }
+
+  .lp-ranking-list li {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .lp-ranking-name span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lp-ranking-points {
+    font-size: 14px;
   }
 
   .lp-card {
