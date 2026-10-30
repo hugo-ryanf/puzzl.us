@@ -5,6 +5,7 @@ import { fetchBulletRanking } from '../../net/ranking';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { PartyIcon, TrophyIcon } from '../../ui/icons';
 import { PlayAgainButton } from '../room/PlayAgainButton';
+import { ordinal, t } from '../../i18n';
 
 interface BulletResultProps {
   room: PuzzleRoom;
@@ -43,8 +44,8 @@ export function BulletResult({ room, snapshot, onShowRanking, onLeave }: BulletR
   const top = ranking?.slice(0, RANKING_PREVIEW) ?? [];
   const mine = ranking?.find((entry) => entry.position === rank);
   const rows = mine && !top.includes(mine) ? [...top, mine] : top;
-  const category = `${query.minutes} min · ${pieceCount} peças · ${
-    teamSize === 1 ? 'solo' : `${teamSize} jogadores`
+  const category = `${query.minutes} min · ${t('{n} peças', { n: pieceCount })} · ${
+    teamSize === 1 ? 'solo' : t('{n} jogadores', { n: teamSize })
   }`;
 
   return (
@@ -54,35 +55,41 @@ export function BulletResult({ room, snapshot, onShowRanking, onLeave }: BulletR
           <span className="result-badge" aria-hidden="true">
             <PartyIcon size={26} />
           </span>
-          <h2 id="bullet-title">Tempo esgotado!</h2>
+          <h2 id="bullet-title">{t('Tempo esgotado!')}</h2>
           {snapshot.record && (
             <p className="record-badge" role="status">
-              <TrophyIcon size={16} /> Novo recorde!
+              <TrophyIcon size={16} /> {t('Novo recorde!')}
             </p>
           )}
           <p className="bullet-score">
-            <strong>{solved}</strong>
-            {solved === 1 ? ' quebra-cabeça montado' : ' quebra-cabeças montados'}
+            <strong>{solved}</strong>{' '}
+            {solved === 1 ? t('quebra-cabeça montado') : t('quebra-cabeças montados')}
           </p>
           {partial > 0 && (
             <p className="caption">
-              + {partial} {partial === 1 ? 'peça encaixada' : 'peças encaixadas'} no último
+              {partial === 1
+                ? t('+ 1 peça encaixada no último')
+                : t('+ {n} peças encaixadas no último', { n: partial })}
             </p>
           )}
         </header>
 
         <section className="result-section">
-          <h3>Ranking · {category}</h3>
-          {rankStatus === 'saving' && <p className="result-note">Registrando no ranking…</p>}
+          <h3>{t('Ranking · {category}', { category })}</h3>
+          {rankStatus === 'saving' && <p className="result-note">{t('Registrando no ranking…')}</p>}
           {rankStatus === 'unavailable' && (
-            <p className="result-note">O ranking está indisponível neste servidor.</p>
+            <p className="result-note">{t('O ranking está indisponível neste servidor.')}</p>
           )}
           {rankStatus === 'saved' && (
             <>
               <p className="result-rank">
                 <TrophyIcon size={18} />
-                <strong>{rank}º lugar</strong> na categoria
-                {rankToday > 0 && <span className="result-rank-today">· {rankToday}º hoje</span>}
+                <strong>{t('{place} lugar', { place: ordinal(rank) })}</strong> {t('na categoria')}
+                {rankToday > 0 && (
+                  <span className="result-rank-today">
+                    {t('· {place} hoje', { place: ordinal(rankToday) })}
+                  </span>
+                )}
               </p>
               {rows.length > 0 && (
                 <ol className="result-ranking">
@@ -91,7 +98,7 @@ export function BulletResult({ room, snapshot, onShowRanking, onLeave }: BulletR
                       key={entry.position}
                       className={entry.position === rank ? 'mine' : undefined}
                     >
-                      <span className="position">{entry.position}º</span>
+                      <span className="position">{ordinal(entry.position)}</span>
                       <span className="players">{entry.players.join(' & ')}</span>
                       <span className="time">
                         {entry.solved}
@@ -109,12 +116,12 @@ export function BulletResult({ room, snapshot, onShowRanking, onLeave }: BulletR
           {rankStatus === 'saved' && (
             <button type="button" className="btn" onClick={() => onShowRanking(query)}>
               <TrophyIcon size={18} />
-              Ranking completo
+              {t('Ranking completo')}
             </button>
           )}
           <PlayAgainButton room={room} snapshot={snapshot} />
           <button type="button" className="btn btn-primary" onClick={onLeave}>
-            Voltar ao início
+            {t('Voltar ao início')}
           </button>
         </div>
       </section>

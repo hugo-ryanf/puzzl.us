@@ -4,6 +4,7 @@ import { puzzleImageInfo, puzzleThumbUrl } from '../board/images';
 import { formatDuration } from '../format';
 import type { Library } from '../net/library';
 import { TrophyIcon } from '../ui/icons';
+import { locale, t } from '../i18n';
 
 interface RecordsScreenProps {
   library: Library;
@@ -12,8 +13,13 @@ interface RecordsScreenProps {
   onShowRanking: (query: RankingQuery) => void;
 }
 
-const TEAM_LABELS: Record<number, string> = { 1: 'Solo', 2: 'Dupla', 3: 'Trio', 4: 'Quarteto' };
-const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+const TEAM_LABELS: Record<number, string> = {
+  1: 'Solo',
+  2: t('Dupla'),
+  3: t('Trio'),
+  4: t('Quarteto'),
+};
+const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'short' });
 
 /** Seus melhores tempos: um por foto + tamanho + modalidade, da partida mais recente para trás. */
 export function RecordsScreen({
@@ -28,18 +34,18 @@ export function RecordsScreen({
     <>
       <div className="page-header">
         <div>
-          <h1>Meus records</h1>
-          <p>Seu melhor tempo em cada quebra-cabeça que você já montou.</p>
+          <h1>{t('Meus records')}</h1>
+          <p>{t('Seu melhor tempo em cada quebra-cabeça que você já montou.')}</p>
         </div>
       </div>
 
       {!signedIn && (
         <div className="empty">
-          <strong>Entre para ver seus records</strong>
-          <p>Com a conta, suas partidas ficam guardadas em qualquer aparelho.</p>
+          <strong>{t('Entre para ver seus records')}</strong>
+          <p>{t('Com a conta, suas partidas ficam guardadas em qualquer aparelho.')}</p>
           {googleLogin && (
             <a className="btn" href="/auth/google">
-              Entrar com Google
+              {t('Entrar com Google')}
             </a>
           )}
         </div>
@@ -47,8 +53,8 @@ export function RecordsScreen({
 
       {signedIn && records.length === 0 && (
         <div className="empty">
-          <strong>Nenhum record ainda</strong>
-          <p>Monte um quebra-cabeça do catálogo e o seu tempo aparece aqui.</p>
+          <strong>{t('Nenhum record ainda')}</strong>
+          <p>{t('Monte um quebra-cabeça do catálogo e o seu tempo aparece aqui.')}</p>
         </div>
       )}
 
@@ -64,23 +70,30 @@ export function RecordsScreen({
               <li key={key}>
                 <img src={puzzleThumbUrl(record.imageId)} alt="" loading="lazy" />
                 <span className="records-title">
-                  <strong>{image?.title ?? 'Foto enviada'}</strong>
+                  <strong>{image?.title ?? t('Foto enviada')}</strong>
                   <small>
-                    {record.pieceCount} peças · {TEAM_LABELS[record.teamSize] ?? record.teamSize}
+                    {t('{n} peças', { n: record.pieceCount })} ·{' '}
+                    {TEAM_LABELS[record.teamSize] ?? record.teamSize}
                   </small>
                 </span>
                 <span className="records-time">
                   <strong>{formatDuration(record.bestMs)}</strong>
                   <small>
-                    {record.plays === 1 ? '1 vez' : `${record.plays} vezes`} · última em{' '}
-                    {dateFormat.format(new Date(record.lastPlayedAt))}
+                    {record.plays === 1
+                      ? t('1 vez · última em {date}', {
+                          date: dateFormat.format(new Date(record.lastPlayedAt)),
+                        })
+                      : t('{n} vezes · última em {date}', {
+                          n: record.plays,
+                          date: dateFormat.format(new Date(record.lastPlayedAt)),
+                        })}
                   </small>
                 </span>
                 {image && ranked && (
                   <button
                     type="button"
                     className="btn"
-                    aria-label={`Ranking de ${image.title}`}
+                    aria-label={t('Ranking de {title}', { title: image.title })}
                     onClick={() =>
                       onShowRanking({
                         image: record.imageId,

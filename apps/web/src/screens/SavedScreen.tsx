@@ -4,6 +4,7 @@ import { puzzleImageInfo, puzzleThumbUrl } from '../board/images';
 import { formatDuration } from '../format';
 import { resumeSavedGame, type PuzzleRoom } from '../net/connection';
 import { ArrowRightIcon } from '../ui/icons';
+import { locale, t } from '../i18n';
 
 interface SavedScreenProps {
   signedIn: boolean;
@@ -12,7 +13,7 @@ interface SavedScreenProps {
   onEnter: (room: PuzzleRoom) => void;
 }
 
-const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' });
 
 /** Partidas salvas pela conta, da mais recente para a mais antiga; continuar abre uma sala nova. */
 export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScreenProps) {
@@ -37,10 +38,10 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
     setOpening(game.id);
     setError(undefined);
     try {
-      onEnter(await resumeSavedGame(game.id, { name: name.trim() || 'Jogador' }));
+      onEnter(await resumeSavedGame(game.id, { name: name.trim() || t('Jogador') }));
     } catch {
       setOpening(undefined);
-      setError('Não deu para continuar esta partida (a foto enviada pode ter expirado).');
+      setError(t('Não deu para continuar esta partida (a foto enviada pode ter expirado).'));
     }
   }
 
@@ -54,8 +55,10 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
     <>
       <div className="page-header">
         <div>
-          <h1>Em andamento</h1>
-          <p>Partidas que você salvou para terminar depois. O tempo continua de onde parou.</p>
+          <h1>{t('Em andamento')}</h1>
+          <p>
+            {t('Partidas que você salvou para terminar depois. O tempo continua de onde parou.')}
+          </p>
         </div>
       </div>
 
@@ -67,11 +70,11 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
 
       {!signedIn && (
         <div className="empty">
-          <strong>Entre para salvar partidas</strong>
-          <p>Com a conta, você salva no meio e continua depois, em qualquer aparelho.</p>
+          <strong>{t('Entre para salvar partidas')}</strong>
+          <p>{t('Com a conta, você salva no meio e continua depois, em qualquer aparelho.')}</p>
           {googleLogin && (
             <a className="btn" href="/auth/google">
-              Entrar com Google
+              {t('Entrar com Google')}
             </a>
           )}
         </div>
@@ -79,10 +82,11 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
 
       {signedIn && games?.length === 0 && (
         <div className="empty">
-          <strong>Nenhuma partida em andamento</strong>
+          <strong>{t('Nenhuma partida em andamento')}</strong>
           <p>
-            Numa sala que você criou, use "Salvar e sair". Se todo mundo sair no meio, ela também
-            fica guardada aqui.
+            {t(
+              'Numa sala que você criou, use "Salvar e sair". Se todo mundo sair no meio, ela também fica guardada aqui.',
+            )}
           </p>
         </div>
       )}
@@ -90,17 +94,21 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
       {signedIn && games && games.length > 0 && (
         <ol className="records-list saved-list">
           {games.map((game) => {
-            const title = puzzleImageInfo(game.imageId)?.title ?? 'Quebra-cabeça';
+            const title = puzzleImageInfo(game.imageId)?.title ?? t('Quebra-cabeça');
             const percent = game.pieces > 0 ? Math.round((game.placed / game.pieces) * 100) : 0;
-            const mode = game.maxPlayers === 1 ? 'Solo' : `até ${game.maxPlayers} jogadores`;
+            const mode =
+              game.maxPlayers === 1 ? 'Solo' : t('até {n} jogadores', { n: game.maxPlayers });
             return (
               <li key={game.id}>
                 <img src={puzzleThumbUrl(game.imageId)} alt="" loading="lazy" />
                 <span className="records-title">
                   <strong>{title}</strong>
                   <small>
-                    {game.pieces} peças · {mode} · salva em{' '}
-                    {dateFormat.format(new Date(game.savedAt))}
+                    {t('{pieces} peças · {mode} · salva em {date}', {
+                      pieces: game.pieces,
+                      mode,
+                      date: dateFormat.format(new Date(game.savedAt)),
+                    })}
                   </small>
                   <span className="saved-progress">
                     <span className="progress-bar" aria-hidden="true">
@@ -111,7 +119,7 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
                 </span>
                 <span className="records-time">
                   <strong>{formatDuration(game.elapsedMs)}</strong>
-                  <small>de jogo</small>
+                  <small>{t('de jogo')}</small>
                 </span>
                 <span className="saved-actions">
                   {confirming === game.id ? (
@@ -121,14 +129,14 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
                         className="btn btn-danger"
                         onClick={() => void discard(game.id)}
                       >
-                        Descartar
+                        {t('Descartar')}
                       </button>
                       <button
                         type="button"
                         className="btn"
                         onClick={() => setConfirming(undefined)}
                       >
-                        Manter
+                        {t('Manter')}
                       </button>
                     </>
                   ) : (
@@ -137,9 +145,9 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
                         type="button"
                         className="btn btn-ghost"
                         onClick={() => setConfirming(game.id)}
-                        aria-label={`Descartar ${title}`}
+                        aria-label={t('Descartar {title}', { title })}
                       >
-                        Descartar
+                        {t('Descartar')}
                       </button>
                       <button
                         type="button"
@@ -147,7 +155,7 @@ export function SavedScreen({ signedIn, googleLogin, name, onEnter }: SavedScree
                         disabled={opening !== undefined}
                         onClick={() => void resume(game)}
                       >
-                        {opening === game.id ? 'Abrindo…' : 'Continuar'}
+                        {opening === game.id ? t('Abrindo…') : t('Continuar')}
                         <ArrowRightIcon size={16} />
                       </button>
                     </>

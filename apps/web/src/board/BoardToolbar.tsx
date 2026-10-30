@@ -9,6 +9,7 @@ import {
 } from '../ui/icons';
 import type { BoardScene } from './BoardScene';
 import { ReferenceImage } from './ReferenceImage';
+import { t } from '../i18n';
 
 interface BoardToolbarProps {
   scene: BoardScene;
@@ -83,11 +84,11 @@ export function BoardToolbar({ scene, image, canScatter, onScatter }: BoardToolb
         }}
       >
         {open && (
-          <div className="tools-bar" role="toolbar" aria-label="Ferramentas da mesa">
+          <div className="tools-bar" role="toolbar" aria-label={t('Ferramentas da mesa')}>
             <button
               type="button"
               className="tool icon-only"
-              aria-label="Afastar"
+              aria-label={t('Afastar')}
               onClick={() => scene.zoomBy(1 / ZOOM_STEP)}
             >
               <ZoomOutIcon size={18} />
@@ -98,7 +99,7 @@ export function BoardToolbar({ scene, image, canScatter, onScatter }: BoardToolb
             <button
               type="button"
               className="tool icon-only"
-              aria-label="Aproximar"
+              aria-label={t('Aproximar')}
               onClick={() => scene.zoomBy(ZOOM_STEP)}
             >
               <ZoomInIcon size={18} />
@@ -106,7 +107,7 @@ export function BoardToolbar({ scene, image, canScatter, onScatter }: BoardToolb
             <span className="tool-divider" aria-hidden="true" />
             <button type="button" className="tool" onClick={() => scene.centerView()}>
               <ScanIcon size={18} />
-              Centralizar
+              {t('Centralizar')}
             </button>
             <button
               type="button"
@@ -115,21 +116,23 @@ export function BoardToolbar({ scene, image, canScatter, onScatter }: BoardToolb
               onClick={() => setShowImage(!showImage)}
             >
               <ImageIcon size={18} />
-              Ver imagem
+              {t('Ver imagem')}
             </button>
             <button
               type="button"
               className="tool"
               disabled={!canScatter}
-              title="Espalha de novo as peças soltas pela mesa (para todos na sala)"
+              title={t('Espalha de novo as peças soltas pela mesa (para todos na sala)')}
               onClick={onScatter}
             >
               <ShuffleIcon size={18} />
-              Espalhar
+              {t('Espalhar')}
             </button>
             <span className="tool-divider" aria-hidden="true" />
             {/* As peças vêm viradas: como desvirar. */}
-            <span className="tool-hint">Girar: clique direito, R arrastando ou dois toques</span>
+            <span className="tool-hint">
+              {t('Girar: clique direito, R arrastando ou dois toques')}
+            </span>
           </div>
         )}
         <button
@@ -137,8 +140,8 @@ export function BoardToolbar({ scene, image, canScatter, onScatter }: BoardToolb
           type="button"
           className={pinned ? 'tools-handle pinned' : 'tools-handle'}
           aria-expanded={open}
-          aria-label={`Ferramentas da mesa (zoom ${zoom}%)`}
-          title={pinned ? 'Recolher ferramentas' : 'Fixar ferramentas abertas'}
+          aria-label={t('Ferramentas da mesa (zoom {zoom}%)', { zoom })}
+          title={pinned ? t('Recolher ferramentas') : t('Fixar ferramentas abertas')}
           onClick={togglePinned}
         >
           <SlidersIcon size={16} />

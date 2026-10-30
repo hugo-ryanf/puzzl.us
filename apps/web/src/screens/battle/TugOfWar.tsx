@@ -1,6 +1,7 @@
 import type { BattleTeam } from '@puzzle/shared';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { battleScore, otherTeam } from './score';
+import { t } from '../../i18n';
 
 /**
  * Cabo de guerra em cima da linha do meio: o nó pende para quem está na frente (o meu lado à
@@ -21,7 +22,11 @@ export function TugOfWar({
   const lead = Math.max(-1, Math.min(1, diff / range));
   const side = Math.abs(lead) < 0.02 ? 'even' : lead > 0 ? 'mine' : 'theirs';
   const label =
-    side === 'even' ? 'Empatados' : side === 'mine' ? 'Seu lado na frente' : 'Adversário na frente';
+    side === 'even'
+      ? t('Empatados')
+      : side === 'mine'
+        ? t('Seu lado na frente')
+        : t('Adversário na frente');
   return (
     <div className={hot ? `tug ${side} hot` : `tug ${side}`} role="img" aria-label={label}>
       <span className="tug-rope" />

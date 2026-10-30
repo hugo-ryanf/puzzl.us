@@ -1,17 +1,18 @@
+import { t } from '../i18n';
 /**
  * Cores de destaque (as cores dos camaleões). Petróleo é o teal de sempre; as outras trocam só
  * `--accent` e os tons dele (data-accent no <html>; as cores claras e escuras ficam no styles.css).
  * Escolhida em "Editar perfil" e guardada neste navegador.
  */
 export const ACCENTS = [
-  { value: 'petroleo', label: 'Petróleo', swatch: '#3a9aad' },
-  { value: 'gelo', label: 'Gelo', swatch: '#4a93bd' },
-  { value: 'verde', label: 'Verde', swatch: '#3f9a46' },
-  { value: 'ouro', label: 'Ouro', swatch: '#c4930a' },
-  { value: 'ambar', label: 'Âmbar', swatch: '#d9741c' },
-  { value: 'vermelho', label: 'Vermelho', swatch: '#d33f3f' },
-  { value: 'rosa', label: 'Rosa', swatch: '#c94f7c' },
-  { value: 'roxo', label: 'Roxo', swatch: '#8350c8' },
+  { value: 'petroleo', label: t('Petróleo'), swatch: '#3a9aad' },
+  { value: 'gelo', label: t('Gelo'), swatch: '#4a93bd' },
+  { value: 'verde', label: t('Verde'), swatch: '#3f9a46' },
+  { value: 'ouro', label: t('Ouro'), swatch: '#c4930a' },
+  { value: 'ambar', label: t('Âmbar'), swatch: '#d9741c' },
+  { value: 'vermelho', label: t('Vermelho'), swatch: '#d33f3f' },
+  { value: 'rosa', label: t('Rosa'), swatch: '#c94f7c' },
+  { value: 'roxo', label: t('Roxo'), swatch: '#8350c8' },
 ] as const;
 export type AccentChoice = (typeof ACCENTS)[number]['value'];
 

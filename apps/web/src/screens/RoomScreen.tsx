@@ -22,6 +22,7 @@ import { DevPanel } from './room/DevPanel';
 import { RoomHeader } from './room/RoomHeader';
 import { StartCountdown } from './room/StartCountdown';
 import { useGameSounds } from './room/useGameSounds';
+import { t } from '../i18n';
 
 interface RoomScreenProps {
   room: PuzzleRoom;
@@ -72,7 +73,7 @@ export function RoomScreen({
         } else if (rejoined) {
           onRejoin(rejoined);
         } else {
-          onLeave('Você foi desconectado da sala.');
+          onLeave(t('Você foi desconectado da sala.'));
         }
       });
     };
@@ -85,8 +86,8 @@ export function RoomScreen({
       leaveRoom(room);
       onLeave(
         owner
-          ? 'Partida salva. Continue quando quiser em "Em andamento".'
-          : 'Quem criou a sala salvou a partida para continuar depois.',
+          ? t('Partida salva. Continue quando quiser em "Em andamento".')
+          : t('Quem criou a sala salvou a partida para continuar depois.'),
       );
     });
     const removeSaveFailed = room.onMessage('saveFailed', () => {
@@ -131,8 +132,8 @@ export function RoomScreen({
           }
         }
       />
-      {reconnecting && <div className="banner">Conexão caiu — reconectando…</div>}
-      {saveError && <div className="banner">Não deu para salvar agora. Tente de novo.</div>}
+      {reconnecting && <div className="banner">{t('Conexão caiu — reconectando…')}</div>}
+      {saveError && <div className="banner">{t('Não deu para salvar agora. Tente de novo.')}</div>}
       <div className="board-area">
         {snapshot.mode === 'bullet' ? (
           <BulletBoard room={room} snapshot={snapshot} />
@@ -142,7 +143,7 @@ export function RoomScreen({
           // "Jogar novamente" troca a mesa: remonta a cena do zero.
           <Board key={snapshot.round} room={room} image={image.image} phase={snapshot.phase} />
         ) : (
-          <p className="board-loading">{image?.error ?? 'Carregando imagem…'}</p>
+          <p className="board-loading">{image?.error ?? t('Carregando imagem…')}</p>
         )}
         <StartCountdown countdown={snapshot.countdown} />
         {/* Atalhos de teste: só no `pnpm dev` (o build de produção remove). */}
@@ -226,46 +227,55 @@ function LobbyPanel({ snapshot, isHost, onStart }: LobbyPanelProps) {
   return (
     <div className="overlay">
       <div className="panel">
-        <h2>{bullet ? 'Bullet' : 'Sala de espera'}</h2>
+        <h2>{bullet ? 'Bullet' : t('Sala de espera')}</h2>
         {/* No Bullet as fotos são sorteadas: a primeira não diz nada sobre a partida. */}
         {!bullet && <ImageCaption imageId={snapshot.imageId} />}
         <p>
           {bullet && `${snapshot.timeLimitMs / 60_000} min · `}
-          {snapshot.pieceCount} peças · {snapshot.players.length} de {snapshot.maxPlayers} jogadores
+          {t('{n} peças · {players} de {max} jogadores', {
+            n: snapshot.pieceCount,
+            players: snapshot.players.length,
+            max: snapshot.maxPlayers,
+          })}
         </p>
         {bullet && (
           <p>
-            Montem o máximo de quebra-cabeças que conseguirem até o tempo acabar. Terminou um, entra
-            outro na hora.
+            {t(
+              'Montem o máximo de quebra-cabeças que conseguirem até o tempo acabar. Terminou um, entra outro na hora.',
+            )}
           </p>
         )}
         {bullet && (
           <p className="caption">
-            Bônus: a peça dourada e cada quebra-cabeça montado rápido valem +5 s. A cada 4, vem um
-            relâmpago de 6 peças que dá um Ímã (encaixa 3 peças sozinho).
+            {t(
+              'Bônus: a peça dourada e cada quebra-cabeça montado rápido valem +5 s. A cada 4, vem um relâmpago de 6 peças que dá um Ímã (encaixa 3 peças sozinho).',
+            )}
           </p>
         )}
         {isHost ? (
           <>
             {bullet ? (
-              <p>Mande o convite e comece quando todo mundo tiver chegado.</p>
+              <p>{t('Mande o convite e comece quando todo mundo tiver chegado.')}</p>
             ) : snapshot.elapsedMs > 0 ? (
               <p>
-                Partida retomada com {formatDuration(snapshot.elapsedMs)} de jogo. Chame quem estava
-                e comece: o tempo continua de onde parou.
+                {t(
+                  'Partida retomada com {time} de jogo. Chame quem estava e comece: o tempo continua de onde parou.',
+                  { time: formatDuration(snapshot.elapsedMs) },
+                )}
               </p>
             ) : (
               <p>
-                Mande o convite e comece quando todo mundo tiver chegado. O tempo conta a partir
-                daí.
+                {t(
+                  'Mande o convite e comece quando todo mundo tiver chegado. O tempo conta a partir daí.',
+                )}
               </p>
             )}
             <button type="button" className="btn btn-primary btn-lg" onClick={onStart}>
-              Começar
+              {t('Começar')}
             </button>
           </>
         ) : (
-          <p>Esperando {hostName ?? 'o anfitrião'} começar…</p>
+          <p>{t('Esperando {name} começar…', { name: hostName ?? t('o anfitrião') })}</p>
         )}
       </div>
     </div>

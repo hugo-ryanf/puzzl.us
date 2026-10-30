@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { joinRoom, type PuzzleRoom } from '../../net/connection';
 import { friendlyError, savePlayerName } from '../../net/playerName';
 import { Dialog } from '../../ui/Dialog';
+import { t, tRich } from '../../i18n';
 
 interface JoinRoomDialogProps {
   open: boolean;
@@ -32,8 +33,8 @@ export function JoinRoomDialog({
     event.preventDefault();
     const trimmed = name.trim();
     const roomCode = code.trim().toUpperCase();
-    if (!trimmed) return setError('Digite seu nome.');
-    if (!roomCode) return setError('Digite o código da sala.');
+    if (!trimmed) return setError(t('Digite seu nome.'));
+    if (!roomCode) return setError(t('Digite o código da sala.'));
     savePlayerName(trimmed);
     setBusy(true);
     setError(undefined);
@@ -48,14 +49,16 @@ export function JoinRoomDialog({
   return (
     <Dialog open={open} onClose={onClose} labelledBy="join-title">
       <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
-        <h2 id="join-title">Entrar com código</h2>
+        <h2 id="join-title">{t('Entrar com código')}</h2>
         {nameLocked ? (
           <p className="field-hint locked-name">
-            Você entra como <strong>{name}</strong>, o nickname do seu perfil.
+            {tRich('Você entra como {name}, o nickname do seu perfil.', {
+              name: <strong>{name}</strong>,
+            })}
           </p>
         ) : (
           <label className="field">
-            Seu nome
+            {t('Seu nome')}
             <input
               className="input"
               value={name}
@@ -66,7 +69,7 @@ export function JoinRoomDialog({
           </label>
         )}
         <label className="field">
-          Código da sala
+          {t('Código da sala')}
           <input
             className="input code-input"
             value={code}
@@ -79,10 +82,10 @@ export function JoinRoomDialog({
         {error && <p className="error">{error}</p>}
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Cancelar
+            {t('Cancelar')}
           </button>
           <button className="btn btn-primary" disabled={busy}>
-            {busy ? 'Entrando…' : 'Entrar'}
+            {busy ? t('Entrando…') : t('Entrar')}
           </button>
         </div>
       </form>

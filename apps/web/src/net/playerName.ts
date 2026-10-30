@@ -1,3 +1,4 @@
+import { t, translateServerMessage } from '../i18n';
 const NAME_KEY = 'quebra-cabeca:nome';
 
 // localStorage pode estar bloqueado; o nome lembrado é só conveniência.
@@ -17,11 +18,11 @@ export function savePlayerName(name: string): void {
   }
 }
 
-/** Mensagens do matchmaker/rede em português, para mostrar a quem joga. */
+/** Mensagens do matchmaker/rede no idioma de quem joga. */
 export function friendlyError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  if (/not found/i.test(message)) return 'Sala não encontrada. Confira o código.';
-  if (/locked|full/i.test(message)) return 'Essa sala está cheia ou já terminou.';
-  if (/fetch|network|ECONNREFUSED/i.test(message)) return 'Não consegui falar com o servidor.';
-  return message;
+  if (/not found/i.test(message)) return t('Sala não encontrada. Confira o código.');
+  if (/locked|full/i.test(message)) return t('Essa sala está cheia ou já terminou.');
+  if (/fetch|network|ECONNREFUSED/i.test(message)) return t('Não consegui falar com o servidor.');
+  return translateServerMessage(message);
 }

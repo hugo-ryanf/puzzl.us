@@ -7,6 +7,7 @@ import { ComboBurst } from '../room/ComboBurst';
 import { FinalSeconds } from '../room/FinalSeconds';
 import { SlidingPuzzle } from '../room/SlidingPuzzle';
 import { BonusBurst, LightningBanner, MagnetButton } from './BulletExtras';
+import { t } from '../../i18n';
 
 /** Quanto tempo o "+1" fica na tela depois de cada quebra-cabeça montado. */
 const CHEER_MS = 1200;
@@ -37,7 +38,7 @@ export function BulletBoard({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
         <div className="slide-solo">
           <SlidingPuzzle
             tiles={snapshot.slides.main.tiles}
-            label="Grade do relâmpago"
+            label={t('Grade do relâmpago')}
             onSlide={
               snapshot.phase === 'playing' ? (index) => room.send('slide', { index }) : undefined
             }
@@ -54,11 +55,11 @@ export function BulletBoard({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
           boardKey="main"
         />
       ) : (
-        <p className="board-loading">{image?.error ?? 'Carregando o próximo…'}</p>
+        <p className="board-loading">{image?.error ?? t('Carregando o próximo…')}</p>
       )}
       {cheer > 0 && (
         <div className="bullet-cheer" aria-live="polite">
-          +1 <small>{cheer === 1 ? '1 montado' : `${cheer} montados`}</small>
+          +1 <small>{cheer === 1 ? t('1 montado') : t('{n} montados', { n: cheer })}</small>
         </div>
       )}
       <ComboBurst

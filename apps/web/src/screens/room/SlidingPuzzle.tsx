@@ -1,6 +1,7 @@
 import { useRef, type CSSProperties, type PointerEvent } from 'react';
 import { CATALOG, EMPTY_TILE, SLIDE_SIZE, canSlide } from '@puzzle/shared';
 import { puzzleImageUrl } from '../../board/images';
+import { t } from '../../i18n';
 
 /**
  * Foto do relâmpago (a mesma para todo mundo). Se ela ainda não existir, a segunda camada (uma
@@ -56,7 +57,7 @@ export function SlidingPuzzle({
             type="button"
             className="slide-tile"
             disabled={!onSlide}
-            aria-label={`Peça ${tile + 1}`}
+            aria-label={t('Peça {n}', { n: tile + 1 })}
             style={
               {
                 '--row': rowOf(position),

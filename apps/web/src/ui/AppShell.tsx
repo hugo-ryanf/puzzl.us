@@ -20,6 +20,7 @@ import {
 import { Avatar } from './UserAvatar';
 import { useTheme, type ThemeChoice } from './theme';
 import { Popover } from './Popover';
+import { locale, setLocale, t, type Locale } from '../i18n';
 
 export type Section =
   'explore' | 'friends' | 'saved' | 'favorites' | 'records' | 'ranking' | 'profile';
@@ -44,7 +45,7 @@ interface AppShellProps {
 const SIDEBAR_FRIENDS = 4;
 const STATUS_ORDER: Record<FriendStatus, number> = { playing: 0, online: 1, offline: 2 };
 const STATUS_LABELS: Record<FriendStatus, string> = {
-  playing: 'Jogando',
+  playing: t('Jogando'),
   online: 'Online',
   offline: 'Offline',
 };
@@ -108,40 +109,40 @@ export function AppShell({
             onClick={onCreateRoom}
           >
             <PlusIcon size={18} />
-            Criar sala
+            {t('Criar sala')}
           </button>
           <form className="join-code" onSubmit={joinWithCode}>
             <label htmlFor="sidebar-code" className="sr-only">
-              Código da sala
+              {t('Código da sala')}
             </label>
             <input
               id="sidebar-code"
               className="input join-code-input"
               autoComplete="off"
               maxLength={5}
-              placeholder="Código da sala"
+              placeholder={t('Código da sala')}
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             />
             <button
               type="submit"
               className={ready ? 'btn join-code-go ready' : 'btn join-code-go'}
-              aria-label="Entrar na sala"
+              aria-label={t('Entrar na sala')}
             >
               <ArrowRightIcon size={18} />
             </button>
           </form>
         </div>
 
-        <nav className="nav" aria-label="Principal">
+        <nav className="nav" aria-label={t('Principal')}>
           <ul>
-            {navLink('explore', <CompassIcon />, 'Explorar')}
-            {navLink('saved', <HourglassIcon />, 'Em andamento')}
-            {navLink('favorites', <BookmarkIcon />, 'Favoritos')}
-            {navLink('records', <TimerIcon />, 'Meus records')}
+            {navLink('explore', <CompassIcon />, t('Explorar'))}
+            {navLink('saved', <HourglassIcon />, t('Em andamento'))}
+            {navLink('favorites', <BookmarkIcon />, t('Favoritos'))}
+            {navLink('records', <TimerIcon />, t('Meus records'))}
             {navLink('ranking', <TrophyIcon />, 'Ranking')}
             {account.user &&
-              navLink('profile', <UserIcon />, 'Perfil', undefined, 'mobile-only nav-profile')}
+              navLink('profile', <UserIcon />, t('Perfil'), undefined, 'mobile-only nav-profile')}
             {/* No celular a seção de amigos não cabe: vira um item do menu. */}
             <li className="mobile-only">
               <button
@@ -151,7 +152,7 @@ export function AppShell({
                 onClick={() => onNavigate('friends')}
               >
                 <UsersIcon />
-                Amigos
+                {t('Amigos')}
                 {friendRequests > 0 && <span className="nav-count">{friendRequests}</span>}
               </button>
             </li>
@@ -174,15 +175,16 @@ export function AppShell({
             onFriends={() => onNavigate('friends')}
             onProfile={() => onNavigate('profile')}
           />
-          {/* Logado, o tema fica no menu "⋯" da conta; convidado não tem menu, então fica aqui. */}
+          {/* Logado, tema e idioma ficam no menu "⋯" da conta; convidado não tem menu, então ficam aqui. */}
           {!account.user && <ThemeSwitch />}
+          {!account.user && <LanguageSwitch />}
           <p className="credits">
-            Feito por{' '}
+            {t('Feito por')}{' '}
             <a href="https://github.com/hugo-ryanf" target="_blank" rel="noreferrer">
               hugo-ryanf
             </a>
             {' · '}
-            <a href="/privacidade">Privacidade</a>
+            <a href="/privacidade">{t('Privacidade')}</a>
           </p>
         </div>
       </aside>
@@ -192,26 +194,58 @@ export function AppShell({
   );
 }
 
-const THEMES: Array<{ value: ThemeChoice; label: string; icon: ReactNode }> = [
-  { value: 'system', label: 'Sistema', icon: <MonitorIcon size={16} /> },
-  { value: 'light', label: 'Claro', icon: <SunIcon size={16} /> },
-  { value: 'dark', label: 'Escuro', icon: <MoonIcon size={16} /> },
+const THEMES: Array<{ value: ThemeChoice; label: string; title: string; icon: ReactNode }> = [
+  {
+    value: 'system',
+    label: t('Sistema'),
+    title: t('Seguir o tema do aparelho'),
+    icon: <MonitorIcon size={16} />,
+  },
+  { value: 'light', label: t('Claro'), title: t('Tema claro'), icon: <SunIcon size={16} /> },
+  { value: 'dark', label: t('Escuro'), title: t('Tema escuro'), icon: <MoonIcon size={16} /> },
+];
+
+/** Cada idioma com o próprio nome: quem não lê o atual ainda acha o seu. */
+const LANGUAGES: Array<{ value: Locale; label: string }> = [
+  { value: 'pt-BR', label: 'Português' },
+  { value: 'en', label: 'English' },
 ];
 
 /** Claro, escuro ou o mesmo do aparelho (guardado neste navegador). */
 function ThemeSwitch() {
   const [theme, setTheme] = useTheme();
   return (
-    <div className="theme-switch" role="group" aria-label="Tema">
-      {THEMES.map(({ value, label, icon }) => (
+    <div className="theme-switch" role="group" aria-label={t('Tema')}>
+      {THEMES.map(({ value, label, title, icon }) => (
         <button
           key={value}
           type="button"
           aria-pressed={theme === value}
-          title={value === 'system' ? 'Seguir o tema do aparelho' : `Tema ${label.toLowerCase()}`}
+          title={title}
           onClick={() => setTheme(value)}
         >
           {icon}
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Português ou inglês (guardado neste navegador); trocar recarrega a página. */
+function LanguageSwitch() {
+  return (
+    <div className="theme-switch" role="group" aria-label={t('Idioma')}>
+      {LANGUAGES.map(({ value, label }) => (
+        <button
+          key={value}
+          type="button"
+          lang={value}
+          aria-pressed={locale === value}
+          onClick={() => {
+            if (locale !== value) setLocale(value);
+          }}
+        >
           {label}
         </button>
       ))}
@@ -242,16 +276,16 @@ function SidebarFriends({
     <section className="sidebar-friends" aria-labelledby="sidebar-friends-title">
       <div className="sidebar-friends-header">
         <h2 id="sidebar-friends-title">
-          Amigos {friends.length > 0 && <span>{online} online</span>}
+          {t('Amigos')} {friends.length > 0 && <span>{t('{n} online', { n: online })}</span>}
         </h2>
         <button
           type="button"
           className={active ? 'btn-link see-all current' : 'btn-link see-all'}
           onClick={onOpen}
         >
-          Ver todos
+          {t('Ver todos')}
           {requests > 0 && (
-            <span className="nav-count" aria-label={`${requests} pedidos`}>
+            <span className="nav-count" aria-label={t('{n} pedidos', { n: requests })}>
               {requests}
             </span>
           )}
@@ -259,7 +293,7 @@ function SidebarFriends({
       </div>
       {shown.length === 0 ? (
         <p className="sidebar-friends-empty">
-          Adicione amigos pelo código para ver quem está online.
+          {t('Adicione amigos pelo código para ver quem está online.')}
         </p>
       ) : (
         <ul>
@@ -313,9 +347,9 @@ function AccountBox({
         {/* Link de verdade (não fetch): o login é uma ida e volta de páginas até o Google. */}
         <a className="btn btn-block google-btn" href="/auth/google">
           <GoogleMark />
-          Entrar com Google
+          {t('Entrar com Google')}
         </a>
-        <small>Para salvar partidas, favoritar e adicionar amigos.</small>
+        <small>{t('Para salvar partidas, favoritar e adicionar amigos.')}</small>
       </div>
     );
   }
@@ -326,7 +360,7 @@ function AccountBox({
         <span className="account-name">{user.name}</span>
       </button>
       <Popover
-        label="Menu da conta"
+        label={t('Menu da conta')}
         triggerClassName="btn btn-ghost icon-only account-menu"
         trigger={<MoreIcon size={18} />}
         align="end"
@@ -334,16 +368,18 @@ function AccountBox({
         <div className="menu-list">
           <button type="button" className="btn" onClick={onProfile}>
             <UserIcon size={16} />
-            Perfil
+            {t('Perfil')}
           </button>
-          <p className="popover-note">Tema</p>
+          <p className="popover-note">{t('Tema')}</p>
           <ThemeSwitch />
+          <p className="popover-note">{t('Idioma')}</p>
+          <LanguageSwitch />
           <button type="button" className="btn" onClick={onFriends}>
             <UsersIcon size={16} />
-            Amigos e código
+            {t('Amigos e código')}
           </button>
           <button type="button" className="btn" onClick={() => void logout()}>
-            Sair
+            {t('Sair da conta')}
           </button>
         </div>
       </Popover>

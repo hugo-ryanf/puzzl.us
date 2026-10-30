@@ -9,6 +9,7 @@ import type {
 } from 'livekit-client';
 import type { VoiceTokenResponse } from '@puzzle/shared';
 import type { PuzzleRoom } from '../net/connection';
+import { t } from '../i18n';
 
 export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'unavailable' | 'error';
 
@@ -152,7 +153,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
       sdk = await import('livekit-client');
     } catch (error) {
       setStatus('error');
-      setNotice(`Não foi possível entrar na chamada: ${errorMessage(error)}`);
+      setNotice(t('Não foi possível entrar na chamada: {error}', { error: errorMessage(error) }));
       return;
     }
     if (!mountedRef.current) return; // saiu da sala enquanto o SDK baixava
@@ -243,7 +244,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
       callRef.current = null;
       void call.disconnect();
       setStatus('error');
-      setNotice(`Não foi possível entrar na chamada: ${errorMessage(error)}`);
+      setNotice(t('Não foi possível entrar na chamada: {error}', { error: errorMessage(error) }));
       return;
     }
 
@@ -253,7 +254,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
       setSelfMuted(false);
     } catch {
       setSelfMuted(true);
-      setNotice('Microfone bloqueado pelo navegador: você está só ouvindo.');
+      setNotice(t('Microfone bloqueado pelo navegador: você está só ouvindo.'));
     }
     setNeedsAudioUnlock(!call.canPlaybackAudio);
     setStatus('connected');
@@ -291,7 +292,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
       setSelfMuted(!enabled);
       setNotice(undefined);
     } catch {
-      setNotice('Microfone bloqueado pelo navegador: libere nas permissões do site.');
+      setNotice(t('Microfone bloqueado pelo navegador: libere nas permissões do site.'));
     }
     setPeers(readPeers(call));
   }, []);
@@ -317,7 +318,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
       setNotice(undefined);
     } catch {
       setSelfCameraOn(false);
-      setNotice('Câmera bloqueada pelo navegador (ou em uso por outro programa).');
+      setNotice(t('Câmera bloqueada pelo navegador (ou em uso por outro programa).'));
     }
     setPeers(readPeers(call));
     // Com a câmera liberada, o navegador passa a dar o nome das câmeras para a lista.
@@ -336,7 +337,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
       await call.switchActiveDevice(kind, deviceId);
       setNotice(undefined);
     } catch {
-      setNotice('Não foi possível trocar o dispositivo.');
+      setNotice(t('Não foi possível trocar o dispositivo.'));
     }
     setDevices(await readDevices(call));
   }, []);

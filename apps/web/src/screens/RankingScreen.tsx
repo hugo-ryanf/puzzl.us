@@ -19,7 +19,7 @@ import {
   type RankingQuery,
   type RankingRowBase,
 } from '@puzzle/shared';
-import { catalogThumbUrl, puzzleImageInfo } from '../board/images';
+import { catalogThumbUrl, localizedCatalogImage, puzzleImageInfo } from '../board/images';
 import { formatDuration } from '../format';
 import {
   fetchBulletRanking,
@@ -37,6 +37,7 @@ import {
   SearchIcon,
   TrophyIcon,
 } from '../ui/icons';
+import { formatNumber, locale, ordinal, t } from '../i18n';
 
 /** O que abre o ranking: a categoria de uma foto e, vindo de um Bullet, a categoria dele. */
 export type RankingOpen = Partial<RankingQuery> & { bullet?: BulletRankingQuery };
@@ -115,15 +116,19 @@ const formatPuzzle = (entry: RankingEntry) => ({
   score: entry.durationMs,
 });
 const formatGeneral = (entry: GeneralRankingEntry) => ({
-  value: `${entry.points.toLocaleString('pt-BR')} pts`,
-  sub: entry.puzzles === 1 ? '1 quebra-cabeça' : `${entry.puzzles} quebra-cabeças`,
+  value: t('{n} pts', { n: formatNumber(entry.points) }),
+  sub: entry.puzzles === 1 ? t('1 quebra-cabeça') : t('{n} quebra-cabeças', { n: entry.puzzles }),
   score: entry.points,
 });
 const formatBullet = (entry: BulletRankingEntry) => ({
-  value: entry.solved === 1 ? '1 montado' : `${entry.solved} montados`,
-  sub: `${entry.partial > 0 ? `+${entry.partial} peças · ` : ''}${dateFormat.format(
-    new Date(entry.finishedAt),
-  )}`,
+  value: entry.solved === 1 ? t('1 montado') : t('{n} montados', { n: entry.solved }),
+  sub:
+    entry.partial > 0
+      ? t('+{n} peças · {date}', {
+          n: entry.partial,
+          date: dateFormat.format(new Date(entry.finishedAt)),
+        })
+      : dateFormat.format(new Date(entry.finishedAt)),
   // Montados valem mais que qualquer número de peças do que ficou pela metade.
   score: entry.solved * 10_000 + entry.partial,
 });
@@ -135,31 +140,36 @@ interface ImageOption {
 }
 
 const PERIOD_LABELS: Record<RankingPeriod, string> = {
-  day: 'Hoje',
-  week: 'Esta semana',
-  month: 'Este mês',
-  all: 'Sempre',
+  day: t('Hoje'),
+  week: t('Esta semana'),
+  month: t('Este mês'),
+  all: t('Sempre'),
 };
 /** "Ninguém no pódio hoje / esta semana / este mês / ainda" */
 const PERIOD_PHRASES: Record<RankingPeriod, string> = {
-  day: 'hoje',
-  week: 'esta semana',
-  month: 'este mês',
-  all: 'ainda',
+  day: t('hoje'),
+  week: t('esta semana'),
+  month: t('este mês'),
+  all: t('ainda'),
 };
 const TAB_LABELS: Record<Tab, string> = {
-  general: 'Pontos',
-  puzzle: 'Por quebra-cabeça',
+  general: t('Pontos'),
+  puzzle: t('Por quebra-cabeça'),
   bullet: 'Bullet',
 };
 const VALUE_HEADERS: Record<Tab, string> = {
-  general: 'PONTOS',
-  puzzle: 'TEMPO',
-  bullet: 'MONTADOS',
+  general: t('PONTOS'),
+  puzzle: t('TEMPO'),
+  bullet: t('MONTADOS'),
 };
-const TEAM_LABELS: Record<number, string> = { 1: 'Solo', 2: 'Duplas', 3: 'Trios', 4: 'Quartetos' };
-const teamLabel = (n: number) => TEAM_LABELS[n] ?? `${n} jogadores`;
-const dateFormat = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' });
+const TEAM_LABELS: Record<number, string> = {
+  1: 'Solo',
+  2: t('Duplas'),
+  3: t('Trios'),
+  4: t('Quartetos'),
+};
+const teamLabel = (n: number) => TEAM_LABELS[n] ?? t('{n} jogadores', { n });
+const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'short' });
 /** "Ver todos" os mais jogados: até quantas fotos. */
 const TRENDING_ALL = 48;
 /** Quantas fotos o seletor mostra (busca ou mais jogadas). */
@@ -184,7 +194,7 @@ export function RankingScreen({
   onOpenProfile,
 }: RankingScreenProps) {
   const images: ImageOption[] = [
-    ...CATALOG.map((image) => ({
+    ...CATALOG.map(localizedCatalogImage).map((image) => ({
       id: image.id,
       title: image.title,
       thumb: catalogThumbUrl(image.id),
@@ -283,16 +293,32 @@ export function RankingScreen({
 
   const hint =
     tab === 'puzzle'
-      ? `Melhor tempo de cada equipe em “${imageTitle ?? 'esta foto'}” com ${query.pieces} peças, medido pelo servidor.`
+      ? t('Melhor tempo de cada equipe em “{title}” com {n} peças, medido pelo servidor.', {
+          title: imageTitle ?? t('esta foto'),
+          n: query.pieces,
+        })
       : tab === 'bullet'
-        ? 'Quantos quebra-cabeças cada equipe montou no tempo. Empate: peças do último.'
-        : 'Pontos somados no período: peças × velocidade, a melhor partida de cada foto.';
+        ? t('Quantos quebra-cabeças cada equipe montou no tempo. Empate: peças do último.')
+        : t('Pontos somados no período: peças × velocidade, a melhor partida de cada foto.');
   const emptyText =
     tab === 'puzzle'
-      ? `Ninguém montou “${imageTitle}” com ${query.pieces} peças em ${teamLabel(players).toLowerCase()} ${PERIOD_PHRASES[period]}. Seja o primeiro!`
+      ? t('Ninguém montou “{title}” com {n} peças em {team} {period}. Seja o primeiro!', {
+          title: imageTitle ?? t('esta foto'),
+          n: query.pieces,
+          team: teamLabel(players).toLowerCase(),
+          period: PERIOD_PHRASES[period],
+        })
       : tab === 'bullet'
-        ? `Nenhum Bullet de ${bulletCategory.minutes} min com ${bulletCategory.pieces} peças em ${teamLabel(players).toLowerCase()} ${PERIOD_PHRASES[period]}. Seja o primeiro!`
-        : `Ninguém jogou em ${teamLabel(players).toLowerCase()} ${PERIOD_PHRASES[period]}. Seja o primeiro!`;
+        ? t('Nenhum Bullet de {minutes} min com {n} peças em {team} {period}. Seja o primeiro!', {
+            minutes: bulletCategory.minutes,
+            n: bulletCategory.pieces,
+            team: teamLabel(players).toLowerCase(),
+            period: PERIOD_PHRASES[period],
+          })
+        : t('Ninguém jogou em {team} {period}. Seja o primeiro!', {
+            team: teamLabel(players).toLowerCase(),
+            period: PERIOD_PHRASES[period],
+          });
 
   /** Clicar no card abre o ranking da foto; clicar de novo no selecionado volta para Pontos. */
   function pickImage(id: string) {
@@ -324,8 +350,8 @@ export function RankingScreen({
           <p>{hint}</p>
         </div>
 
-        <div className="rk-filters" role="group" aria-label="Filtros do ranking">
-          <div className="rk-segmented" role="group" aria-label="Período">
+        <div className="rk-filters" role="group" aria-label={t('Filtros do ranking')}>
+          <div className="rk-segmented" role="group" aria-label={t('Período')}>
             {RANKING_PERIODS.map((value) => (
               <button
                 key={value}
@@ -339,7 +365,7 @@ export function RankingScreen({
           </div>
 
           <SelectBox
-            label="Modalidade"
+            label={t('Modalidade')}
             value={String(players)}
             display={teamLabel(players)}
             onChange={(value) => setQuery({ ...query, players: Number(value) })}
@@ -349,7 +375,7 @@ export function RankingScreen({
             }))}
           />
           <SelectBox
-            label="Tipo"
+            label={t('Tipo')}
             value={tab}
             display={TAB_LABELS[tab]}
             onChange={(value) => setTab(value as Tab)}
@@ -368,13 +394,13 @@ export function RankingScreen({
                 onPick={(id) => setQuery({ ...query, image: id })}
               />
               <SelectBox
-                label="Peças"
+                label={t('Peças')}
                 value={String(query.pieces)}
-                display={query.pieces.toLocaleString('pt-BR')}
+                display={formatNumber(query.pieces)}
                 onChange={(value) => setQuery({ ...query, pieces: Number(value) })}
                 options={PIECE_COUNT_PRESETS.map((count) => ({
                   value: String(count),
-                  label: count.toLocaleString('pt-BR'),
+                  label: formatNumber(count),
                 }))}
               />
             </>
@@ -382,7 +408,7 @@ export function RankingScreen({
           {tab === 'bullet' && (
             <>
               <SelectBox
-                label="Tempo"
+                label={t('Tempo')}
                 value={String(bulletCategory.minutes)}
                 display={`${bulletCategory.minutes} min`}
                 onChange={(value) =>
@@ -397,7 +423,7 @@ export function RankingScreen({
                 }))}
               />
               <SelectBox
-                label="Peças"
+                label={t('Peças')}
                 value={String(bulletCategory.pieces)}
                 display={String(bulletCategory.pieces)}
                 onChange={(value) =>
@@ -415,17 +441,17 @@ export function RankingScreen({
           )}
         </div>
 
-        {!result && <p className="loading">Carregando…</p>}
+        {!result && <p className="loading">{t('Carregando…')}</p>}
         {result?.error && <p className="error">{result.error}</p>}
         {rows?.length === 0 && (
           <div className="rk-empty">
             <TrophyIcon size={36} />
-            <p className="rk-empty-title">Pódio livre</p>
+            <p className="rk-empty-title">{t('Pódio livre')}</p>
             <p>{emptyText}</p>
             {onCreateRoom && (
               <button type="button" className="btn btn-primary rk-square" onClick={onCreateRoom}>
                 <PlusIcon size={16} />
-                Criar sala
+                {t('Criar sala')}
               </button>
             )}
           </div>
@@ -436,7 +462,7 @@ export function RankingScreen({
             rows={rows}
             valueHeader={VALUE_HEADERS[tab]}
             more={(result?.total ?? rows.length) - rows.length}
-            noun={players === 1 ? 'jogadores' : 'equipes'}
+            noun={players === 1 ? t('jogadores') : t('equipes')}
           />
         )}
         {result?.me && (
@@ -444,15 +470,19 @@ export function RankingScreen({
             onOpenProfile={onOpenProfile}
             me={result.me}
             higherIsBetter={tab !== 'puzzle'}
-            gapLabel={(ahead, me) =>
-              tab === 'puzzle'
-                ? `Falta ${formatDuration(me.score - ahead.score)}`
-                : tab === 'bullet'
-                  ? Math.floor(ahead.score / 10_000) > Math.floor(me.score / 10_000)
-                    ? `Falta${ahead.score - me.score >= 20_000 ? 'm' : ''} ${Math.floor(ahead.score / 10_000) - Math.floor(me.score / 10_000)} montado${Math.floor(ahead.score / 10_000) - Math.floor(me.score / 10_000) === 1 ? '' : 's'}`
-                    : `Faltam ${ahead.score - me.score} peças`
-                  : `Faltam ${(ahead.score - me.score).toLocaleString('pt-BR')} pts`
-            }
+            gapLabel={(ahead, me) => {
+              if (tab === 'puzzle') {
+                return t('Falta {time}', { time: formatDuration(me.score - ahead.score) });
+              }
+              if (tab !== 'bullet') {
+                return t('Faltam {n} pts', { n: formatNumber(ahead.score - me.score) });
+              }
+              const solved = Math.floor(ahead.score / 10_000) - Math.floor(me.score / 10_000);
+              if (solved === 1) return t('Falta 1 montado');
+              return solved > 1
+                ? t('Faltam {n} montados', { n: solved })
+                : t('Faltam {n} peças', { n: ahead.score - me.score });
+            }}
           />
         )}
       </section>
@@ -483,7 +513,7 @@ function Avatars({
             size={size}
           />
           {row.levels[index] !== undefined && (
-            <span className="rk-level">Nv {row.levels[index]}</span>
+            <span className="rk-level">{t('Nv {level}', { level: row.levels[index]! })}</span>
           )}
         </span>
       ))}
@@ -524,11 +554,11 @@ function TeamName({
 /** "▲ 2", "▼ 1", "=" ou "NOVO": quanto a equipe subiu ou caiu desde o período anterior. */
 function Change({ change }: { change?: number | null }) {
   if (change === undefined) return <span className="rk-change">—</span>;
-  if (change === null) return <span className="rk-change new">NOVO</span>;
+  if (change === null) return <span className="rk-change new">{t('NOVO')}</span>;
   if (change === 0) return <span className="rk-change">=</span>;
   return (
     <span className={change > 0 ? 'rk-change up' : 'rk-change down'}>
-      <span className="sr-only">{change > 0 ? 'Subiu ' : 'Caiu '}</span>
+      <span className="sr-only">{change > 0 ? t('Subiu') : t('Caiu')} </span>
       <span aria-hidden="true">{change > 0 ? '▲' : '▼'}</span> {Math.abs(change)}
     </span>
   );
@@ -539,9 +569,9 @@ function Streak({ days }: { days: number }) {
   return (
     <span className={days >= 3 ? 'rk-streak hot' : 'rk-streak'}>
       <FlameIcon size={15} />
-      <span className="sr-only">Sequência de </span>
+      <span className="sr-only">{t('Sequência de')} </span>
       {days}
-      <span className="sr-only"> {days === 1 ? 'dia' : 'dias'}</span>
+      <span className="sr-only"> {days === 1 ? t('dia') : t('dias')}</span>
     </span>
   );
 }
@@ -564,11 +594,11 @@ function Board({
   const rest = rows.slice(3);
   return (
     <div className="rk-board">
-      <ol className="rk-podium" aria-label="Pódio">
+      <ol className="rk-podium" aria-label={t('Pódio')}>
         {podium.map((row) => (
           <li key={row.position} className={`rk-podium-${row.position}`}>
             {row.position === 1 && (
-              <span className="rk-crown" role="img" aria-label="Campeão">
+              <span className="rk-crown" role="img" aria-label={t('Campeão')}>
                 <CrownIcon size={28} />
               </span>
             )}
@@ -581,7 +611,7 @@ function Board({
               <span className="rk-mono rk-podium-value">{row.value}</span>
             </span>
             <span className="rk-podium-block">
-              <span className="sr-only">Posição </span>
+              <span className="sr-only">{t('Posição')} </span>
               {row.position}
             </span>
           </li>
@@ -593,15 +623,15 @@ function Board({
           <div className="rk-row rk-row-header" aria-hidden="true">
             <span>POS</span>
             <span>±</span>
-            <span>JOGADOR</span>
-            <span className="rk-col-streak">SEQUÊNCIA</span>
+            <span>{t('JOGADOR')}</span>
+            <span className="rk-col-streak">{t('SEQUÊNCIA')}</span>
             <span className="rk-value">{valueHeader}</span>
           </div>
           <ol className="rk-rows" start={4}>
             {rest.map((row) => (
               <li key={row.position} className="rk-row">
                 <span className="rk-mono rk-pos">
-                  <span className="sr-only">Posição </span>
+                  <span className="sr-only">{t('Posição')} </span>
                   {row.position}
                 </span>
                 <Change change={row.change} />
@@ -628,7 +658,7 @@ function Board({
           <span />
           <span />
           <span />
-          mais {more} {noun}
+          {t('mais {n} {noun}', { n: more, noun })}
         </div>
       )}
     </div>
@@ -660,8 +690,8 @@ function MyPosition({
   return (
     <div className="rk-me">
       <span className="rk-mono rk-me-pos">
-        <span className="sr-only">Sua posição: </span>
-        {me.position}º
+        <span className="sr-only">{t('Sua posição:')} </span>
+        {ordinal(me.position)}
       </span>
       <span className="rk-me-who">
         <Avatars row={me} size={40} />
@@ -670,23 +700,28 @@ function MyPosition({
             <strong>
               <TeamName row={me} onOpen={onOpenProfile} />
             </strong>
-            <span className="rk-me-you">Você</span>
+            <span className="rk-me-you">{t('Você')}</span>
           </span>
           <small>
-            {ahead ? `${gapLabel(ahead, me)} para o ${ahead.position}º lugar` : 'Você lidera!'}
+            {ahead
+              ? t('{gap} para o {place} lugar', {
+                  gap: gapLabel(ahead, me),
+                  place: ordinal(ahead.position),
+                })
+              : t('Você lidera!')}
           </small>
         </span>
       </span>
       {ahead && (
         <span className="rk-me-progress">
           <span className="rk-me-progress-label">
-            <span>Rumo ao {ahead.position}º</span>
+            <span>{t('Rumo ao {place}', { place: ordinal(ahead.position) })}</span>
             <span className="rk-mono">{pct}%</span>
           </span>
           <span
             className="rk-me-bar"
             role="progressbar"
-            aria-label="Progresso até a próxima posição"
+            aria-label={t('Progresso até a próxima posição')}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={pct}
@@ -711,7 +746,7 @@ function Trend({ popular }: { popular: PopularImage }) {
   if (trend === null) return null;
   return (
     <span className={trend >= 0 ? 'rk-mono rk-trend up' : 'rk-mono rk-trend down'}>
-      <span className="sr-only">{trend >= 0 ? 'Subiu ' : 'Caiu '}</span>
+      <span className="sr-only">{trend >= 0 ? t('Subiu') : t('Caiu')} </span>
       <span aria-hidden="true">{trend >= 0 ? '▲' : '▼'}</span>
       {Math.abs(trend)}%
     </span>
@@ -762,8 +797,8 @@ function Trending({
     <section className="rk-section rk-trending" aria-labelledby="rk-trending-title">
       <div className="rk-trending-header">
         <div>
-          <span className="rk-eyebrow">EM ALTA</span>
-          <h2 id="rk-trending-title">Mais jogados da semana</h2>
+          <span className="rk-eyebrow">{t('EM ALTA')}</span>
+          <h2 id="rk-trending-title">{t('Mais jogados da semana')}</h2>
         </div>
         <div className="rk-trending-nav">
           <button
@@ -772,14 +807,14 @@ function Trending({
             aria-expanded={showAll}
             onClick={() => onShowAll(!showAll)}
           >
-            {showAll ? 'Mostrar menos' : 'Ver todos'}
+            {showAll ? t('Mostrar menos') : t('Ver todos')}
           </button>
           {!showAll && (
             <>
               <button
                 type="button"
                 className="rk-square-btn"
-                aria-label="Anteriores"
+                aria-label={t('Anteriores')}
                 disabled={scroll.atStart}
                 onClick={() => page(-1)}
               >
@@ -788,7 +823,7 @@ function Trending({
               <button
                 type="button"
                 className="rk-square-btn next"
-                aria-label="Próximos"
+                aria-label={t('Próximos')}
                 disabled={scroll.atEnd}
                 onClick={() => page(1)}
               >
@@ -805,7 +840,7 @@ function Trending({
             type="button"
             className="rk-card"
             aria-pressed={image.id === selected}
-            title={image.id === selected ? 'Clique de novo para desmarcar' : 'Ver o ranking'}
+            title={image.id === selected ? t('Clique de novo para desmarcar') : t('Ver o ranking')}
             onClick={() => onPick(image.id)}
           >
             <span className="rk-card-thumb">
@@ -814,13 +849,13 @@ function Trending({
               {image.id === selected ? (
                 <span className="rk-card-selected">
                   <CloseIcon size={12} />
-                  Desmarcar
+                  {t('Desmarcar')}
                 </span>
               ) : (
                 isTrending(popular) && (
                   <span className="rk-mono rk-card-hot">
                     <FlameIcon size={12} />
-                    EM ALTA
+                    {t('EM ALTA')}
                   </span>
                 )
               )}
@@ -828,7 +863,9 @@ function Trending({
             <span className="rk-card-body">
               <strong>{image.title}</strong>
               <span className="rk-card-meta">
-                <small>{popular.plays === 1 ? '1 partida' : `${popular.plays} partidas`}</small>
+                <small>
+                  {popular.plays === 1 ? t('1 partida') : t('{n} partidas', { n: popular.plays })}
+                </small>
                 <Trend popular={popular} />
               </span>
             </span>
@@ -921,18 +958,18 @@ function ImagePicker({
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        <span className="rk-select-label">Imagem</span>
-        <span className="rk-select-value">{current?.title ?? 'Escolher'}</span>
+        <span className="rk-select-label">{t('Imagem')}</span>
+        <span className="rk-select-value">{current?.title ?? t('Escolher')}</span>
         <ChevronDownIcon size={16} />
       </button>
       {open && (
-        <div className="rk-picker-panel" role="dialog" aria-label="Escolher a foto">
+        <div className="rk-picker-panel" role="dialog" aria-label={t('Escolher a foto')}>
           <label className="search">
             <SearchIcon size={18} />
-            <span className="sr-only">Buscar foto</span>
+            <span className="sr-only">{t('Buscar foto')}</span>
             <input
               type="search"
-              placeholder="Buscar pelo título…"
+              placeholder={t('Buscar pelo título…')}
               value={search}
               autoFocus
               onChange={(e) => setSearch(e.target.value)}
@@ -941,11 +978,11 @@ function ImagePicker({
           <small className="field-hint">
             {q
               ? candidates.length === 0
-                ? 'Nenhuma foto com esse título.'
-                : 'Resultados'
+                ? t('Nenhuma foto com esse título.')
+                : t('Resultados')
               : popular?.length
-                ? 'Mais jogadas'
-                : 'Ninguém jogou nesta modalidade no período: busque pelo título.'}
+                ? t('Mais jogadas')
+                : t('Ninguém jogou nesta modalidade no período: busque pelo título.')}
           </small>
           <ul>
             {choices.map((image) => (

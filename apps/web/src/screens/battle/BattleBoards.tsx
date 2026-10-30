@@ -13,6 +13,7 @@ import { SlideOverlay } from './SlideOverlay';
 import { EnergyMeter, PowerBar } from './PowerBar';
 import { otherTeam } from './score';
 import { TugOfWar } from './TugOfWar';
+import { t } from '../../i18n';
 
 /** Abaixo disso a tela dividida não cabe: um tabuleiro por vez, com abas. */
 const NARROW_QUERY = '(max-width: 760px)';
@@ -45,25 +46,25 @@ function SideHeader({
   return (
     <div className={mine ? 'battle-side-header mine' : 'battle-side-header'}>
       <span className="battle-side-names">
-        <strong>{mine ? 'Seu lado' : 'Adversário'}</strong>
-        <small>{names.join(' & ') || 'ninguém ainda'}</small>
+        <strong>{mine ? t('Seu lado') : t('Adversário')}</strong>
+        <small>{names.join(' & ') || t('ninguém ainda')}</small>
       </span>
       {snapshot.powers && <EnergyMeter board={board} />}
       {board?.lightning && (
-        <span className="lightning-pill" title="Rodada relâmpago: quebra-cabeça de 6 peças">
-          <BoltIcon size={14} /> Relâmpago
+        <span className="lightning-pill" title={t('Rodada relâmpago: quebra-cabeça de 6 peças')}>
+          <BoltIcon size={14} /> {t('Relâmpago')}
         </span>
       )}
       {timed && (
-        <span className="solved-pill" aria-label={`${board?.solved ?? 0} montados`}>
-          <strong>{board?.solved ?? 0}</strong> {board?.solved === 1 ? 'montado' : 'montados'}
+        <span className="solved-pill" aria-label={t('{n} montados', { n: board?.solved ?? 0 })}>
+          <strong>{board?.solved ?? 0}</strong> {board?.solved === 1 ? t('montado') : t('montados')}
         </span>
       )}
       <span className="progress-bar" aria-hidden="true">
         <span style={{ width: `${percent}%` }} />
       </span>
       <strong className="battle-side-percent">
-        {board?.done ? (timed ? '+1!' : 'Montou!') : `${percent}%`}
+        {board?.done ? (timed ? '+1!' : t('Montou!')) : `${percent}%`}
       </strong>
     </div>
   );
@@ -91,7 +92,7 @@ function SideBoard({
   const image = usePuzzleImage(view?.imageId ?? snapshot.imageId);
   const source = room.state.boards.get(team);
   if (!image?.image || !source || !view) {
-    return <p className="board-loading">{image?.error ?? 'Carregando…'}</p>;
+    return <p className="board-loading">{image?.error ?? t('Carregando…')}</p>;
   }
   const playing = snapshot.phase === 'playing';
   return (
@@ -111,7 +112,7 @@ function SideBoard({
       {playing && view.frozenUntil > now && (
         <div className="power-frozen" role="status">
           <SnowflakeIcon size={28} />
-          Congelado!
+          {t('Congelado!')}
         </div>
       )}
     </>
@@ -142,17 +143,17 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
   return (
     <div className={narrow ? 'battle-split narrow' : 'battle-split'}>
       {narrow && (
-        <div className="chips battle-tabs" role="group" aria-label="Tabuleiro">
+        <div className="chips battle-tabs" role="group" aria-label={t('Tabuleiro')}>
           <button
             type="button"
             className="chip"
             aria-pressed={!peek}
             onClick={() => setPeek(false)}
           >
-            Seu lado · {progressOf(snapshot, myTeam)}
+            {t('Seu lado · {progress}', { progress: progressOf(snapshot, myTeam) })}
           </button>
           <button type="button" className="chip" aria-pressed={peek} onClick={() => setPeek(true)}>
-            Adversário · {progressOf(snapshot, otherTeam(myTeam))}
+            {t('Adversário · {progress}', { progress: progressOf(snapshot, otherTeam(myTeam)) })}
           </button>
         </div>
       )}
@@ -180,7 +181,7 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
         <div className={narrow ? 'battle-hud narrow' : 'battle-hud'}>
           {snapshot.suddenDeath && (
             <div className="sudden-death-banner" role="status">
-              Morte súbita! <small>Quem montar este primeiro ganha</small>
+              {t('Morte súbita!')} <small>{t('Quem montar este primeiro ganha')}</small>
             </div>
           )}
           <TugOfWar snapshot={snapshot} myTeam={myTeam} hot={final.active} />
@@ -200,8 +201,8 @@ export function BattleBoards({ room, snapshot }: { room: PuzzleRoom; snapshot: R
 function progressOf(snapshot: RoomSnapshot, team: BattleTeam): string {
   const board = snapshot.boards[team];
   if (snapshot.timeLimitMs > 0) {
-    return `${board?.solved ?? 0} ${board?.solved === 1 ? 'montado' : 'montados'}`;
+    return `${board?.solved ?? 0} ${board?.solved === 1 ? t('montado') : t('montados')}`;
   }
-  if (board?.done) return 'montou';
+  if (board?.done) return t('montou');
   return `${board && board.pieces > 0 ? Math.round((board.placed / board.pieces) * 100) : 0}%`;
 }

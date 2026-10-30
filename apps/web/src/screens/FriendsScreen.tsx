@@ -3,6 +3,7 @@ import type { FriendStatus, FriendView } from '@puzzle/shared';
 import type { Friends } from '../net/friends';
 import { CheckIcon, LinkIcon, PlusIcon } from '../ui/icons';
 import { Avatar } from '../ui/UserAvatar';
+import { t } from '../i18n';
 
 interface FriendsScreenProps {
   friends: Friends;
@@ -15,7 +16,7 @@ interface FriendsScreenProps {
 }
 
 const STATUS_LABELS: Record<FriendStatus, string> = {
-  playing: 'Jogando',
+  playing: t('Jogando'),
   online: 'Online',
   offline: 'Offline',
 };
@@ -47,10 +48,10 @@ export function FriendsScreen({
       setMessage({
         text:
           result === 'requested'
-            ? 'Pedido enviado. Assim que aceitarem, a pessoa aparece aqui.'
+            ? t('Pedido enviado. Assim que aceitarem, a pessoa aparece aqui.')
             : result === 'accepted'
-              ? 'Vocês agora são amigos!'
-              : 'Vocês já são amigos.',
+              ? t('Vocês agora são amigos!')
+              : t('Vocês já são amigos.'),
       });
     } catch (e) {
       setMessage({ text: e instanceof Error ? e.message : String(e), error: true });
@@ -83,18 +84,18 @@ export function FriendsScreen({
     <>
       <div className="page-header">
         <div>
-          <h1>Amigos</h1>
-          <p>Veja quem está online e chame para montar junto.</p>
+          <h1>{t('Amigos')}</h1>
+          <p>{t('Veja quem está online e chame para montar junto.')}</p>
         </div>
       </div>
 
       {!signedIn && (
         <div className="empty">
-          <strong>Entre para ter amigos</strong>
-          <p>Com a conta, você adiciona amigos pelo código e chama eles para a sua sala.</p>
+          <strong>{t('Entre para ter amigos')}</strong>
+          <p>{t('Com a conta, você adiciona amigos pelo código e chama eles para a sua sala.')}</p>
           {googleLogin && (
             <a className="btn" href="/auth/google">
-              Entrar com Google
+              {t('Entrar com Google')}
             </a>
           )}
         </div>
@@ -103,22 +104,22 @@ export function FriendsScreen({
       {signedIn && data && (
         <div className="friends-layout">
           <section className="friends-card">
-            <h2>Seu código</h2>
+            <h2>{t('Seu código')}</h2>
             <p className="friend-code">{data.friendCode}</p>
             <div className="friends-actions">
               <button type="button" className="btn" onClick={() => void copy('code')}>
                 {copied === 'code' ? <CheckIcon size={16} /> : null}
-                {copied === 'code' ? 'Copiado!' : 'Copiar código'}
+                {copied === 'code' ? t('Copiado!') : t('Copiar código')}
               </button>
               <button type="button" className="btn" onClick={() => void copy('link')}>
                 {copied === 'link' ? <CheckIcon size={16} /> : <LinkIcon size={16} />}
-                {copied === 'link' ? 'Link copiado!' : 'Copiar link'}
+                {copied === 'link' ? t('Link copiado!') : t('Copiar link')}
               </button>
             </div>
 
             <form className="friend-add" onSubmit={(event) => void add(event)}>
               <label className="field">
-                Adicionar pelo código
+                {t('Adicionar pelo código')}
                 <input
                   className="input code-input"
                   value={code}
@@ -129,7 +130,7 @@ export function FriendsScreen({
               </label>
               <button type="submit" className="btn btn-primary" disabled={busy || !code.trim()}>
                 <PlusIcon size={16} />
-                Adicionar
+                {t('Adicionar')}
               </button>
             </form>
             {message && (
@@ -142,7 +143,7 @@ export function FriendsScreen({
           <div className="friends-lists">
             {data.incoming.length > 0 && (
               <FriendList
-                title="Pedidos recebidos"
+                title={t('Pedidos recebidos')}
                 people={data.incoming}
                 onOpenProfile={onOpenProfile}
               >
@@ -153,14 +154,14 @@ export function FriendsScreen({
                       className="btn"
                       onClick={run(() => friends.remove(person.id))}
                     >
-                      Recusar
+                      {t('Recusar')}
                     </button>
                     <button
                       type="button"
                       className="btn btn-primary"
                       onClick={run(() => friends.accept(person.id))}
                     >
-                      Aceitar
+                      {t('Aceitar')}
                     </button>
                   </>
                 )}
@@ -168,7 +169,7 @@ export function FriendsScreen({
             )}
 
             <FriendList
-              title={`Amigos (${sorted.length})`}
+              title={t('Amigos ({n})', { n: sorted.length })}
               people={sorted}
               showStatus
               onOpenProfile={onOpenProfile}
@@ -177,14 +178,14 @@ export function FriendsScreen({
                 removing === person.id ? (
                   <>
                     <button type="button" className="btn" onClick={() => setRemoving(undefined)}>
-                      Manter
+                      {t('Manter')}
                     </button>
                     <button
                       type="button"
                       className="btn btn-danger"
                       onClick={run(() => friends.remove(person.id))}
                     >
-                      Desfazer amizade
+                      {t('Desfazer amizade')}
                     </button>
                   </>
                 ) : (
@@ -192,22 +193,24 @@ export function FriendsScreen({
                     type="button"
                     className="btn btn-ghost"
                     onClick={() => setRemoving(person.id)}
-                    aria-label={`Desfazer amizade com ${person.name}`}
+                    aria-label={t('Desfazer amizade com {name}', { name: person.name })}
                   >
-                    Remover
+                    {t('Remover')}
                   </button>
                 )
               }
             </FriendList>
             {sorted.length === 0 && (
               <p className="result-note">
-                Ninguém ainda. Mande seu código (ou o link) e adicione o de quem joga com você.
+                {t(
+                  'Ninguém ainda. Mande seu código (ou o link) e adicione o de quem joga com você.',
+                )}
               </p>
             )}
 
             {data.outgoing.length > 0 && (
               <FriendList
-                title="Pedidos enviados"
+                title={t('Pedidos enviados')}
                 people={data.outgoing}
                 onOpenProfile={onOpenProfile}
               >
@@ -217,7 +220,7 @@ export function FriendsScreen({
                     className="btn btn-ghost"
                     onClick={run(() => friends.remove(person.id))}
                   >
-                    Cancelar
+                    {t('Cancelar')}
                   </button>
                 )}
               </FriendList>

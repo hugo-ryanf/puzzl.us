@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { GamePhase } from '@puzzle/shared';
 import { formatDuration } from '../format';
 import { TimerIcon } from '../ui/icons';
+import { t } from '../i18n';
 
 interface GameClockProps {
   phase: GamePhase;
@@ -56,10 +57,12 @@ export function GameClock({ phase, elapsedMs, durationMs, limitMs, paused }: Gam
   return (
     <span
       className={urgent ? 'clock urgent' : 'clock'}
-      title={limitMs === undefined ? 'Tempo de montagem (medido no servidor)' : 'Tempo restante'}
+      title={
+        limitMs === undefined ? t('Tempo de montagem (medido no servidor)') : t('Tempo restante')
+      }
     >
       <TimerIcon size={18} />
-      <span className="sr-only">Tempo:</span>
+      <span className="sr-only">{t('Tempo:')}</span>
       {formatDuration(shown)}
     </span>
   );

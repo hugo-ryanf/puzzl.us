@@ -3,6 +3,7 @@ import { MAGNET_PIECES, MAX_HELPERS } from '@puzzle/shared';
 import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { BoltIcon, MagnetIcon } from '../../ui/icons';
+import { t } from '../../i18n';
 
 /** Quanto tempo o "+5 s" fica na tela. */
 const BONUS_MS = 1300;
@@ -33,7 +34,7 @@ export function BonusBurst({ bonusMs }: { bonusMs: number }) {
 export function LightningBanner() {
   return (
     <div className="lightning-banner" role="status">
-      <BoltIcon size={18} /> Relâmpago! Deslize as peças para montar: vale um Ímã
+      <BoltIcon size={18} /> {t('Relâmpago! Deslize as peças para montar: vale um Ímã')}
     </div>
   );
 }
@@ -60,19 +61,19 @@ export function MagnetButton({ room, snapshot }: { room: PuzzleRoom; snapshot: R
   }, [ready, room]);
 
   const title = ready
-    ? `Encaixa ${MAGNET_PIECES} peças sozinho (tecla M)`
-    : 'Monte uma rodada relâmpago para ganhar um Ímã';
+    ? t('Encaixa {n} peças sozinho (tecla M)', { n: MAGNET_PIECES })
+    : t('Monte uma rodada relâmpago para ganhar um Ímã');
   return (
     <button
       type="button"
       className={helpers > 0 ? 'magnet-btn charged' : 'magnet-btn'}
       disabled={!ready}
       title={title}
-      aria-label={`Ímã: ${helpers} de ${MAX_HELPERS}. ${title}`}
+      aria-label={t('Ímã: {helpers} de {max}. {title}', { helpers, max: MAX_HELPERS, title })}
       onClick={() => room.send('magnet')}
     >
       <MagnetIcon size={18} />
-      Ímã <strong>{helpers}</strong>
+      {t('Ímã')} <strong>{helpers}</strong>
     </button>
   );
 }

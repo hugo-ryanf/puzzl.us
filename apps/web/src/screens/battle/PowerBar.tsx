@@ -10,19 +10,20 @@ import {
 import type { PuzzleRoom } from '../../net/connection';
 import type { BoardView } from '../../net/useRoomSnapshot';
 import { CloudFogIcon, ShieldIcon, ShuffleIcon, SnowflakeIcon } from '../../ui/icons';
+import { t } from '../../i18n';
 
 export const POWER_LABELS: Record<BattlePower, string> = {
-  shield: 'Escudo',
-  fog: 'Neblina',
-  freeze: 'Congelar',
-  shuffle: 'Embaralhar',
+  shield: t('Escudo'),
+  fog: t('Neblina'),
+  freeze: t('Congelar'),
+  shuffle: t('Embaralhar'),
 };
 
 const POWER_HINTS: Record<BattlePower, string> = {
-  shield: 'Protege o seu lado: anula o próximo poder do adversário',
-  fog: `Desfoca a mesa do adversário por ${FOG_MS / 1000} s`,
-  freeze: `O adversário não pega peças nem usa poderes por ${FREEZE_MS / 1000} s`,
-  shuffle: 'Espalha de novo as peças soltas do adversário',
+  shield: t('Protege o seu lado: anula o próximo poder do adversário'),
+  fog: t('Desfoca a mesa do adversário por {n} s', { n: FOG_MS / 1000 }),
+  freeze: t('O adversário não pega peças nem usa poderes por {n} s', { n: FREEZE_MS / 1000 }),
+  shuffle: t('Espalha de novo as peças soltas do adversário'),
 };
 
 const POWER_ICONS: Record<BattlePower, typeof ShieldIcon> = {
@@ -36,16 +37,19 @@ const POWER_ICONS: Record<BattlePower, typeof ShieldIcon> = {
 export function EnergyMeter({ board }: { board: BoardView | undefined }) {
   const energy = board?.energy ?? 0;
   return (
-    <span className="energy-meter" title={`Energia: ${energy} de ${MAX_ENERGY}`}>
+    <span
+      className="energy-meter"
+      title={t('Energia: {energy} de {max}', { energy, max: MAX_ENERGY })}
+    >
       {board?.shield && (
-        <span className="energy-shield" aria-label="Escudo armado">
+        <span className="energy-shield" aria-label={t('Escudo armado!')}>
           <ShieldIcon size={14} />
         </span>
       )}
       <span className="energy-track" aria-hidden="true">
         <span style={{ width: `${(energy / MAX_ENERGY) * 100}%` }} />
       </span>
-      <span className="sr-only">Energia {energy}</span>
+      <span className="sr-only">{t('Energia {energy}', { energy })}</span>
     </span>
   );
 }
@@ -88,8 +92,11 @@ export function PowerBar({
   }, [active, room]);
 
   return (
-    <div className="power-bar" role="toolbar" aria-label="Poderes">
-      <span className="power-energy" title={`Energia: ${energy} de ${MAX_ENERGY}`}>
+    <div className="power-bar" role="toolbar" aria-label={t('Poderes')}>
+      <span
+        className="power-energy"
+        title={t('Energia: {energy} de {max}', { energy, max: MAX_ENERGY })}
+      >
         <span className="power-energy-track" aria-hidden="true">
           <span style={{ width: `${(energy / MAX_ENERGY) * 100}%` }} />
         </span>

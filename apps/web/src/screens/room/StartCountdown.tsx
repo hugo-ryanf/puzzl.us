@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { playCountdown } from '../../sound/sounds';
+import { t } from '../../i18n';
 
 /** Quanto tempo o "Já!" fica na tela depois do 1. */
 const GO_MS = 700;
@@ -32,7 +33,7 @@ export function StartCountdown({ countdown }: { countdown: number }) {
     <div className="start-countdown" role="status" aria-live="assertive">
       {/* key: o número novo refaz a animação de entrada. */}
       <span key={countdown} className={countdown > 0 ? 'start-countdown-number' : 'start-go'}>
-        {countdown > 0 ? countdown : 'Já!'}
+        {countdown > 0 ? countdown : t('Já!')}
       </span>
     </div>
   );

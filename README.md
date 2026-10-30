@@ -53,6 +53,19 @@ Para mexer e testar sem tocar na produção: `pnpm dev:local`.
 Depois de validar: `pnpm test`, `pnpm lint`, `pnpm typecheck` e `pnpm build`; aí commit e push no
 `main` (o Render publica sozinho).
 
+## Idiomas
+
+O site existe em português e inglês. Sem escolha salva, navegador em português abre em português
+e qualquer outro em inglês; o seletor fica na barra lateral (convidado) ou no menu da conta.
+
+- O texto em português é a própria chave: `t('Criar sala')`. A tradução fica em
+  `apps/web/src/i18n/en.ts`; chave sem tradução ou valor faltando não compila.
+- O servidor responde sempre em português, e o site traduz as mensagens dele pelo mesmo
+  dicionário. Mensagem nova no servidor: adicione em `en.ts` (sem isso, ela aparece em português).
+- Foto nova no catálogo: adicione o título em `en.ts` (o `pnpm test` avisa se faltar).
+- A política de privacidade fica inteira por idioma em `PrivacyScreen.tsx`. O laboratório e o
+  painel de testes ficam só em português.
+
 ## Catálogo de imagens
 
 As salas usam fotos de um catálogo fixo.

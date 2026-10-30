@@ -1,5 +1,6 @@
-import { findCatalogImage, uploadIdOf } from '@puzzle/shared';
+import { findCatalogImage, uploadIdOf, type CatalogImage } from '@puzzle/shared';
 import { communityPuzzleOf } from '../net/community';
+import { t, translateOptional } from '../i18n';
 
 /** Imagens do catálogo ficam em public/catalog (geradas por `pnpm catalog`). */
 export const catalogThumbUrl = (id: string) => `/catalog/${id}-mini.webp`;
@@ -10,12 +11,26 @@ export function puzzleImageUrl(imageId: string): string {
   return uploadId ? `/api/uploads/${uploadId}` : `/catalog/${imageId}.webp`;
 }
 
+/** Foto do catálogo com título e crédito no idioma da pessoa. */
+export function localizedCatalogImage(image: CatalogImage): CatalogImage {
+  const credit = /^Foto de (.+) no (\S+)$/.exec(image.credit);
+  return {
+    ...image,
+    title: translateOptional(image.title),
+    credit: credit
+      ? t('Foto de {author} no {site}', { author: credit[1]!, site: credit[2]! })
+      : image.credit,
+  };
+}
+
 /** Título e crédito: do catálogo, da comunidade (título e autor) ou "Foto enviada". */
 export function puzzleImageInfo(imageId: string): { title: string; credit: string } | undefined {
   const published = communityPuzzleOf(imageId);
-  if (published) return { title: published.title, credit: `por ${published.authorName}` };
-  if (uploadIdOf(imageId)) return { title: 'Foto enviada', credit: '' };
-  return findCatalogImage(imageId);
+  if (published)
+    return { title: published.title, credit: t('por {author}', { author: published.authorName }) };
+  if (uploadIdOf(imageId)) return { title: t('Foto enviada'), credit: '' };
+  const image = findCatalogImage(imageId);
+  return image && localizedCatalogImage(image);
 }
 
 /** Miniatura para listas: do catálogo, a da comunidade, ou a própria foto enviada. */

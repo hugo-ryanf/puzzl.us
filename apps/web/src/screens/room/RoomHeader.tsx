@@ -18,6 +18,7 @@ import { VoiceMenu } from '../../voice/VoiceMenu';
 import { GameClock } from '../GameClock';
 import { BulletBestPill } from '../bullet/BulletBestPill';
 import { InviteMenu } from './InviteMenu';
+import { t, tRich } from '../../i18n';
 
 interface RoomHeaderProps {
   roomId: string;
@@ -58,7 +59,7 @@ export function RoomHeader({
       : 0
     : snapshot.solved;
   const solo = maxPlayers === 1;
-  const title = puzzleImageInfo(imageId)?.title ?? 'Quebra-cabeça';
+  const title = puzzleImageInfo(imageId)?.title ?? t('Quebra-cabeça');
   const difficulty = DIFFICULTY_NAMES[difficultyOf(pieceCount) - 1];
   const percent = pieces > 0 ? Math.round((placed / pieces) * 100) : 0;
 
@@ -75,25 +76,22 @@ export function RoomHeader({
         <div>
           <h1>{title}</h1>
           <p>
-            {solo ? (
-              'Solo'
-            ) : (
-              <>
-                Sala <span className="room-code">{roomId}</span>
-              </>
-            )}{' '}
+            {solo
+              ? 'Solo'
+              : tRich('Sala {code}', { code: <span className="room-code">{roomId}</span> })}{' '}
             {bullet ? (
               <>
-                · Bullet · {snapshot.timeLimitMs / 60_000} min · {pieceCount} peças
+                · Bullet · {snapshot.timeLimitMs / 60_000} min · {t('{n} peças', { n: pieceCount })}
               </>
             ) : mode === 'battle' ? (
               <>
-                · Batalha {maxPlayers / 2}v{maxPlayers / 2}
-                {timedBattle && <> · {snapshot.timeLimitMs / 60_000} min</>} · {pieces} peças
+                · {t('Batalha {a}v{a}', { a: maxPlayers / 2 })}
+                {timedBattle && <> · {snapshot.timeLimitMs / 60_000} min</>} ·{' '}
+                {t('{n} peças', { n: pieces })}
               </>
             ) : (
               <>
-                · {pieces} peças · {difficulty}
+                · {t('{n} peças', { n: pieces })} · {difficulty}
               </>
             )}
           </p>
@@ -102,7 +100,7 @@ export function RoomHeader({
 
       <div className="room-progress">
         {snapshot.suddenDeath && phase === 'playing' ? (
-          <span className="clock-pill sudden-death">Morte súbita</span>
+          <span className="clock-pill sudden-death">{t('Morte súbita')}</span>
         ) : (
           <span className="clock-pill">
             <GameClock
@@ -115,15 +113,15 @@ export function RoomHeader({
           </span>
         )}
         {(bullet || timedBattle) && (
-          <span className="solved-pill" aria-label={`${solved} montados`}>
-            <strong>{solved}</strong> {solved === 1 ? 'montado' : 'montados'}
+          <span className="solved-pill" aria-label={t('{n} montados', { n: solved })}>
+            <strong>{solved}</strong> {solved === 1 ? t('montado') : t('montados')}
           </span>
         )}
         {bullet && <BulletBestPill snapshot={snapshot} />}
         <div
           className="progress-bar"
           role="progressbar"
-          aria-label="Peças encaixadas"
+          aria-label={t('Peças encaixadas')}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={percent}
@@ -132,7 +130,7 @@ export function RoomHeader({
         </div>
         <strong className="progress-percent">{percent}%</strong>
         <span className="progress-count">
-          {placed} de {pieces} peças
+          {t('{placed} de {total} peças', { placed, total: pieces })}
         </span>
       </div>
 
@@ -150,7 +148,7 @@ export function RoomHeader({
                 onClick={() => void copyInvite()}
               >
                 {copied ? <CheckIcon size={18} /> : <LinkIcon size={18} />}
-                <span className="reveal-label">{copied ? 'Link copiado!' : 'Convidar'}</span>
+                <span className="reveal-label">{copied ? t('Link copiado!') : t('Convidar')}</span>
               </button>
             )}
             <VoiceMenu voice={voice} />
@@ -164,15 +162,15 @@ export function RoomHeader({
             className="btn"
             onClick={onSaveAndLeave}
             disabled={saving}
-            title="Guarda a partida em Em andamento e encerra a sala para todos"
+            title={t('Guarda a partida em Em andamento e encerra a sala para todos')}
           >
             <HourglassIcon size={18} />
-            {saving ? 'Salvando…' : 'Salvar e sair'}
+            {saving ? t('Salvando…') : t('Salvar e sair')}
           </button>
         )}
         <button type="button" className="btn btn-ghost" onClick={onLeave}>
           <LogOutIcon size={18} />
-          Sair
+          {t('Sair')}
         </button>
       </div>
     </header>
@@ -182,7 +180,7 @@ export function RoomHeader({
 /** Liga e desliga os sons do jogo (encaixe, contagem, fim…), não o áudio da chamada. */
 function SoundToggle() {
   const on = useSoundEnabled();
-  const label = on ? 'Desligar os sons do jogo' : 'Ligar os sons do jogo';
+  const label = on ? t('Desligar os sons do jogo') : t('Ligar os sons do jogo');
   return (
     <button
       type="button"

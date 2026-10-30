@@ -11,6 +11,7 @@ import {
 } from '../ui/icons';
 import { Popover } from '../ui/Popover';
 import type { DeviceKind, VoiceChat } from './useVoiceChat';
+import { t } from '../i18n';
 
 /**
  * Suas opções de som na barra superior: microfone e fone (liga/desliga), cada um com uma seta
@@ -24,10 +25,12 @@ export function VoiceMenu({ voice }: { voice: VoiceChat }) {
   if (status !== 'connected') {
     const label =
       status === 'connecting'
-        ? 'Conectando à chamada…'
+        ? t('Conectando à chamada…')
         : status === 'unavailable'
-          ? 'Chamada de voz indisponível neste servidor'
-          : (notice ?? 'Não foi possível entrar na chamada') + ' — clique para tentar de novo';
+          ? t('Chamada de voz indisponível neste servidor')
+          : t('{problem} — clique para tentar de novo', {
+              problem: notice ?? t('Não foi possível entrar na chamada'),
+            });
     return (
       <button
         type="button"
@@ -48,26 +51,26 @@ export function VoiceMenu({ voice }: { voice: VoiceChat }) {
       {needsAudioUnlock && (
         <button type="button" className="btn" onClick={voice.unlockAudio}>
           <VolumeIcon size={18} />
-          Ativar som
+          {t('Ativar som')}
         </button>
       )}
       <span className="split">
         <button
           type="button"
           className={selfMuted ? 'btn icon-btn muted' : 'btn icon-btn'}
-          aria-label={selfMuted ? 'Ligar o microfone' : 'Desligar o microfone'}
-          title={notice ?? (selfMuted ? 'Ligar o microfone' : 'Desligar o microfone')}
+          aria-label={selfMuted ? t('Ligar o microfone') : t('Desligar o microfone')}
+          title={notice ?? (selfMuted ? t('Ligar o microfone') : t('Desligar o microfone'))}
           onClick={voice.toggleMute}
         >
           {selfMuted ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
         </button>
         <Popover
-          label="Escolher microfone"
+          label={t('Escolher microfone')}
           triggerClassName="btn"
           trigger={<ChevronDownIcon size={16} />}
         >
           <DeviceList
-            title="Microfone"
+            title={t('Microfone')}
             kind="audioinput"
             options={devices.inputs}
             active={devices.activeInput}
@@ -80,20 +83,20 @@ export function VoiceMenu({ voice }: { voice: VoiceChat }) {
         <button
           type="button"
           className={selfDeafened ? 'btn icon-btn muted' : 'btn icon-btn'}
-          aria-label={selfDeafened ? 'Ligar o som da chamada' : 'Desligar o som da chamada'}
-          title={selfDeafened ? 'Ligar o som da chamada' : 'Desligar o som da chamada'}
+          aria-label={selfDeafened ? t('Ligar o som da chamada') : t('Desligar o som da chamada')}
+          title={selfDeafened ? t('Ligar o som da chamada') : t('Desligar o som da chamada')}
           onClick={voice.toggleDeafen}
         >
           {selfDeafened ? <HeadphonesOffIcon size={18} /> : <HeadphonesIcon size={18} />}
         </button>
         <Popover
-          label="Escolher saída de som"
+          label={t('Escolher saída de som')}
           triggerClassName="btn"
           trigger={<ChevronDownIcon size={16} />}
         >
           {devices.outputs.length > 0 ? (
             <DeviceList
-              title="Saída de som"
+              title={t('Saída de som')}
               kind="audiooutput"
               options={devices.outputs}
               active={devices.activeOutput}
@@ -102,7 +105,7 @@ export function VoiceMenu({ voice }: { voice: VoiceChat }) {
           ) : (
             // Firefox e Safari não deixam o site escolher a saída: vale a do sistema.
             <p className="popover-note">
-              Este navegador não deixa escolher a saída de som: ele usa a do sistema.
+              {t('Este navegador não deixa escolher a saída de som: ele usa a do sistema.')}
             </p>
           )}
         </Popover>
@@ -111,24 +114,24 @@ export function VoiceMenu({ voice }: { voice: VoiceChat }) {
         <button
           type="button"
           className="btn icon-btn"
-          aria-label={selfCameraOn ? 'Desligar a câmera' : 'Ligar a câmera'}
-          title={selfCameraOn ? 'Desligar a câmera' : 'Ligar a câmera'}
+          aria-label={selfCameraOn ? t('Desligar a câmera') : t('Ligar a câmera')}
+          title={selfCameraOn ? t('Desligar a câmera') : t('Ligar a câmera')}
           onClick={voice.toggleCamera}
         >
           {selfCameraOn ? <VideoIcon size={18} /> : <VideoOffIcon size={18} />}
         </button>
         <Popover
-          label="Escolher câmera"
+          label={t('Escolher câmera')}
           triggerClassName="btn"
           trigger={<ChevronDownIcon size={16} />}
         >
           <DeviceList
-            title="Câmera"
+            title={t('Câmera')}
             kind="videoinput"
             options={devices.cameras}
             active={devices.activeCamera}
             onSelect={voice.selectDevice}
-            emptyNote="Ligue a câmera uma vez para o navegador mostrar a lista."
+            emptyNote={t('Ligue a câmera uma vez para o navegador mostrar a lista.')}
           />
         </Popover>
       </span>
@@ -152,7 +155,7 @@ function DeviceList({
   options,
   active,
   onSelect,
-  emptyNote = 'Nenhum dispositivo encontrado.',
+  emptyNote = t('Nenhum dispositivo encontrado.'),
 }: DeviceListProps) {
   const name = useId();
   return (

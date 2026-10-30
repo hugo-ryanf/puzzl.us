@@ -1,6 +1,7 @@
 import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { ReplayIcon } from '../../ui/icons';
+import { t } from '../../i18n';
 
 /**
  * "Jogar novamente": o anfitrião começa outra partida na mesma sala (todos continuam nela, e a
@@ -8,14 +9,14 @@ import { ReplayIcon } from '../../ui/icons';
  */
 export function PlayAgainButton({ room, snapshot }: { room: PuzzleRoom; snapshot: RoomSnapshot }) {
   if (snapshot.hostId !== room.sessionId) {
-    return <span className="result-note">O anfitrião pode começar outra partida.</span>;
+    return <span className="result-note">{t('O anfitrião pode começar outra partida.')}</span>;
   }
   // Enquanto o resultado é gravado, ele ainda pertence a esta partida.
   const saving = snapshot.rankStatus === 'saving';
   return (
     <button type="button" className="btn" disabled={saving} onClick={() => room.send('playAgain')}>
       <ReplayIcon size={18} />
-      Jogar novamente
+      {t('Jogar novamente')}
     </button>
   );
 }

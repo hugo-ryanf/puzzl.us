@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { InviteMessage } from '@puzzle/shared';
 import { puzzleImageInfo, puzzleThumbUrl } from '../board/images';
 import { CloseIcon } from './icons';
+import { t, tRich } from '../i18n';
 
 interface InviteToastsProps {
   invites: InviteMessage[];
@@ -15,19 +16,22 @@ export function InviteToasts({ invites, onAccept, onDismiss }: InviteToastsProps
   if (invites.length === 0) return null;
 
   return (
-    <div className="toasts" role="region" aria-label="Convites">
+    <div className="toasts" role="region" aria-label={t('Convites')}>
       {invites.map((invite) => {
-        const title = puzzleImageInfo(invite.imageId)?.title ?? 'um quebra-cabeça';
+        const title = puzzleImageInfo(invite.imageId)?.title ?? t('um quebra-cabeça');
         return (
           <div key={`${invite.fromId}:${invite.roomCode}`} className="toast" role="alert">
             <img src={puzzleThumbUrl(invite.imageId)} alt="" />
             <div className="toast-body">
               <p>
-                <strong>{invite.fromName}</strong> te chamou para montar <strong>{title}</strong>
+                {tRich('{name} te chamou para montar {title}', {
+                  name: <strong>{invite.fromName}</strong>,
+                  title: <strong>{title}</strong>,
+                })}
               </p>
               <div className="toast-actions">
                 <button type="button" className="btn" onClick={() => onDismiss(invite)}>
-                  Agora não
+                  {t('Agora não')}
                 </button>
                 <button
                   type="button"
@@ -38,14 +42,14 @@ export function InviteToasts({ invites, onAccept, onDismiss }: InviteToastsProps
                     void onAccept(invite).finally(() => setJoining(undefined));
                   }}
                 >
-                  {joining === invite ? 'Entrando…' : 'Entrar'}
+                  {joining === invite ? t('Entrando…') : t('Entrar')}
                 </button>
               </div>
             </div>
             <button
               type="button"
               className="tool icon-only toast-close"
-              aria-label="Fechar convite"
+              aria-label={t('Fechar convite')}
               onClick={() => onDismiss(invite)}
             >
               <CloseIcon size={16} />

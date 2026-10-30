@@ -29,6 +29,7 @@ import { SavedScreen } from './screens/SavedScreen';
 import { AppShell, type Section } from './ui/AppShell';
 import { ArrowLeftIcon } from './ui/icons';
 import { InviteToasts } from './ui/InviteToasts';
+import { t } from './i18n';
 
 /** Laboratório (/lab): só no ambiente de desenvolvimento; some do build de produção. */
 const LabScreen = import.meta.env.DEV ? lazy(() => import('./screens/lab/LabScreen')) : null;
@@ -124,9 +125,9 @@ export function App() {
       dismissInvite(invite);
       if (room) leaveRoom(room);
       try {
-        enter(await joinRoom(invite.roomCode, { name: playerName.trim() || 'Jogador' }));
+        enter(await joinRoom(invite.roomCode, { name: playerName.trim() || t('Jogador') }));
       } catch {
-        leave('Não deu para entrar na sala do convite (ela pode ter acabado ou enchido).');
+        leave(t('Não deu para entrar na sala do convite (ela pode ter acabado ou enchido).'));
       }
     },
     [dismissInvite, room, enter, leave, playerName],
@@ -149,7 +150,7 @@ export function App() {
       </Suspense>
     );
   }
-  if (resuming) return <p className="loading">Voltando para a sala…</p>;
+  if (resuming) return <p className="loading">{t('Voltando para a sala…')}</p>;
   if (room) {
     // Ranking aberto do fim da partida: sem barra lateral (o "Explorar" voltaria para a sala).
     if (ranking) {
@@ -157,7 +158,7 @@ export function App() {
         <div className="main standalone">
           <button type="button" className="btn" onClick={() => setRanking(null)}>
             <ArrowLeftIcon size={18} />
-            Voltar para a sala
+            {t('Voltar para a sala')}
           </button>
           <RankingScreen
             key={JSON.stringify(ranking)}

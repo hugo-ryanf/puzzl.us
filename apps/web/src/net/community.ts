@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CommunityPuzzle, PublishPuzzleRequest } from '@puzzle/shared';
+import { t, translateServerMessage } from '../i18n';
 
 /**
  * Último retrato da lista, por imageId: a sala e o resultado mostram título e autor da foto
@@ -20,11 +21,15 @@ export interface Community {
   restore: (id: string) => Promise<void>;
 }
 
-/** Erro da API em português ({ error }) ou um genérico com o status. */
+/** Erro da API ({ error }, sempre em português) traduzido, ou um genérico com o status. */
 async function ensureOk(response: Response): Promise<Response> {
   if (response.ok) return response;
   const body = (await response.json().catch(() => ({}))) as { error?: string };
-  throw new Error(body.error ?? `Erro ${response.status}.`);
+  throw new Error(
+    body.error
+      ? translateServerMessage(body.error)
+      : t('Erro {status}.', { status: response.status }),
+  );
 }
 
 /** Quebra-cabeças da comunidade; busca de novo ao entrar/sair (muda "minha", "denunciei"). */

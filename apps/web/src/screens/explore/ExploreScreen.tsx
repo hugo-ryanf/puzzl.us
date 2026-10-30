@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { CATALOG, type CommunityPuzzle } from '@puzzle/shared';
-import { catalogThumbUrl } from '../../board/images';
+import { catalogThumbUrl, localizedCatalogImage } from '../../board/images';
 import type { Community } from '../../net/community';
 import type { PuzzleRoom } from '../../net/connection';
 import type { Library } from '../../net/library';
@@ -8,12 +8,13 @@ import { ChevronDownIcon, FilterIcon, SearchIcon } from '../../ui/icons';
 import { CreateRoomDialog, type CreateRoomSource, type PuzzleChoice } from './CreateRoomDialog';
 import { JoinRoomDialog } from './JoinRoomDialog';
 import { PuzzleCard, orientationOf, type CommunityActions, type PuzzleImage } from './PuzzleCard';
+import { t } from '../../i18n';
 
 type Orientation = 'Todas' | 'Horizontal' | 'Vertical';
 const ORIENTATIONS: { value: Orientation; label: string }[] = [
-  { value: 'Todas', label: 'Todas' },
-  { value: 'Horizontal', label: 'Horizontais' },
-  { value: 'Vertical', label: 'Verticais' },
+  { value: 'Todas', label: t('Todas') },
+  { value: 'Horizontal', label: t('Horizontais') },
+  { value: 'Vertical', label: t('Verticais') },
 ];
 
 /** Busca sem acento e sem caixa: "patio" acha "Pátio com chafariz". */
@@ -32,7 +33,7 @@ interface ExploreItem {
 }
 
 const catalogItems: ExploreItem[] = CATALOG.map((image) => ({
-  image,
+  image: localizedCatalogImage(image),
   thumbUrl: catalogThumbUrl(image.id),
 }));
 
@@ -41,7 +42,7 @@ function communityItem(puzzle: CommunityPuzzle): ExploreItem {
     image: {
       id: puzzle.imageId,
       title: puzzle.title,
-      credit: `por ${puzzle.authorName}`,
+      credit: t('por {author}', { author: puzzle.authorName }),
       width: puzzle.width,
       height: puzzle.height,
     },
@@ -54,7 +55,7 @@ function choiceOf({ image, thumbUrl }: ExploreItem): PuzzleChoice {
   return {
     imageId: image.id,
     title: image.title,
-    subtitle: image.credit || 'Foto do catálogo',
+    subtitle: image.credit || t('Foto do catálogo'),
     thumbUrl,
   };
 }
@@ -138,24 +139,24 @@ export function ExploreScreen({
       <div className="toolbar-row">
         <label className="search">
           <SearchIcon size={18} />
-          <span className="sr-only">Buscar imagens</span>
+          <span className="sr-only">{t('Buscar imagens')}</span>
           <input
             type="search"
-            placeholder="Buscar por título…"
+            placeholder={t('Buscar por título…')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
-        <button type="button" className="btn btn-lg" disabled title="Em breve">
+        <button type="button" className="btn btn-lg" disabled title={t('Em breve')}>
           <FilterIcon size={18} />
-          Filtros
-          <span className="soon">em breve</span>
+          {t('Filtros')}
+          <span className="soon">{t('em breve')}</span>
         </button>
-        <button type="button" className="btn btn-lg" disabled title="Em breve">
-          <span style={{ color: 'var(--text-3)' }}>Ordenar:</span>
-          Mais populares
+        <button type="button" className="btn btn-lg" disabled title={t('Em breve')}>
+          <span style={{ color: 'var(--text-3)' }}>{t('Ordenar:')}</span>
+          {t('Mais populares')}
           <ChevronDownIcon size={18} />
-          <span className="soon">em breve</span>
+          <span className="soon">{t('em breve')}</span>
         </button>
       </div>
 
@@ -163,13 +164,13 @@ export function ExploreScreen({
 
       <div className="page-header">
         <div>
-          <h1>{favoritesOnly ? 'Favoritos' : 'Explorar'}</h1>
+          <h1>{favoritesOnly ? t('Favoritos') : t('Explorar')}</h1>
           <p>
-            {items.length === 1 ? '1 imagem' : `${items.length} imagens`} ·{' '}
-            {favoritesOnly ? 'separadas para montar depois' : 'escolha uma para jogar'}
+            {items.length === 1 ? t('1 imagem') : t('{n} imagens', { n: items.length })} ·{' '}
+            {favoritesOnly ? t('separadas para montar depois') : t('escolha uma para jogar')}
           </p>
         </div>
-        <div className="chips" role="group" aria-label="Orientação">
+        <div className="chips" role="group" aria-label={t('Orientação')}>
           {ORIENTATIONS.map(({ value, label }) => (
             <button
               key={value}
@@ -202,15 +203,15 @@ export function ExploreScreen({
 
       {favoritesOnly && !filtering && items.length === 0 && (
         <div className="empty">
-          <strong>{signedIn ? 'Nenhum favorito ainda' : 'Entre para ter favoritos'}</strong>
+          <strong>{signedIn ? t('Nenhum favorito ainda') : t('Entre para ter favoritos')}</strong>
           <p>
             {signedIn
-              ? 'Toque no marcador de um quebra-cabeça para guardar aqui e montar depois.'
-              : 'Os favoritos ficam na sua conta, em qualquer aparelho.'}
+              ? t('Toque no marcador de um quebra-cabeça para guardar aqui e montar depois.')
+              : t('Os favoritos ficam na sua conta, em qualquer aparelho.')}
           </p>
           {!signedIn && googleLogin && (
             <a className="btn" href="/auth/google">
-              Entrar com Google
+              {t('Entrar com Google')}
             </a>
           )}
         </div>
@@ -218,8 +219,8 @@ export function ExploreScreen({
 
       {filtering && items.length === 0 && (
         <div className="empty">
-          <strong>Nenhuma imagem encontrada</strong>
-          <p>Tente outro termo ou outra orientação.</p>
+          <strong>{t('Nenhuma imagem encontrada')}</strong>
+          <p>{t('Tente outro termo ou outra orientação.')}</p>
           <button
             type="button"
             className="btn"
@@ -228,7 +229,7 @@ export function ExploreScreen({
               setOrientation('Todas');
             }}
           >
-            Limpar filtros
+            {t('Limpar filtros')}
           </button>
         </div>
       )}

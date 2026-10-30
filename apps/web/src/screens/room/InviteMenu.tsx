@@ -3,6 +3,7 @@ import type { FriendView } from '@puzzle/shared';
 import { CheckIcon, LinkIcon } from '../../ui/icons';
 import { Popover } from '../../ui/Popover';
 import { FriendAvatar } from '../FriendsScreen';
+import { t } from '../../i18n';
 
 interface InviteMenuProps {
   roomId: string;
@@ -36,22 +37,22 @@ export function InviteMenu({ roomId, friends, onInvite }: InviteMenuProps) {
 
   return (
     <Popover
-      label="Convidar"
+      label={t('Convidar')}
       triggerClassName="btn reveal-btn"
       trigger={
         <>
           <LinkIcon size={18} />
-          <span className="reveal-label">Convidar</span>
+          <span className="reveal-label">{t('Convidar')}</span>
         </>
       }
     >
       <button type="button" className="btn btn-block" onClick={() => void copyInvite()}>
         {copied ? <CheckIcon size={16} /> : <LinkIcon size={16} />}
-        {copied ? 'Link copiado!' : 'Copiar link da sala'}
+        {copied ? t('Link copiado!') : t('Copiar link da sala')}
       </button>
-      <p className="popover-note">Amigos online</p>
+      <p className="popover-note">{t('Amigos online')}</p>
       {online.length === 0 ? (
-        <p className="popover-note">Nenhum amigo online agora.</p>
+        <p className="popover-note">{t('Nenhum amigo online agora.')}</p>
       ) : (
         <ul className="invite-list">
           {online.map((friend) => (
@@ -59,7 +60,7 @@ export function InviteMenu({ roomId, friends, onInvite }: InviteMenuProps) {
               <FriendAvatar person={friend} />
               <span className="friend-name">
                 <strong>{friend.name}</strong>
-                <small>{friend.status === 'playing' ? 'Jogando' : 'Online'}</small>
+                <small>{friend.status === 'playing' ? t('Jogando') : 'Online'}</small>
               </span>
               <button
                 type="button"
@@ -67,7 +68,7 @@ export function InviteMenu({ roomId, friends, onInvite }: InviteMenuProps) {
                 disabled={sent.has(friend.id)}
                 onClick={() => void invite(friend)}
               >
-                {sent.has(friend.id) ? 'Chamado' : 'Chamar'}
+                {sent.has(friend.id) ? t('Chamado') : t('Chamar')}
               </button>
             </li>
           ))}

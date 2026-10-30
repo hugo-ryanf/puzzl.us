@@ -11,6 +11,7 @@ import {
 } from '../../ui/icons';
 import { Popover } from '../../ui/Popover';
 import type { VoiceChat } from '../../voice/useVoiceChat';
+import { t } from '../../i18n';
 
 interface PlayerAvatarsProps {
   players: PlayerView[];
@@ -76,21 +77,21 @@ export function PlayerAvatars({ players, selfId, hostId, voice }: PlayerAvatarsP
       silencedForMe: !isSelf && volume === 0,
       video: video.get(id),
       status: !player.connected
-        ? 'Reconectando…'
+        ? t('Reconectando…')
         : !isInCall
-          ? 'Fora da chamada'
+          ? t('Fora da chamada')
           : isMuted
-            ? 'Microfone desligado'
+            ? t('Microfone desligado')
             : isSpeaking
-              ? 'Falando'
-              : 'Na chamada',
+              ? t('Falando')
+              : t('Na chamada'),
     };
   });
   const circles = infos.filter((info) => !info.video);
   const tiles = infos.filter((info) => info.video);
 
   return (
-    <div className="people" role="group" aria-label="Jogadores na sala">
+    <div className="people" role="group" aria-label={t('Jogadores na sala')}>
       {circles.length > 0 && (
         <ul className="avatars">
           {circles.map((info) => (
@@ -118,11 +119,15 @@ function AvatarCircle({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
   const classes = ['avatar', isSpeaking && 'speaking', !player.connected && 'offline']
     .filter(Boolean)
     .join(' ');
+  const name = isSelf ? t('{name} (você)', { name: player.name }) : player.name;
 
   return (
     <Popover
-      label={`Opções de ${player.name}`}
-      triggerLabel={`${player.name}${isSelf ? ' (você)' : ''}${isHost ? ', anfitrião' : ''}: ${info.status}`}
+      label={t('Opções de {name}', { name: player.name })}
+      triggerLabel={t('{name}: {status}', {
+        name: isHost ? t('{name}, anfitrião', { name }) : name,
+        status: info.status,
+      })}
       triggerClassName={classes}
       openOnHover
       trigger={
@@ -147,19 +152,15 @@ function AvatarCircle({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
       }
     >
       <div className="player-card">
-        <strong>
-          {player.name}
-          {isSelf && ' (você)'}
-        </strong>
+        <strong>{name}</strong>
         <span className="player-status">
-          {isHost && 'Anfitrião · '}
-          {info.status}
+          {isHost ? t('Anfitrião · {status}', { status: info.status }) : info.status}
         </span>
       </div>
 
       {isSelf && isInCall && (
         <button type="button" className="btn btn-block" onClick={voice.toggleMute}>
-          {isMuted ? 'Ligar meu microfone' : 'Desligar meu microfone'}
+          {isMuted ? t('Ligar meu microfone') : t('Desligar meu microfone')}
         </button>
       )}
 
@@ -170,13 +171,13 @@ function AvatarCircle({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
             className="btn btn-block"
             onClick={() => voice.togglePeerMuted(player.sessionId)}
           >
-            {silencedForMe ? 'Voltar a ouvir' : 'Silenciar para mim'}
+            {silencedForMe ? t('Voltar a ouvir') : t('Silenciar para mim')}
           </button>
           <div className="volume-row">
             <button
               type="button"
               className="btn icon-btn"
-              aria-label="Abaixar volume"
+              aria-label={t('Abaixar volume')}
               onClick={() => voice.setPeerVolume(player.sessionId, volume - 0.1)}
             >
               −
@@ -185,19 +186,19 @@ function AvatarCircle({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
             <button
               type="button"
               className="btn icon-btn"
-              aria-label="Aumentar volume"
+              aria-label={t('Aumentar volume')}
               onClick={() => voice.setPeerVolume(player.sessionId, volume + 0.1)}
             >
               +
             </button>
             <span className="volume-value">{Math.round(volume * 100)}%</span>
           </div>
-          <p className="popover-note">O volume só muda para você.</p>
+          <p className="popover-note">{t('O volume só muda para você.')}</p>
         </>
       )}
       {!isSelf && !isInCall && (
         <p className="popover-note">
-          Volume e silenciar aparecem quando {player.name} entrar na chamada.
+          {t('Volume e silenciar aparecem quando {name} entrar na chamada.', { name: player.name })}
         </p>
       )}
     </Popover>
@@ -220,10 +221,7 @@ function VideoTile({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
       <CameraVideo track={info.video!} mirrored={isSelf} />
       <figcaption className="tile-name">
         {isHost && <CrownIcon size={12} />}
-        <span>
-          {player.name}
-          {isSelf && ' (você)'}
-        </span>
+        <span>{isSelf ? t('{name} (você)', { name: player.name }) : player.name}</span>
         {isMuted && <MicOffIcon size={12} />}
         {silencedForMe && <VolumeXIcon size={12} />}
       </figcaption>
@@ -234,8 +232,8 @@ function VideoTile({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
             <button
               type="button"
               className="tile-btn"
-              aria-label={isMuted ? 'Ligar o microfone' : 'Desligar o microfone'}
-              title={isMuted ? 'Ligar o microfone' : 'Desligar o microfone'}
+              aria-label={isMuted ? t('Ligar o microfone') : t('Desligar o microfone')}
+              title={isMuted ? t('Ligar o microfone') : t('Desligar o microfone')}
               onClick={voice.toggleMute}
             >
               {isMuted ? <MicOffIcon size={16} /> : <MicIcon size={16} />}
@@ -243,8 +241,8 @@ function VideoTile({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
             <button
               type="button"
               className="tile-btn"
-              aria-label="Desligar a câmera"
-              title="Desligar a câmera"
+              aria-label={t('Desligar a câmera')}
+              title={t('Desligar a câmera')}
               onClick={voice.toggleCamera}
             >
               <VideoOffIcon size={16} />
@@ -257,10 +255,10 @@ function VideoTile({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
               className="tile-btn"
               aria-label={
                 silencedForMe
-                  ? `Voltar a ouvir ${player.name}`
-                  : `Silenciar ${player.name} para mim`
+                  ? t('Voltar a ouvir {name}', { name: player.name })
+                  : t('Silenciar {name} para mim', { name: player.name })
               }
-              title={silencedForMe ? 'Voltar a ouvir' : 'Silenciar para mim'}
+              title={silencedForMe ? t('Voltar a ouvir') : t('Silenciar para mim')}
               onClick={() => voice.togglePeerMuted(player.sessionId)}
             >
               {silencedForMe ? <VolumeXIcon size={16} /> : <VolumeIcon size={16} />}
@@ -283,7 +281,7 @@ function VolumeSlider({ info, voice }: { info: PlayerInfo; voice: VoiceChat }) {
       max={100}
       step={5}
       value={Math.round(volume * 100)}
-      aria-label={`Volume de ${player.name} (só para você)`}
+      aria-label={t('Volume de {name} (só para você)', { name: player.name })}
       onChange={(e) => voice.setPeerVolume(player.sessionId, Number(e.target.value) / 100)}
     />
   );

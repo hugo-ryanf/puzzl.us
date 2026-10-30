@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CloseIcon } from '../ui/icons';
+import { t } from '../i18n';
 
 interface ReferenceImageProps {
   src: string;
@@ -22,7 +23,7 @@ export function ReferenceImage({ src, onClose }: ReferenceImageProps) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [expanded]);
 
-  const image = <img src={src} alt="Imagem do quebra-cabeça montado" />;
+  const image = <img src={src} alt={t('Imagem do quebra-cabeça montado')} />;
 
   return (
     <>
@@ -35,7 +36,7 @@ export function ReferenceImage({ src, onClose }: ReferenceImageProps) {
           <button
             type="button"
             className="reference-zoom"
-            aria-label="Ampliar imagem"
+            aria-label={t('Ampliar imagem')}
             onClick={() => setExpanded(true)}
           >
             {image}
@@ -44,7 +45,7 @@ export function ReferenceImage({ src, onClose }: ReferenceImageProps) {
         <button
           type="button"
           className="tool icon-only"
-          aria-label="Fechar imagem"
+          aria-label={t('Fechar imagem')}
           onClick={onClose}
         >
           <CloseIcon size={16} />

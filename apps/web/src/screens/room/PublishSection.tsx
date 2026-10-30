@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { GlobeIcon } from '../../ui/icons';
+import { t } from '../../i18n';
 
 export interface Publisher {
   /** Nome que aparece como autor, se a pessoa não trocar. */
@@ -36,39 +37,41 @@ export function PublishSection({ defaultAuthor, publish }: Publisher) {
 
   return (
     <section className="result-section publish-section">
-      <h3>Publicar para todos</h3>
+      <h3>{t('Publicar para todos')}</h3>
       {done ? (
         <p className="result-note">
-          Publicado! Já está no Explorar, e as próximas partidas com esta foto entram no ranking.
-          Fica no ar enquanto for jogada: 7 dias sem nenhuma partida, ela sai.
+          {t(
+            'Publicado! Já está no Explorar, e as próximas partidas com esta foto entram no ranking. Fica no ar enquanto for jogada: 7 dias sem nenhuma partida, ela sai.',
+          )}
         </p>
       ) : !open ? (
         <div className="publish-intro">
           <p className="result-note">
-            Gostou? Publique a foto para qualquer pessoa montar. Ela ganha ranking próprio e fica no
-            ar enquanto alguém jogar (7 dias sem partidas, ela sai).
+            {t(
+              'Gostou? Publique a foto para qualquer pessoa montar. Ela ganha ranking próprio e fica no ar enquanto alguém jogar (7 dias sem partidas, ela sai).',
+            )}
           </p>
           <button type="button" className="btn" onClick={() => setOpen(true)}>
             <GlobeIcon size={18} />
-            Publicar…
+            {t('Publicar…')}
           </button>
         </div>
       ) : (
         <form className="publish-form" onSubmit={(event) => void submit(event)}>
           <label className="field">
-            Título
+            {t('Título')}
             <input
               className="input"
               value={title}
               maxLength={60}
-              placeholder="Ex.: Pôr do sol na praia"
+              placeholder={t('Ex.: Pôr do sol na praia')}
               autoFocus
               required
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
           <label className="field">
-            Autor
+            {t('Autor')}
             <input
               className="input"
               value={author}
@@ -79,19 +82,19 @@ export function PublishSection({ defaultAuthor, publish }: Publisher) {
           </label>
           <label className="check">
             <input type="checkbox" checked={rights} onChange={(e) => setRights(e.target.checked)} />
-            A foto é minha ou tenho direito de compartilhá-la, e ela não tem nada impróprio.
+            {t('A foto é minha ou tenho direito de compartilhá-la, e ela não tem nada impróprio.')}
           </label>
           {error && <p className="error">{error}</p>}
           <div className="publish-actions">
             <button type="button" className="btn" onClick={() => setOpen(false)}>
-              Cancelar
+              {t('Cancelar')}
             </button>
             <button
               type="submit"
               className="btn btn-primary"
               disabled={busy || !rights || title.trim().length < 2 || !author.trim()}
             >
-              {busy ? 'Publicando…' : 'Publicar'}
+              {busy ? t('Publicando…') : t('Publicar')}
             </button>
           </div>
         </form>

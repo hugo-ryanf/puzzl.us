@@ -11,6 +11,7 @@ import {
   type RankingQuery,
 } from '@puzzle/shared';
 import { guestId } from './connection';
+import { t } from '../i18n';
 
 async function getRanking<T>(
   path: string,
@@ -24,8 +25,10 @@ async function getRanking<T>(
   // O convidado deste navegador vai no cabeçalho: assim o ranking acha "Sua posição" sem login
   // (logado, o cookie da conta já basta).
   const response = await fetch(`${path}?${search}`, { headers: { [GUEST_HEADER]: guestId() } });
-  if (response.status === 503) throw new Error('O ranking está indisponível (servidor sem banco).');
-  if (!response.ok) throw new Error(`Erro ${response.status} ao carregar o ranking.`);
+  if (response.status === 503)
+    throw new Error(t('O ranking está indisponível (servidor sem banco).'));
+  if (!response.ok)
+    throw new Error(t('Erro {status} ao carregar o ranking.', { status: response.status }));
   return (await response.json()) as T;
 }
 

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AccountView, MeResponse, ProfileUpdate } from '@puzzle/shared';
 import { guestId } from './connection';
+import { t, translateServerMessage } from '../i18n';
 
 /** Marca, por conta, que o histórico de convidado deste navegador já foi passado para ela. */
 const LINKED_KEY = 'quebra-cabeca:convidado-ligado';
 
 /** Mensagens da volta do login (o servidor devolve o navegador para "/?login=…"). */
 const LOGIN_NOTICES: Record<string, string> = {
-  erro: 'Não foi possível entrar com o Google. Tente de novo.',
-  cancelado: 'Login cancelado.',
-  indisponivel: 'O login com Google não está configurado neste servidor.',
+  erro: t('Não foi possível entrar com o Google. Tente de novo.'),
+  cancelado: t('Login cancelado.'),
+  indisponivel: t('O login com Google não está configurado neste servidor.'),
 };
 
 export interface Account {
@@ -88,7 +89,13 @@ export function useAccount(): Account {
       body: JSON.stringify(update),
     });
     const body = (await response.json().catch(() => ({}))) as AccountView & { error?: string };
-    if (!response.ok) throw new Error(body.error ?? `Erro ${response.status}.`);
+    if (!response.ok) {
+      throw new Error(
+        body.error
+          ? translateServerMessage(body.error)
+          : t('Erro {status}.', { status: response.status }),
+      );
+    }
     setMe((previous) => previous && { ...previous, user: body });
   }, []);
 

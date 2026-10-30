@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FriendsResponse, InviteRequest } from '@puzzle/shared';
+import { t, translateServerMessage } from '../i18n';
 
 export interface Friends {
   /** undefined: carregando ou convidado. */
@@ -19,7 +20,11 @@ async function request(path: string, method: string, body?: object): Promise<Res
   });
   if (!response.ok) {
     const error = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(error.error ?? `Erro ${response.status}.`);
+    throw new Error(
+      error.error
+        ? translateServerMessage(error.error)
+        : t('Erro {status}.', { status: response.status }),
+    );
   }
   return response;
 }

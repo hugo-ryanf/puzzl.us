@@ -5,8 +5,9 @@ import type { PuzzleRoom } from '../../net/connection';
 import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { ImageIcon, PartyIcon, SwordsIcon } from '../../ui/icons';
 import { PlayAgainButton } from '../room/PlayAgainButton';
+import { t } from '../../i18n';
 
-const TEAM_NAMES: Record<BattleTeam, string> = { a: 'Lado A', b: 'Lado B' };
+const TEAM_NAMES: Record<BattleTeam, string> = { a: t('Lado A'), b: t('Lado B') };
 
 /** Lobby da Batalha: os dois lados lado a lado; cada um escolhe o seu, o anfitrião começa. */
 export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: RoomSnapshot }) {
@@ -20,24 +21,28 @@ export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
     <div className="overlay">
       <div className="panel battle-lobby">
         <h2>
-          <SwordsIcon size={22} /> Batalha {perTeam}v{perTeam}
+          <SwordsIcon size={22} /> {t('Batalha {a}v{a}', { a: perTeam })}
         </h2>
         {snapshot.timeLimitMs > 0 ? (
           <p>
-            Por tempo: {snapshot.timeLimitMs / 60_000} min, quebra-cabeças de {snapshot.pieceCount}{' '}
-            peças. Os dois lados recebem as mesmas fotos, na mesma ordem; montou um, vem o próximo.
-            Quem montar mais quando o tempo acabar ganha.
+            {t(
+              'Por tempo: {minutes} min, quebra-cabeças de {pieces} peças. Os dois lados recebem as mesmas fotos, na mesma ordem; montou um, vem o próximo. Quem montar mais quando o tempo acabar ganha.',
+              { minutes: snapshot.timeLimitMs / 60_000, pieces: snapshot.pieceCount },
+            )}
           </p>
         ) : (
           <p>
-            Os dois lados montam o mesmo quebra-cabeça ({snapshot.pieceCount} peças), cada um na sua
-            mesa. Quem terminar primeiro ganha.
+            {t(
+              'Os dois lados montam o mesmo quebra-cabeça ({pieces} peças), cada um na sua mesa. Quem terminar primeiro ganha.',
+              { pieces: snapshot.pieceCount },
+            )}
           </p>
         )}
         {snapshot.powers && (
           <p className="caption">
-            Com poderes: os encaixes enchem a energia do lado; gaste em Escudo, Neblina, Congelar ou
-            Embaralhar (teclas 1 a 4).
+            {t(
+              'Com poderes: os encaixes enchem a energia do lado; gaste em Escudo, Neblina, Congelar ou Embaralhar (teclas 1 a 4).',
+            )}
           </p>
         )}
         <div className="battle-teams">
@@ -56,7 +61,7 @@ export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
                   ))}
                   {Array.from({ length: perTeam - members.length }, (_, i) => (
                     <li key={`vaga-${i}`} className="empty-slot">
-                      vaga livre
+                      {t('vaga livre')}
                     </li>
                   ))}
                 </ul>
@@ -67,7 +72,7 @@ export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
                     disabled={full}
                     onClick={() => room.send('chooseTeam', { team })}
                   >
-                    {full ? 'Cheio' : 'Ir para este lado'}
+                    {full ? t('Cheio') : t('Ir para este lado')}
                   </button>
                 )}
               </div>
@@ -81,10 +86,10 @@ export function BattleLobby({ room, snapshot }: { room: PuzzleRoom; snapshot: Ro
             disabled={!ready}
             onClick={() => room.send('start')}
           >
-            {ready ? 'Começar' : 'Esperando o outro lado…'}
+            {ready ? t('Começar') : t('Esperando o outro lado…')}
           </button>
         ) : (
-          <p>Esperando {hostName ?? 'o anfitrião'} começar…</p>
+          <p>{t('Esperando {name} começar…', { name: hostName ?? t('o anfitrião') })}</p>
         )}
       </div>
     </div>
@@ -124,7 +129,7 @@ export function BattleResult({
     return (
       <button type="button" className="btn result-reopen" onClick={() => setOpen(true)}>
         <SwordsIcon size={18} />
-        Ver resultado
+        {t('Ver resultado')}
       </button>
     );
   }
@@ -140,42 +145,56 @@ export function BattleResult({
           <span className="result-badge" aria-hidden="true">
             {won ? <PartyIcon size={26} /> : <SwordsIcon size={26} />}
           </span>
-          <h2 id="battle-title">{draw ? 'Empate!' : won ? 'Vitória!' : 'Não foi dessa vez'}</h2>
+          <h2 id="battle-title">
+            {draw ? t('Empate!') : won ? t('Vitória!') : t('Não foi dessa vez')}
+          </h2>
           {draw ? (
             <p className="caption">
-              Os dois lados montaram {solvedBy('a')} e empataram também nas peças encaixadas.
+              {t('Os dois lados montaram {n} e empataram também nas peças encaixadas.', {
+                n: solvedBy('a'),
+              })}
             </p>
           ) : (
             <p className="caption">
               <strong>{names(winner) || TEAM_NAMES[winner]}</strong>{' '}
               {snapshot.walkover
-                ? 'ganhou: o outro lado saiu.'
+                ? t('ganhou: o outro lado saiu.')
                 : snapshot.suddenDeath
-                  ? `ganhou na morte súbita, depois de empatar em ${solvedBy(winner)} montados.`
+                  ? t('ganhou na morte súbita, depois de empatar em {n} montados.', {
+                      n: solvedBy(winner),
+                    })
                   : timed
                     ? solvedBy(winner) === solvedBy(loser)
-                      ? `ganhou no desempate: ${solvedBy(winner)} montados para cada lado, mais peças encaixadas no último.`
-                      : `montou mais: ${solvedBy(winner)} a ${solvedBy(loser)}.`
-                    : `montou primeiro, em ${formatDuration(snapshot.durationMs)}.`}
+                      ? t(
+                          'ganhou no desempate: {n} montados para cada lado, mais peças encaixadas no último.',
+                          { n: solvedBy(winner) },
+                        )
+                      : t('montou mais: {a} a {b}.', { a: solvedBy(winner), b: solvedBy(loser) })
+                    : t('montou primeiro, em {time}.', {
+                        time: formatDuration(snapshot.durationMs),
+                      })}
             </p>
           )}
         </header>
         {!snapshot.walkover && !timed && (
           <section className="result-section">
-            <h3>Outro lado</h3>
+            <h3>{t('Outro lado')}</h3>
             <p className="result-note">
-              {names(loser) || TEAM_NAMES[loser]} tinha montado {loserPercent}% quando acabou.
+              {t('{names} tinha montado {n}% quando acabou.', {
+                names: names(loser) || TEAM_NAMES[loser],
+                n: loserPercent,
+              })}
             </p>
           </section>
         )}
         <div className="result-actions">
           <button type="button" className="btn" onClick={() => setOpen(false)}>
             <ImageIcon size={18} />
-            Ver as mesas
+            {t('Ver as mesas')}
           </button>
           <PlayAgainButton room={room} snapshot={snapshot} />
           <button type="button" className="btn btn-primary" onClick={onLeave}>
-            Voltar ao início
+            {t('Voltar ao início')}
           </button>
         </div>
       </section>

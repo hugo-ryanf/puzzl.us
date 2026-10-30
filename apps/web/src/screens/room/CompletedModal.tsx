@@ -9,6 +9,7 @@ import { DIFFICULTY_NAMES, difficultyOf } from '../../ui/difficulty';
 import { CloseIcon, ImageIcon, PartyIcon, TrophyIcon } from '../../ui/icons';
 import { PlayAgainButton } from './PlayAgainButton';
 import { PublishSection, type Publisher } from './PublishSection';
+import { formatNumber, ordinal, t } from '../../i18n';
 
 interface CompletedModalProps {
   room: PuzzleRoom;
@@ -88,15 +89,16 @@ export function CompletedModal({
     return (
       <button type="button" className="btn result-reopen" onClick={() => setOpen(true)}>
         <TrophyIcon size={18} />
-        Ver resultado
+        {t('Ver resultado')}
       </button>
     );
   }
 
   const minutes = durationMs / 60_000;
-  const pace =
-    minutes > 0 ? (pieces / minutes).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '—';
-  const category = `${pieceCount} peças · ${teamSize === 1 ? 'solo' : `${teamSize} jogadores`}`;
+  const pace = minutes > 0 ? formatNumber(pieces / minutes, { maximumFractionDigits: 1 }) : '—';
+  const category = `${t('{n} peças', { n: pieceCount })} · ${
+    teamSize === 1 ? 'solo' : t('{n} jogadores', { n: teamSize })
+  }`;
   const totalSnaps = Math.max(1, pieces - 1);
   const contributions = [...players].sort((a, b) => b.snaps - a.snaps);
 
@@ -119,7 +121,7 @@ export function CompletedModal({
         <button
           type="button"
           className="tool icon-only result-close"
-          aria-label="Fechar e ver a imagem"
+          aria-label={t('Fechar e ver a imagem')}
           onClick={() => setOpen(false)}
         >
           <CloseIcon size={18} />
@@ -129,7 +131,7 @@ export function CompletedModal({
           <span className="result-badge" aria-hidden="true">
             <PartyIcon size={26} />
           </span>
-          <h2 id="result-title">Quebra-cabeça completo!</h2>
+          <h2 id="result-title">{t('Quebra-cabeça completo!')}</h2>
           {image && (
             <p className="caption">
               <strong>{image.title}</strong>
@@ -140,28 +142,28 @@ export function CompletedModal({
 
         <dl className="metrics">
           <div>
-            <dt>Tempo</dt>
+            <dt>{t('Tempo')}</dt>
             <dd>{formatDuration(durationMs)}</dd>
           </div>
           <div>
-            <dt>Peças</dt>
+            <dt>{t('Peças')}</dt>
             <dd>{pieces}</dd>
           </div>
           <div>
-            <dt>Ritmo</dt>
+            <dt>{t('Ritmo')}</dt>
             <dd>
-              {pace} <small>peças/min</small>
+              {pace} <small>{t('peças/min')}</small>
             </dd>
           </div>
           <div>
-            <dt>Dificuldade</dt>
+            <dt>{t('Dificuldade')}</dt>
             <dd>{DIFFICULTY_NAMES[difficultyOf(pieceCount) - 1]}</dd>
           </div>
         </dl>
 
         {players.length > 1 && (
           <section className="result-section">
-            <h3>Encaixes de cada um</h3>
+            <h3>{t('Encaixes de cada um')}</h3>
             <ul className="contributions">
               {contributions.map((player) => {
                 const share = player.snaps / totalSnaps;
@@ -185,25 +187,29 @@ export function CompletedModal({
         )}
 
         <section className="result-section">
-          <h3>Ranking · {category}</h3>
-          {rankStatus === 'saving' && <p className="result-note">Registrando no ranking…</p>}
+          <h3>{t('Ranking · {category}', { category })}</h3>
+          {rankStatus === 'saving' && <p className="result-note">{t('Registrando no ranking…')}</p>}
           {rankStatus === 'unavailable' && (
-            <p className="result-note">O ranking está indisponível neste servidor.</p>
+            <p className="result-note">{t('O ranking está indisponível neste servidor.')}</p>
           )}
           {rankStatus === 'unranked' && (
             <p className="result-note">
-              Foto própria: fica fora do ranking enquanto não for publicada.
+              {t('Foto própria: fica fora do ranking enquanto não for publicada.')}
             </p>
           )}
           {rankStatus === 'saved' && (
             <>
               <p className="result-rank">
                 <TrophyIcon size={18} />
-                <strong>{rank}º lugar</strong> na categoria
-                {rankToday > 0 && <span className="result-rank-today">· {rankToday}º hoje</span>}
+                <strong>{t('{place} lugar', { place: ordinal(rank) })}</strong> {t('na categoria')}
+                {rankToday > 0 && (
+                  <span className="result-rank-today">
+                    {t('· {place} hoje', { place: ordinal(rankToday) })}
+                  </span>
+                )}
                 {snapshot.points > 0 && (
                   <span className="result-points">
-                    +{snapshot.points.toLocaleString('pt-BR')} pts
+                    +{t('{n} pts', { n: formatNumber(snapshot.points) })}
                   </span>
                 )}
               </p>
@@ -214,7 +220,7 @@ export function CompletedModal({
                       key={entry.position}
                       className={entry.position === rank ? 'mine' : undefined}
                     >
-                      <span className="position">{entry.position}º</span>
+                      <span className="position">{ordinal(entry.position)}</span>
                       <span className="players">{entry.players.join(' & ')}</span>
                       <span className="time">{formatDuration(entry.durationMs)}</span>
                     </li>
@@ -231,16 +237,16 @@ export function CompletedModal({
           {rankStatus === 'saved' && (
             <button type="button" className="btn" onClick={() => onShowRanking(query)}>
               <TrophyIcon size={18} />
-              Ranking completo
+              {t('Ranking completo')}
             </button>
           )}
           <button type="button" className="btn" onClick={() => setOpen(false)}>
             <ImageIcon size={18} />
-            Ver a imagem
+            {t('Ver a imagem')}
           </button>
           <PlayAgainButton room={room} snapshot={snapshot} />
           <button type="button" className="btn btn-primary" onClick={onLeave}>
-            Voltar ao início
+            {t('Voltar ao início')}
           </button>
         </div>
       </section>

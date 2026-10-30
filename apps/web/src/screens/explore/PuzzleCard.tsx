@@ -3,6 +3,7 @@ import type { CommunityPuzzle } from '@puzzle/shared';
 import { formatDuration } from '../../format';
 import { BookmarkIcon, CheckIcon, FlagIcon, MoreIcon, TrophyIcon } from '../../ui/icons';
 import { Popover } from '../../ui/Popover';
+import { t, tRich } from '../../i18n';
 
 /** O que o card precisa de uma foto, seja do catálogo ou da comunidade. */
 export interface PuzzleImage {
@@ -39,7 +40,8 @@ export const orientationOf = (image: { width: number; height: number }) =>
   image.width >= image.height ? 'Horizontal' : 'Vertical';
 
 /** No card só cabe o nome: "Foto de Adrian Botica no Unsplash" → "Adrian Botica". */
-const shortCredit = (credit: string) => /^Foto de (.+) no \S+$/.exec(credit)?.[1] ?? credit;
+const shortCredit = (credit: string) =>
+  /^(?:Foto de|Photo by) (.+) (?:no|on) \S+$/.exec(credit)?.[1] ?? credit;
 
 /**
  * Card do catálogo: foto + título abrem "Criar sala"; o troféu abre o ranking da foto; o
@@ -63,19 +65,21 @@ export function PuzzleCard({
           <img src={thumbUrl} alt="" loading="lazy" />
           <span className="card-badges">
             <span className="card-badge">{orientationOf(image)}</span>
-            {community && <span className="card-badge community">Comunidade</span>}
+            {community && <span className="card-badge community">{t('Comunidade')}</span>}
             {hidden && (
               <span className="card-badge warning">
-                Oculta · {community.puzzle.reports} denúncias
+                {t('Oculta · {n} denúncias', { n: community.puzzle.reports })}
               </span>
             )}
             {completedMs !== undefined && (
               <span
                 className="card-badge done"
-                title={`Você já montou · melhor tempo ${formatDuration(completedMs)}`}
+                title={t('Você já montou · melhor tempo {time}', {
+                  time: formatDuration(completedMs),
+                })}
               >
                 <CheckIcon size={12} />
-                Montado
+                {t('Montado')}
               </span>
             )}
           </span>
@@ -88,8 +92,12 @@ export function PuzzleCard({
           type="button"
           className={favorite ? 'card-favorite on' : 'card-favorite'}
           aria-pressed={favorite}
-          aria-label={favorite ? `Tirar ${image.title} dos favoritos` : `Favoritar ${image.title}`}
-          title={favorite ? 'Tirar dos favoritos' : 'Favoritar para montar depois'}
+          aria-label={
+            favorite
+              ? t('Tirar {title} dos favoritos', { title: image.title })
+              : t('Favoritar {title}', { title: image.title })
+          }
+          title={favorite ? t('Tirar dos favoritos') : t('Favoritar para montar depois')}
           onClick={onToggleFavorite}
         >
           <BookmarkIcon size={17} />
@@ -98,14 +106,18 @@ export function PuzzleCard({
       <div className="card-meta">
         {/* O crédito completo fica no title e aparece inteiro no diálogo e na sala. */}
         <span className="credit" title={image.credit}>
-          {community ? image.credit : image.credit ? shortCredit(image.credit) : 'Foto do catálogo'}
+          {community
+            ? image.credit
+            : image.credit
+              ? shortCredit(image.credit)
+              : t('Foto do catálogo')}
         </span>
         {community && <CommunityMenu title={image.title} actions={community} />}
         <button
           type="button"
           className="btn"
           onClick={onShowRanking}
-          aria-label={`Ranking de ${image.title}`}
+          aria-label={t('Ranking de {title}', { title: image.title })}
         >
           <TrophyIcon size={16} />
           Ranking
@@ -140,17 +152,17 @@ function CommunityMenu({ title, actions }: { title: string; actions: CommunityAc
 
   return (
     <Popover
-      label={`Opções de ${title}`}
+      label={t('Opções de {name}', { name: title })}
       triggerClassName="btn btn-ghost icon-only card-more"
       trigger={<MoreIcon size={18} />}
     >
       <div className="menu-list">
         <p className="popover-note">
-          Publicado por <strong>{puzzle.authorName}</strong>
+          {tRich('Publicado por {name}', { name: <strong>{puzzle.authorName}</strong> })}
         </p>
         {confirming === 'report' ? (
           <>
-            <p className="popover-note">Denunciar como imprópria ou sem direito de uso?</p>
+            <p className="popover-note">{t('Denunciar como imprópria ou sem direito de uso?')}</p>
             <button
               type="button"
               className="btn btn-danger"
@@ -158,30 +170,30 @@ function CommunityMenu({ title, actions }: { title: string; actions: CommunityAc
               onClick={() => void run(onReport)}
             >
               <FlagIcon size={16} />
-              Confirmar denúncia
+              {t('Confirmar denúncia')}
             </button>
           </>
         ) : confirming === 'remove' ? (
           <>
-            <p className="popover-note">Tirar do Explorar para todo mundo?</p>
+            <p className="popover-note">{t('Tirar do Explorar para todo mundo?')}</p>
             <button
               type="button"
               className="btn btn-danger"
               disabled={busy}
               onClick={() => void run(onRemove)}
             >
-              Confirmar remoção
+              {t('Confirmar remoção')}
             </button>
           </>
         ) : (
           <>
             {puzzle.reported ? (
-              <p className="popover-note">Você já denunciou esta foto.</p>
+              <p className="popover-note">{t('Você já denunciou esta foto.')}</p>
             ) : (
               onReport && (
                 <button type="button" className="btn" onClick={() => setConfirming('report')}>
                   <FlagIcon size={16} />
-                  Denunciar
+                  {t('Denunciar')}
                 </button>
               )
             )}
@@ -192,12 +204,12 @@ function CommunityMenu({ title, actions }: { title: string; actions: CommunityAc
                 disabled={busy}
                 onClick={() => void run(onRestore)}
               >
-                Voltar ao ar
+                {t('Voltar ao ar')}
               </button>
             )}
             {onRemove && (
               <button type="button" className="btn" onClick={() => setConfirming('remove')}>
-                Remover
+                {t('Remover')}
               </button>
             )}
           </>

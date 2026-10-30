@@ -1,4 +1,5 @@
 import type { UploadResponse } from '@puzzle/shared';
+import { t, translateServerMessage } from '../i18n';
 
 /** O servidor reduz para 2048 de qualquer jeito: reduzir antes poupa o upload (8 MB → ~600 kB). */
 const MAX_SIDE = 2048;
@@ -13,7 +14,9 @@ async function prepareImage(file: File): Promise<Blob> {
   try {
     bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {
-    throw new Error('Formato não suportado. Use JPG, PNG ou WEBP (no iPhone, exporte como JPG).');
+    throw new Error(
+      t('Formato não suportado. Use JPG, PNG ou WEBP (no iPhone, exporte como JPG).'),
+    );
   }
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
@@ -23,7 +26,7 @@ async function prepareImage(file: File): Promise<Blob> {
   bitmap.close();
   return new Promise((resolve, reject) =>
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Não foi possível preparar a foto.'))),
+      (blob) => (blob ? resolve(blob) : reject(new Error(t('Não foi possível preparar a foto.')))),
       'image/jpeg',
       0.9,
     ),
@@ -45,14 +48,18 @@ export async function uploadImage(file: File): Promise<UploadedImage> {
       headers: { 'Content-Type': 'image/jpeg' },
     });
   } catch {
-    throw new Error('Não consegui falar com o servidor.');
+    throw new Error(t('Não consegui falar com o servidor.'));
   }
   // O servidor responde { error } em português para 400/413/429/503.
   const body = (await response.json().catch(() => ({}))) as Partial<UploadResponse> & {
     error?: string;
   };
   if (!response.ok || !body.imageId) {
-    throw new Error(body.error ?? `Erro ${response.status} ao enviar a foto.`);
+    throw new Error(
+      body.error
+        ? translateServerMessage(body.error)
+        : t('Erro {status} ao enviar a foto.', { status: response.status }),
+    );
   }
   return {
     imageId: body.imageId,

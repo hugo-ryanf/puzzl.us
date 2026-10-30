@@ -29,6 +29,7 @@ import {
   UserIcon,
   UsersIcon,
 } from '../../ui/icons';
+import { formatNumber, t, tRich } from '../../i18n';
 
 /** A imagem escolhida na grade do catálogo. */
 export interface PuzzleChoice {
@@ -59,8 +60,6 @@ type BattleFormat = '1v1' | '2v2';
 const PLAYER_OPTIONS = Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2); // 2, 3, 4
 /** No Bullet dá para jogar sozinho também. */
 const BULLET_PLAYER_OPTIONS = Array.from({ length: MAX_PLAYERS }, (_, i) => i + 1); // 1–4
-/** 1000 → "1.000", como no resto do site. */
-const formatCount = (count: number) => count.toLocaleString('pt-BR');
 
 /**
  * Criar sala em duas colunas: à esquerda a foto (grande, só a imagem) com quantas peças vai
@@ -109,8 +108,8 @@ export function CreateRoomDialog({
   const preview: PuzzleChoice | undefined = custom
     ? uploaded && {
         imageId: uploaded.imageId,
-        title: 'Sua foto',
-        subtitle: 'Sala personalizada · publique no fim para entrar no ranking',
+        title: t('Sua foto'),
+        subtitle: t('Sala personalizada · publique no fim para entrar no ranking'),
         thumbUrl: uploaded.previewUrl,
       }
     : (source ?? undefined);
@@ -119,7 +118,7 @@ export function CreateRoomDialog({
     event.preventDefault();
     if (!source) return;
     const trimmed = name.trim();
-    if (!trimmed) return setError('Digite seu nome.');
+    if (!trimmed) return setError(t('Digite seu nome.'));
     if (bullet) {
       // Bullet não usa a foto escolhida: cada quebra-cabeça é sorteado do catálogo.
       savePlayerName(trimmed);
@@ -162,7 +161,7 @@ export function CreateRoomDialog({
       return;
     }
     const imageId = random ? RANDOM_IMAGE : preview?.imageId;
-    if (!imageId) return setError('Escolha a foto do quebra-cabeça.');
+    if (!imageId) return setError(t('Escolha a foto do quebra-cabeça.'));
     savePlayerName(trimmed);
     setBusy(true);
     setError(undefined);
@@ -180,22 +179,22 @@ export function CreateRoomDialog({
   }
 
   const subtitle = bullet
-    ? 'Monte o máximo de quebra-cabeças pequenos até o tempo acabar. As fotos são sorteadas.'
+    ? t('Monte o máximo de quebra-cabeças pequenos até o tempo acabar. As fotos são sorteadas.')
     : custom
-      ? 'Envie uma foto sua e escolha como jogar.'
+      ? t('Envie uma foto sua e escolha como jogar.')
       : mode === 'solo'
-        ? 'Escolha o tamanho e comece quando quiser.'
+        ? t('Escolha o tamanho e comece quando quiser.')
         : timedBattle
-          ? 'Dois lados, as mesmas fotos sorteadas: quem montar mais até o tempo acabar ganha.'
+          ? t('Dois lados, as mesmas fotos sorteadas: quem montar mais até o tempo acabar ganha.')
           : mode === 'battle'
-            ? 'Dois lados montam o mesmo quebra-cabeça: quem terminar primeiro ganha.'
-            : 'Escolha o tamanho e chame seus amigos pelo link da sala.';
+            ? t('Dois lados montam o mesmo quebra-cabeça: quem terminar primeiro ganha.')
+            : t('Escolha o tamanho e chame seus amigos pelo link da sala.');
 
   /** Tempo e tamanho do Bullet (também na batalha por tempo). */
   const timeAndPieces = (
     <>
       <fieldset className="choice-row">
-        <legend>Tempo</legend>
+        <legend>{t('Tempo')}</legend>
         {BULLET_MINUTES.map((value) => (
           <label key={value} className="radio-chip">
             <input
@@ -210,7 +209,7 @@ export function CreateRoomDialog({
         ))}
       </fieldset>
       <fieldset className="choice-row">
-        <legend>Peças</legend>
+        <legend>{t('Peças')}</legend>
         {BULLET_PIECES.map((value) => (
           <label key={value} className="radio-chip">
             <input
@@ -254,13 +253,13 @@ export function CreateRoomDialog({
 
           <form className="play-form" onSubmit={handleSubmit}>
             <header className="play-header">
-              <h2 id="create-title">{custom ? 'Sala personalizada' : 'Criar sala'}</h2>
+              <h2 id="create-title">{custom ? t('Sala personalizada') : t('Criar sala')}</h2>
               <p>{subtitle}</p>
             </header>
 
             {/* Rádios nativos escondidos: as setas do teclado trocam a opção, como em qualquer grupo. */}
             <fieldset className="mode-options">
-              <legend>Como jogar</legend>
+              <legend>{t('Como jogar')}</legend>
               <label className="mode-option">
                 <input
                   type="radio"
@@ -271,7 +270,7 @@ export function CreateRoomDialog({
                 />
                 <UserIcon size={20} />
                 <strong>Solo</strong>
-                <small>Só você. O relógio começa na hora.</small>
+                <small>{t('Só você. O relógio começa na hora.')}</small>
               </label>
               <label className="mode-option">
                 <input
@@ -283,7 +282,7 @@ export function CreateRoomDialog({
                 />
                 <UsersIcon size={20} />
                 <strong>Multiplayer</strong>
-                <small>Monte com amigos, com chamada de voz.</small>
+                <small>{t('Monte com amigos, com chamada de voz.')}</small>
               </label>
               <label className="mode-option">
                 <input
@@ -294,8 +293,8 @@ export function CreateRoomDialog({
                   onChange={() => setMode('battle')}
                 />
                 <SwordsIcon size={20} />
-                <strong>Batalha</strong>
-                <small>Lado contra lado: quem montar primeiro, ou mais no tempo.</small>
+                <strong>{t('Batalha')}</strong>
+                <small>{t('Lado contra lado: quem montar primeiro, ou mais no tempo.')}</small>
               </label>
               <label className="mode-option">
                 <input
@@ -307,14 +306,14 @@ export function CreateRoomDialog({
                 />
                 <TimerIcon size={20} />
                 <strong>Bullet</strong>
-                <small>Contra o relógio: quantos você monta em 3, 5 ou 10 min?</small>
+                <small>{t('Contra o relógio: quantos você monta em 3, 5 ou 10 min?')}</small>
               </label>
             </fieldset>
 
             {bullet && (
               <div className="choice-rows">
                 <fieldset className="choice-row">
-                  <legend>Jogadores</legend>
+                  <legend>{t('Jogadores')}</legend>
                   {BULLET_PLAYER_OPTIONS.map((count) => (
                     <label key={count} className="radio-chip">
                       <input
@@ -335,7 +334,7 @@ export function CreateRoomDialog({
             {mode === 'battle' && (
               <div className="choice-rows">
                 <fieldset className="choice-row">
-                  <legend>Tipo</legend>
+                  <legend>{t('Tipo')}</legend>
                   <label className="radio-chip">
                     <input
                       type="radio"
@@ -344,7 +343,7 @@ export function CreateRoomDialog({
                       checked={!battleTimed}
                       onChange={() => setBattleTimed(false)}
                     />
-                    Corrida
+                    {t('Corrida')}
                   </label>
                   <label className="radio-chip">
                     <input
@@ -355,11 +354,11 @@ export function CreateRoomDialog({
                       onChange={() => setBattleTimed(true)}
                     />
                     <TimerIcon size={16} />
-                    Por tempo
+                    {t('Por tempo')}
                   </label>
                 </fieldset>
                 <fieldset className="choice-row">
-                  <legend>Formato</legend>
+                  <legend>{t('Formato')}</legend>
                   {(['1v1', '2v2'] as const).map((value) => (
                     <label key={value} className="radio-chip">
                       <input
@@ -374,7 +373,7 @@ export function CreateRoomDialog({
                   ))}
                 </fieldset>
                 <fieldset className="choice-row">
-                  <legend>Poderes</legend>
+                  <legend>{t('Poderes')}</legend>
                   <label className="radio-chip">
                     <input
                       type="radio"
@@ -384,7 +383,7 @@ export function CreateRoomDialog({
                       onChange={() => setPowers(true)}
                     />
                     <BoltIcon size={16} />
-                    Com poderes
+                    {t('Com poderes')}
                   </label>
                   <label className="radio-chip">
                     <input
@@ -394,13 +393,13 @@ export function CreateRoomDialog({
                       checked={!powers}
                       onChange={() => setPowers(false)}
                     />
-                    Sem
+                    {t('Sem')}
                   </label>
                 </fieldset>
                 {timedBattle && timeAndPieces}
                 {!custom && !timedBattle && (
                   <fieldset className="choice-row">
-                    <legend>Foto</legend>
+                    <legend>{t('Foto')}</legend>
                     <label className="radio-chip">
                       <input
                         type="radio"
@@ -409,7 +408,7 @@ export function CreateRoomDialog({
                         checked={!randomImage}
                         onChange={() => setRandomImage(false)}
                       />
-                      Esta foto
+                      {t('Esta foto')}
                     </label>
                     <label className="radio-chip">
                       <input
@@ -420,7 +419,7 @@ export function CreateRoomDialog({
                         onChange={() => setRandomImage(true)}
                       />
                       <ShuffleIcon size={16} />
-                      Aleatória
+                      {t('Aleatória')}
                     </label>
                   </fieldset>
                 )}
@@ -430,7 +429,7 @@ export function CreateRoomDialog({
             {mode === 'multi' && (
               <div className="choice-rows">
                 <fieldset className="choice-row">
-                  <legend>Jogadores</legend>
+                  <legend>{t('Jogadores')}</legend>
                   {PLAYER_OPTIONS.map((count) => (
                     <label key={count} className="radio-chip">
                       <input
@@ -446,7 +445,7 @@ export function CreateRoomDialog({
                 </fieldset>
                 {!custom && (
                   <fieldset className="choice-row">
-                    <legend>Foto</legend>
+                    <legend>{t('Foto')}</legend>
                     <label className="radio-chip">
                       <input
                         type="radio"
@@ -455,7 +454,7 @@ export function CreateRoomDialog({
                         checked={!randomImage}
                         onChange={() => setRandomImage(false)}
                       />
-                      Esta foto
+                      {t('Esta foto')}
                     </label>
                     <label className="radio-chip">
                       <input
@@ -466,7 +465,7 @@ export function CreateRoomDialog({
                         onChange={() => setRandomImage(true)}
                       />
                       <ShuffleIcon size={16} />
-                      Aleatória
+                      {t('Aleatória')}
                     </label>
                   </fieldset>
                 )}
@@ -477,11 +476,13 @@ export function CreateRoomDialog({
 
             {nameLocked ? (
               <p className="field-hint locked-name">
-                Você entra como <strong>{name}</strong>, o nickname do seu perfil.
+                {tRich('Você entra como {name}, o nickname do seu perfil.', {
+                  name: <strong>{name}</strong>,
+                })}
               </p>
             ) : (
               <label className="field">
-                Seu nome
+                {t('Seu nome')}
                 <input
                   className="input"
                   value={name}
@@ -491,8 +492,8 @@ export function CreateRoomDialog({
                 />
                 <small className="field-hint">
                   {mode === 'solo' || bullet
-                    ? 'É o nome que aparece no ranking.'
-                    : 'É assim que seus amigos vão te ver na sala.'}
+                    ? t('É o nome que aparece no ranking.')
+                    : t('É assim que seus amigos vão te ver na sala.')}
                 </small>
               </label>
             )}
@@ -501,14 +502,14 @@ export function CreateRoomDialog({
 
             <div className="dialog-actions play-actions">
               <button type="button" className="btn" onClick={onClose}>
-                Cancelar
+                {t('Cancelar')}
               </button>
               <button className="btn btn-primary" disabled={busy || missingPhoto}>
                 {busy
-                  ? 'Criando…'
+                  ? t('Criando…')
                   : mode === 'solo' || (bullet && bulletPlayers === 1)
-                    ? 'Começar'
-                    : 'Criar sala'}
+                    ? t('Começar')
+                    : t('Criar sala')}
                 {!busy && <ArrowRightIcon size={18} />}
               </button>
             </div>
@@ -517,7 +518,7 @@ export function CreateRoomDialog({
             <button
               type="button"
               className="tool icon-only play-close"
-              aria-label="Fechar"
+              aria-label={t('Fechar')}
               onClick={onClose}
             >
               <CloseIcon size={18} />
@@ -535,11 +536,13 @@ function BulletPreview({ pieces }: { pieces: number }) {
     <>
       <div className="play-photo bullet-preview">
         <TimerIcon size={40} />
-        <span className="play-count">{pieces} peças cada</span>
+        <span className="play-count">{t('{n} peças cada', { n: pieces })}</span>
       </div>
       <div className="play-caption">
-        <strong>Fotos sorteadas</strong>
-        <p>Terminou um quebra-cabeça, entra outro do catálogo na hora, até o tempo acabar.</p>
+        <strong>{t('Fotos sorteadas')}</strong>
+        <p>
+          {t('Terminou um quebra-cabeça, entra outro do catálogo na hora, até o tempo acabar.')}
+        </p>
       </div>
     </>
   );
@@ -570,15 +573,15 @@ function PhotoUpload({ onUploaded }: { onUploaded: (image: UploadedImage) => voi
         type="file"
         accept="image/*"
         className="sr-only"
-        aria-label="Escolher a foto do quebra-cabeça"
+        aria-label={t('Escolher a foto do quebra-cabeça')}
         disabled={uploading}
         onChange={handleFile}
       />
       <span className="upload-mark">
         <CameraIcon size={24} />
       </span>
-      <strong>{uploading ? 'Enviando…' : 'Escolher foto'}</strong>
-      <small>JPG, PNG ou WEBP · vira um quebra-cabeça só seu (fora do ranking)</small>
+      <strong>{uploading ? t('Enviando…') : t('Escolher foto')}</strong>
+      <small>{t('JPG, PNG ou WEBP · vira um quebra-cabeça só seu (fora do ranking)')}</small>
       {error && <span className="error">{error}</span>}
     </label>
   );
@@ -613,16 +616,16 @@ function MediaPreview({ choice, aspect, onAspect, pieceCount, onChangePhoto }: M
         )}
         <span className="play-count" aria-live="polite">
           {choice
-            ? `${cols} × ${rows} = ${formatCount(cols * rows)} peças`
-            : `cerca de ${formatCount(pieceCount)} peças`}
+            ? t('{cols} × {rows} = {n} peças', { cols, rows, n: formatNumber(cols * rows) })
+            : t('cerca de {n} peças', { n: formatNumber(pieceCount) })}
         </span>
       </div>
       <div className="play-caption">
-        <strong>{choice ? choice.title : 'Foto aleatória'}</strong>
-        <p>{choice ? choice.subtitle : 'Sorteada entre as do catálogo ao criar a sala'}</p>
+        <strong>{choice ? choice.title : t('Foto aleatória')}</strong>
+        <p>{choice ? choice.subtitle : t('Sorteada entre as do catálogo ao criar a sala')}</p>
         {onChangePhoto && (
           <button type="button" className="btn-link" onClick={onChangePhoto}>
-            Trocar foto
+            {t('Trocar foto')}
           </button>
         )}
       </div>
@@ -639,7 +642,7 @@ function SizeOptions({
 }) {
   return (
     <fieldset className="size-options">
-      <legend>Tamanho</legend>
+      <legend>{t('Tamanho')}</legend>
       {PIECE_COUNT_PRESETS.map((count) => {
         const optionLevel = difficultyOf(count);
         return (
@@ -654,8 +657,8 @@ function SizeOptions({
             <span className="size-option-check" aria-hidden="true">
               <CheckIcon size={12} />
             </span>
-            <span className="size-option-number">{formatCount(count)}</span>
-            <span className="size-option-unit">peças</span>
+            <span className="size-option-number">{formatNumber(count)}</span>
+            <span className="size-option-unit">{t('peças')}</span>
             <span className="size-option-level">
               <Pips level={optionLevel} />
               {DIFFICULTY_NAMES[optionLevel - 1]}

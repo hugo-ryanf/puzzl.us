@@ -1,4 +1,5 @@
-export const DIFFICULTY_NAMES = ['Fácil', 'Médio', 'Difícil', 'Expert'] as const;
+import { t } from '../i18n';
+export const DIFFICULTY_NAMES = [t('Fácil'), t('Médio'), t('Difícil'), 'Expert'] as const;
 
 /** Aqui a dificuldade é o número de peças escolhido ao criar a sala (1 = Fácil … 4 = Expert). */
 export function difficultyOf(pieces: number): 1 | 2 | 3 | 4 {

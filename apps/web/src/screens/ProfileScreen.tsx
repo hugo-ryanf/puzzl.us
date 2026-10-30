@@ -28,6 +28,7 @@ import {
   TrophyIcon,
   UsersIcon,
 } from '../ui/icons';
+import { formatNumber, locale, t, tRich } from '../i18n';
 
 interface ProfileScreenProps {
   /** Código de amigo do perfil aberto (o próprio, quando é "Perfil" do menu). */
@@ -40,21 +41,21 @@ interface ProfileScreenProps {
   onOpenFriends?: () => void;
 }
 
-const dateFormat = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' });
+const dateFormat = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
 /** Os dias da barrinha da sequência (a conquista é uma semana seguida). */
 const STREAK_GOAL = 7;
 const PIECES_GOAL = 100;
 /** Vitórias seguidas na batalha para a conquista. */
 const WIN_STREAK_GOAL = 5;
 const PRESET_NAMES: Record<AvatarPreset, string> = {
-  petroleo: 'Petróleo',
-  gelo: 'Gelo',
-  verde: 'Verde',
-  ouro: 'Ouro',
-  ambar: 'Âmbar',
-  vermelho: 'Vermelho',
-  rosa: 'Rosa',
-  roxo: 'Roxo',
+  petroleo: t('Petróleo'),
+  gelo: t('Gelo'),
+  verde: t('Verde'),
+  ouro: t('Ouro'),
+  ambar: t('Âmbar'),
+  vermelho: t('Vermelho'),
+  rosa: t('Rosa'),
+  roxo: t('Roxo'),
 };
 
 /**
@@ -87,12 +88,12 @@ export function ProfileScreen({
     // muda, aqui ou do outro lado (pedido aceito, desfeito…): a relação mostrada acompanha.
   }, [code, account.user, friends.data]);
 
-  if (profile === undefined) return <p className="loading">Carregando…</p>;
+  if (profile === undefined) return <p className="loading">{t('Carregando…')}</p>;
   if (profile === null) {
     return (
       <div className="empty">
-        <strong>Perfil não encontrado</strong>
-        <p>Confira o código do link.</p>
+        <strong>{t('Perfil não encontrado')}</strong>
+        <p>{t('Confira o código do link.')}</p>
       </div>
     );
   }
@@ -140,21 +141,27 @@ export function ProfileScreen({
               size={96}
               className="profile-avatar"
             />
-            <span className="profile-level-badge">Nv {level}</span>
+            <span className="profile-level-badge">{t('Nv {level}', { level })}</span>
           </span>
           <div className="profile-who">
             <h1 id="profile-name">{profile.name}</h1>
             <p className="profile-meta">
               {/* O nome do Google só para a própria pessoa: o perfil público mostra o nickname. */}
-              {isMe ? `${account.user!.googleName} · joga` : 'Joga'} desde{' '}
-              {dateFormat.format(new Date(profile.memberSince))}
+              {isMe
+                ? t('{google} · joga desde {date}', {
+                    google: account.user!.googleName,
+                    date: dateFormat.format(new Date(profile.memberSince)),
+                  })
+                : t('Joga desde {date}', {
+                    date: dateFormat.format(new Date(profile.memberSince)),
+                  })}
             </p>
             {profile.bio ? (
               <p className="profile-bio">{profile.bio}</p>
             ) : (
               isMe && (
                 <button type="button" className="profile-add-bio" onClick={() => setTab('edit')}>
-                  Adicionar uma bio
+                  {t('Adicionar uma bio')}
                 </button>
               )
             )}
@@ -162,31 +169,31 @@ export function ProfileScreen({
           <div className="profile-actions">
             <button type="button" className="btn" onClick={() => void copy('link')}>
               {copied === 'link' ? <CheckIcon size={16} /> : <LinkIcon size={16} />}
-              {copied === 'link' ? 'Link copiado' : 'Copiar link do perfil'}
+              {copied === 'link' ? t('Link copiado') : t('Copiar link do perfil')}
             </button>
             {isMe && !editing && (
               <button type="button" className="btn btn-primary" onClick={() => setTab('edit')}>
                 <PencilIcon size={16} />
-                Editar perfil
+                {t('Editar perfil')}
               </button>
             )}
             {profile.relation === 'none' && (
               <button type="button" className="btn btn-primary" onClick={() => void addFriend()}>
                 <PlusIcon size={16} />
-                Adicionar amigo
+                {t('Adicionar amigo')}
               </button>
             )}
             {profile.relation === 'pending' && (
-              <span className="profile-relation">Pedido de amizade pendente</span>
+              <span className="profile-relation">{t('Pedido de amizade pendente')}</span>
             )}
             {profile.relation === 'friend' && (
               <span className="profile-relation">
-                <CheckIcon size={16} /> Vocês são amigos
+                <CheckIcon size={16} /> {t('Vocês são amigos')}
               </span>
             )}
             {profile.relation === 'guest' && account.googleLogin && (
               <a className="btn btn-primary" href="/auth/google">
-                Entrar para adicionar
+                {t('Entrar para adicionar')}
               </a>
             )}
             {friendError && <p className="error">{friendError}</p>}
@@ -197,8 +204,11 @@ export function ProfileScreen({
           <div className="profile-level">
             <div className="profile-level-label">
               <span>
-                <strong>Nível {level}</strong> · faltam{' '}
-                {(levelSize - levelDone).toLocaleString('pt-BR')} pts para o nível {level + 1}
+                <strong>{t('Nível {level}', { level })}</strong>{' '}
+                {t('· faltam {points} pts para o nível {level}', {
+                  points: formatNumber(levelSize - levelDone),
+                  level: level + 1,
+                })}
               </span>
               <span className="profile-mono">
                 {levelDone}/{levelSize}
@@ -207,7 +217,7 @@ export function ProfileScreen({
             <div
               className="profile-level-bar"
               role="progressbar"
-              aria-label="Progresso do nível"
+              aria-label={t('Progresso do nível')}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={levelPct}
@@ -216,31 +226,31 @@ export function ProfileScreen({
             </div>
           </div>
           <div className="profile-code">
-            Código de amigo
+            {t('Código de amigo')}
             <button
               type="button"
               className="profile-code-btn"
-              aria-label={`Copiar código de amigo ${profile.friendCode}`}
+              aria-label={t('Copiar código de amigo {code}', { code: profile.friendCode })}
               onClick={() => void copy('code')}
             >
               {profile.friendCode}
-              <span>{copied === 'code' ? 'Copiado' : 'Copiar'}</span>
+              <span>{copied === 'code' ? t('Copiado') : t('Copiar')}</span>
             </button>
           </div>
         </div>
 
         {isMe && (
-          <div className="profile-tabs" role="tablist" aria-label="Seções do perfil">
+          <div className="profile-tabs" role="tablist" aria-label={t('Seções do perfil')}>
             <button
               type="button"
               role="tab"
               aria-selected={!editing}
               onClick={() => setTab('overview')}
             >
-              Visão geral
+              {t('Visão geral')}
             </button>
             <button type="button" role="tab" aria-selected={editing} onClick={() => setTab('edit')}>
-              Editar perfil
+              {t('Editar perfil')}
             </button>
           </div>
         )}
@@ -270,10 +280,10 @@ function Overview({
 }) {
   const streakDays = Math.min(stats.streak, STREAK_GOAL);
   const streakHint = stats.playedToday
-    ? 'Jogue amanhã para manter'
+    ? t('Jogue amanhã para manter')
     : stats.streak > 0
-      ? 'Jogue hoje para manter'
-      : 'Jogue hoje para começar';
+      ? t('Jogue hoje para manter')
+      : t('Jogue hoje para começar');
   const badges = achievements(stats);
   const unlocked = badges.filter((badge) => badge.pct >= 100).length;
 
@@ -283,23 +293,23 @@ function Overview({
         <div className="profile-highlight">
           <span className="profile-highlight-label">
             <StarIcon size={16} />
-            Pontos no total
+            {t('Pontos no total')}
           </span>
-          <span className="profile-big">{stats.pointsAll.toLocaleString('pt-BR')}</span>
+          <span className="profile-big">{formatNumber(stats.pointsAll)}</span>
           <span className={stats.pointsWeek > 0 ? 'profile-gain' : 'profile-hint'}>
             {stats.pointsWeek > 0
-              ? `+${stats.pointsWeek.toLocaleString('pt-BR')} esta semana`
-              : 'Nenhum ponto esta semana'}
+              ? t('+{n} esta semana', { n: formatNumber(stats.pointsWeek) })
+              : t('Nenhum ponto esta semana')}
           </span>
         </div>
         <div className="profile-highlight">
           <span className="profile-highlight-label streak">
             <FlameIcon size={16} />
-            Sequência
+            {t('Sequência')}
           </span>
           <span className="profile-big-line">
             <span className="profile-big">{stats.streak}</span>
-            {stats.streak === 1 ? 'dia' : 'dias'}
+            {stats.streak === 1 ? t('dia') : t('dias')}
           </span>
           <span className="profile-streak-bar" aria-hidden="true">
             {Array.from({ length: STREAK_GOAL }, (_, index) => (
@@ -311,49 +321,54 @@ function Overview({
         <div className="profile-highlight">
           <span className="profile-highlight-label">
             <BoltIcon size={16} />
-            Melhor Bullet
+            {t('Melhor Bullet')}
           </span>
           <span className="profile-big-line">
             <span className="profile-big">{stats.bulletBest}</span>
-            {stats.bulletBest === 1 ? 'montado' : 'montados'}
+            {stats.bulletBest === 1 ? t('montado') : t('montados')}
           </span>
           {onShowBulletRanking && (
             <button type="button" className="profile-link" onClick={onShowBulletRanking}>
-              Ver no ranking
+              {t('Ver no ranking')}
             </button>
           )}
         </div>
       </div>
 
       <div className="profile-numbers">
-        <Stat value={stats.puzzles} label="Quebra-cabeças montados" />
-        <Stat value={stats.images} label="Fotos diferentes" />
-        <Stat value={stats.pieces} label="Peças encaixadas" />
-        <Stat value={stats.friends} label="Amigos" onClick={onOpenFriends} />
+        <Stat value={stats.puzzles} label={t('Quebra-cabeças montados')} />
+        <Stat value={stats.images} label={t('Fotos diferentes')} />
+        <Stat value={stats.pieces} label={t('Peças encaixadas')} />
+        <Stat value={stats.friends} label={t('Amigos')} onClick={onOpenFriends} />
       </div>
 
       <section className="profile-battles" aria-labelledby="profile-battles-title">
         <h2 id="profile-battles-title">
-          <SwordsIcon size={18} /> Batalhas
+          <SwordsIcon size={18} /> {t('Batalhas')}
         </h2>
         <div className="profile-numbers">
-          <Stat value={stats.battleWins} label="Vitórias" />
-          <Stat value={stats.battleLosses} label="Derrotas" />
-          <Stat value={stats.battleBestStreak} label="Maior sequência de vitórias" />
+          <Stat value={stats.battleWins} label={t('Vitórias')} />
+          <Stat value={stats.battleLosses} label={t('Derrotas')} />
+          <Stat value={stats.battleBestStreak} label={t('Maior sequência de vitórias')} />
         </div>
         {stats.rival && (
           <p className="profile-hint">
-            Quem mais enfrentou: <strong>{stats.rival.name}</strong> ({stats.rival.battles}{' '}
-            {stats.rival.battles === 1 ? 'batalha' : 'batalhas'})
+            {tRich('Quem mais enfrentou: {name} ({battles})', {
+              name: <strong>{stats.rival.name}</strong>,
+              battles:
+                stats.rival.battles === 1
+                  ? t('1 batalha')
+                  : t('{n} batalhas', { n: stats.rival.battles }),
+            })}
           </p>
         )}
       </section>
 
       <section className="profile-badges" aria-labelledby="profile-badges-title">
         <div className="profile-badges-head">
-          <h2 id="profile-badges-title">Conquistas</h2>
+          <h2 id="profile-badges-title">{t('Conquistas')}</h2>
           <span>
-            {unlocked} de {badges.length} desbloqueadas
+            {t('{unlocked} de {total} desbloqueadas', { unlocked, total: badges.length })}
           </span>
         </div>
         <ul>
@@ -367,7 +382,7 @@ function Overview({
                 <span className="profile-badge-text">
                   <strong>
                     {badge.title}
-                    {done && <span className="sr-only"> (desbloqueada)</span>}
+                    {done && <span className="sr-only"> {t('(desbloqueada)')}</span>}
                   </strong>
                   <span>{done ? badge.doneText : badge.progressText}</span>
                   {!done && (
@@ -397,51 +412,60 @@ function achievements(stats: ProfileStats): Array<{
   return [
     {
       icon: <PuzzleIcon size={22} />,
-      title: 'Primeira montagem',
-      doneText: 'Montou o primeiro quebra-cabeça',
-      progressText: 'Monte seu primeiro quebra-cabeça',
+      title: t('Primeira montagem'),
+      doneText: t('Montou o primeiro quebra-cabeça'),
+      progressText: t('Monte seu primeiro quebra-cabeça'),
       pct: pct(stats.puzzles, 1),
     },
     {
       icon: <FlameIcon size={22} />,
-      title: 'Uma semana seguida',
-      doneText: `${STREAK_GOAL} dias seguidos jogando`,
-      progressText: `${Math.min(stats.bestStreak, STREAK_GOAL)} de ${STREAK_GOAL} dias`,
+      title: t('Uma semana seguida'),
+      doneText: t('{n} dias seguidos jogando', { n: STREAK_GOAL }),
+      progressText: t('{current} de {goal} dias', {
+        current: Math.min(stats.bestStreak, STREAK_GOAL),
+        goal: STREAK_GOAL,
+      }),
       pct: pct(stats.bestStreak, STREAK_GOAL),
     },
     {
       icon: <GridIcon size={22} />,
-      title: `${PIECES_GOAL} peças`,
-      doneText: `${PIECES_GOAL} peças encaixadas`,
-      progressText: `${stats.pieces} de ${PIECES_GOAL} peças encaixadas`,
+      title: t('{goal} peças', { goal: PIECES_GOAL }),
+      doneText: t('{goal} peças encaixadas', { goal: PIECES_GOAL }),
+      progressText: t('{current} de {goal} peças encaixadas', {
+        current: stats.pieces,
+        goal: PIECES_GOAL,
+      }),
       pct: pct(stats.pieces, PIECES_GOAL),
     },
     {
       icon: <UsersIcon size={22} />,
-      title: 'Em equipe',
-      doneText: 'Montou um quebra-cabeça em equipe',
-      progressText: 'Monte um quebra-cabeça em dupla',
+      title: t('Em equipe'),
+      doneText: t('Montou um quebra-cabeça em equipe'),
+      progressText: t('Monte um quebra-cabeça em dupla'),
       pct: pct(stats.teamPuzzles, 1),
     },
     {
       icon: <SwordsIcon size={22} />,
-      title: 'Primeira vitória',
-      doneText: 'Ganhou a primeira batalha',
-      progressText: 'Ganhe uma batalha',
+      title: t('Primeira vitória'),
+      doneText: t('Ganhou a primeira batalha'),
+      progressText: t('Ganhe uma batalha'),
       pct: pct(stats.battleWins, 1),
     },
     {
       icon: <TrophyIcon size={22} />,
-      title: `${WIN_STREAK_GOAL} seguidas`,
-      doneText: `${WIN_STREAK_GOAL} batalhas ganhas seguidas`,
-      progressText: `${Math.min(stats.battleBestStreak, WIN_STREAK_GOAL)} de ${WIN_STREAK_GOAL} vitórias seguidas`,
+      title: t('{goal} seguidas', { goal: WIN_STREAK_GOAL }),
+      doneText: t('{goal} batalhas ganhas seguidas', { goal: WIN_STREAK_GOAL }),
+      progressText: t('{current} de {goal} vitórias seguidas', {
+        current: Math.min(stats.battleBestStreak, WIN_STREAK_GOAL),
+        goal: WIN_STREAK_GOAL,
+      }),
       pct: pct(stats.battleBestStreak, WIN_STREAK_GOAL),
     },
     {
       icon: <BoltIcon size={22} />,
-      title: 'Virada!',
-      doneText: 'Ganhou uma batalha estando atrás a 10 s do fim',
-      progressText: 'Vire uma batalha por tempo nos últimos 10 s',
+      title: t('Virada!'),
+      doneText: t('Ganhou uma batalha estando atrás a 10 s do fim'),
+      progressText: t('Vire uma batalha por tempo nos últimos 10 s'),
       pct: pct(stats.battleComebacks, 1),
     },
   ];
@@ -451,7 +475,7 @@ function achievements(stats: ProfileStats): Array<{
 function Stat({ value, label, onClick }: { value: number; label: string; onClick?: () => void }) {
   const content = (
     <>
-      <span className="profile-number-value">{value.toLocaleString('pt-BR')}</span>
+      <span className="profile-number-value">{formatNumber(value)}</span>
       <span className="profile-number-label">{label}</span>
     </>
   );
@@ -508,7 +532,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
       aria-labelledby="profile-form-title"
       onSubmit={(event) => void save(event)}
     >
-      <h2 id="profile-form-title">Editar perfil</h2>
+      <h2 id="profile-form-title">{t('Editar perfil')}</h2>
 
       <fieldset>
         <legend>Avatar</legend>
@@ -523,7 +547,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
                 onChange={() => setStyle('google')}
               />
               <Avatar name={nickname || user.name} url={user.googleAvatarUrl} size={44} />
-              Foto do Google
+              {t('Foto do Google')}
             </label>
           )}
           <label className="avatar-option">
@@ -535,7 +559,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
               onChange={() => setStyle('initials')}
             />
             <Avatar name={nickname || user.name} color={color} size={44} />
-            Iniciais
+            {t('Iniciais')}
           </label>
           <label className="avatar-option">
             <input
@@ -546,18 +570,18 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
               onChange={() => setStyle('preset')}
             />
             <Avatar name={nickname || user.name} url={avatarPresetUrl(preset)} size={44} />
-            Camaleão
+            {t('Camaleão')}
           </label>
         </div>
         {style === 'preset' && (
-          <div className="profile-presets" role="radiogroup" aria-label="Camaleão">
+          <div className="profile-presets" role="radiogroup" aria-label={t('Camaleão')}>
             {AVATAR_PRESETS.map((value) => (
               <label key={value} className="preset-option" title={PRESET_NAMES[value]}>
                 <input
                   type="radio"
                   name="avatar-preset"
                   className="sr-only"
-                  aria-label={`Camaleão ${PRESET_NAMES[value]}`}
+                  aria-label={t('Camaleão {name}', { name: PRESET_NAMES[value] })}
                   checked={preset === value}
                   onChange={() => setPreset(value)}
                 />
@@ -567,7 +591,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
           </div>
         )}
         {style === 'initials' && (
-          <div className="profile-colors" role="radiogroup" aria-label="Cor das iniciais">
+          <div className="profile-colors" role="radiogroup" aria-label={t('Cor das iniciais')}>
             <label className="color-swatch auto">
               <input
                 type="radio"
@@ -576,7 +600,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
                 checked={color === null}
                 onChange={() => setColor(null)}
               />
-              Automática
+              {t('Automática')}
             </label>
             {AVATAR_COLORS.map((value) => (
               <label key={value} className="color-swatch">
@@ -584,7 +608,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
                   type="radio"
                   name="avatar-color"
                   className="sr-only"
-                  aria-label={`Cor ${value}`}
+                  aria-label={t('Cor {value}', { value })}
                   checked={color === value}
                   onChange={() => setColor(value)}
                 />
@@ -596,15 +620,15 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
       </fieldset>
 
       <fieldset>
-        <legend>Cor de destaque</legend>
-        <div className="accent-options" role="radiogroup" aria-label="Cor de destaque">
+        <legend>{t('Cor de destaque')}</legend>
+        <div className="accent-options" role="radiogroup" aria-label={t('Cor de destaque')}>
           {ACCENTS.map(({ value, label, swatch }) => (
             <label key={value} className="color-swatch" title={label}>
               <input
                 type="radio"
                 name="accent"
                 className="sr-only"
-                aria-label={`Destaque ${label}`}
+                aria-label={t('Destaque {name}', { name: label })}
                 checked={accent === value}
                 onChange={() => setAccent(value)}
               />
@@ -613,7 +637,7 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
           ))}
         </div>
         <small className="field-hint">
-          Muda só a cor de destaque do site (barras, selos, marcações), neste navegador.
+          {t('Muda só a cor de destaque do site (barras, selos, marcações), neste navegador.')}
         </small>
       </fieldset>
 
@@ -628,20 +652,20 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
           onChange={(e) => setNickname(e.target.value)}
         />
         <small className="field-hint">
-          Aparece nas salas e no ranking. No Google você é {user.googleName}.
+          {t('Aparece nas salas e no ranking. No Google você é {name}.', { name: user.googleName })}
         </small>
       </label>
 
       <label className="field">
         <span>
-          Bio <span className="profile-optional">(opcional)</span>
+          Bio <span className="profile-optional">{t('(opcional)')}</span>
         </span>
         <textarea
           className="input profile-bio-input"
           value={bio}
           maxLength={120}
           rows={3}
-          placeholder="Uma frase sobre você"
+          placeholder={t('Uma frase sobre você')}
           onChange={(e) => setBio(e.target.value)}
         />
         <small className="profile-mono profile-count">{bio.length}/120</small>
@@ -654,14 +678,14 @@ function ProfileForm({ account, onDone }: { account: Account; onDone: () => void
       )}
       <div className="profile-form-actions">
         <button type="button" className="btn" onClick={onDone}>
-          Cancelar
+          {t('Cancelar')}
         </button>
         <button
           type="submit"
           className="btn btn-primary"
           disabled={busy || nickname.trim().length < 2}
         >
-          {busy ? 'Salvando…' : 'Salvar perfil'}
+          {busy ? t('Salvando…') : t('Salvar perfil')}
         </button>
       </div>
     </form>

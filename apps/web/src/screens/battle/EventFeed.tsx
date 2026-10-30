@@ -5,6 +5,7 @@ import type { RoomSnapshot } from '../../net/useRoomSnapshot';
 import { playSound } from '../../sound/sounds';
 import { POWER_LABELS } from './PowerBar';
 import { battleScore, otherTeam, teamNames } from './score';
+import { t } from '../../i18n';
 
 /** Quanto tempo cada aviso fica e quantos cabem de uma vez. */
 const SHOW_MS = 2500;
@@ -64,8 +65,8 @@ export function EventFeed({
       added.push({ id: nextId++, text, tone: team === myTeam ? 'mine' : 'theirs' });
     const who = (team: BattleTeam) => {
       const many = snapshot.players.filter((p) => p.team === team).length > 1;
-      if (team === myTeam) return { name: many ? 'Vocês' : 'Você', many };
-      return { name: teamNames(snapshot, team) || 'Adversário', many };
+      if (team === myTeam) return { name: many ? t('Vocês') : t('Você'), many };
+      return { name: teamNames(snapshot, team) || t('Adversário'), many };
     };
 
     if (snapshot.phase === 'playing' && current.round === tracked.round) {
@@ -73,15 +74,20 @@ export function EventFeed({
         const { name, many } = who(team);
         if (timed && current.solved[team] > tracked.solved[team]) {
           add(
-            `${name} ${many ? 'montaram' : 'montou'}! ${solved(myTeam)} × ${solved(other)}`,
+            t(many ? '{name} montaram! {a} × {b}' : '{name} montou! {a} × {b}', {
+              name,
+              a: solved(myTeam),
+              b: solved(other),
+            }),
             team,
           );
         }
-        if (current.nearEnd[team] && !tracked.nearEnd[team]) add(`${name}: falta pouco!`, team);
+        if (current.nearEnd[team] && !tracked.nearEnd[team])
+          add(t('{name}: falta pouco!', { name }), team);
       }
       const started = timed || Math.max(score(myTeam), score(other)) >= 0.3;
       if (leader && tracked.leader && leader !== tracked.leader && started) {
-        add(`Virada! ${who(leader).name} na frente`, leader);
+        add(t('Virada! {name} na frente', { name: who(leader).name }), leader);
       }
     }
     setTracked({ ...current, leader: leader || tracked.leader, nextId });
@@ -89,7 +95,7 @@ export function EventFeed({
   }
 
   // Poderes: quem usou, em quem, e se o escudo anulou.
-  const theirNames = teamNames(snapshot, other) || 'Adversário';
+  const theirNames = teamNames(snapshot, other) || t('Adversário');
   useEffect(
     () =>
       room.onMessage('power', ({ team, power, blocked }: PowerBroadcast) => {
@@ -99,15 +105,15 @@ export function EventFeed({
         const text =
           power === 'shield'
             ? mine
-              ? 'Escudo armado!'
-              : `${theirNames} armaram um escudo`
+              ? t('Escudo armado!')
+              : t('{names} armaram um escudo', { names: theirNames })
             : blocked
               ? mine
-                ? `O escudo deles anulou ${label}`
-                : `Seu escudo anulou ${label}!`
+                ? t('O escudo deles anulou {power}', { power: label })
+                : t('Seu escudo anulou {power}!', { power: label })
               : mine
-                ? `${label} no adversário!`
-                : `${theirNames}: ${label} em vocês!`;
+                ? t('{power} no adversário!', { power: label })
+                : t('{names}: {power} em vocês!', { names: theirNames, power: label });
         // Bom para mim: o meu poder que pegou, ou o deles que o meu escudo anulou.
         const item: FeedItem = {
           id: -Date.now(),
