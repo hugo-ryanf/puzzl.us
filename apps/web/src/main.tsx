@@ -5,7 +5,10 @@ import '@fontsource-variable/figtree';
 import '@fontsource-variable/bricolage-grotesque';
 import '@fontsource-variable/jetbrains-mono';
 import { App } from './App';
+import { startAnalytics } from './net/analytics';
 import './styles.css';
+
+startAnalytics();
 
 const root = document.getElementById('root');
 if (!root) throw new Error('#root não encontrado no index.html');
