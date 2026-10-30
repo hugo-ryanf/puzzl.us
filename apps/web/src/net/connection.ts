@@ -183,6 +183,8 @@ async function track(room: PuzzleRoom): Promise<PuzzleRoom> {
   const save = () => writeSession({ roomId: room.roomId, token: room.reconnectionToken });
   save();
   room.onReconnect(save);
+  // Só no `pnpm dev`: a sala exposta para scripts de teste e gravação (os robôs do vídeo de demonstração).
+  if (import.meta.env.DEV) (window as unknown as { __puzzleRoom?: PuzzleRoom }).__puzzleRoom = room;
   return room;
 }
 

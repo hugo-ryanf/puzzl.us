@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "dev:local": "tsx watch --env-file-if-exists=.env.local src/index.ts --dev-tools",
+    "dev:demo": "tsx src/dev/demoServer.ts",
     "build": "tsup",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "test": "vitest run",

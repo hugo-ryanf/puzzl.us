@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @puzzle/web --filter @puzzle/server dev",
     "dev:local": "pnpm --parallel --filter @puzzle/web --filter @puzzle/server dev:local",
+    "dev:demo": "pnpm --parallel --filter @puzzle/web --filter @puzzle/server dev:demo",
     "build": "pnpm -r build",
     "build:deploy": "pnpm --filter @puzzle/web build && pnpm --filter @puzzle/server build",
     "test": "pnpm -r test",
