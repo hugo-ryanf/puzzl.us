@@ -793,4 +793,66 @@ export const en = {
   'Foto anterior': 'Previous photo',
   'Próxima foto': 'Next photo',
   'Foto {n}': 'Photo {n}',
+  // Landing: seções com os trechos do vídeo
+  'Ver o vídeo': 'Watch the video',
+  'Modos de jogo': 'Game modes',
+  'Três jeitos de jogar': 'Three ways to play',
+  Clássico: 'Classic',
+  'Monte sozinho ou com amigos, de 24 a 1.000 peças. As peças vêm giradas: vire, encaixe e vença.':
+    'Solve alone or with friends, from 24 to 1,000 pieces. Pieces come turned: rotate, snap and win.',
+  'Contra o relógio: quantos quebra-cabeças você monta em 3, 5 ou 10 minutos? Sozinho ou em equipe.':
+    'Race the clock: how many puzzles can you solve in 3, 5 or 10 minutes? Alone or as a team.',
+  'Lado contra lado, com poderes (Neblina, Congelar, Escudo, Embaralhar) e o relâmpago de deslizar: quem montar primeiro leva.':
+    'Side against side, with powers (Fog, Freeze, Shield, Shuffle) and the sliding lightning round: first to finish wins.',
+  'Jogue junto, de verdade': 'Really play together',
+  'Cada um com seu cursor e seu nome: você vê os amigos pegando e encaixando as peças na hora.':
+    'Everyone has their own named cursor: you see your friends grab and snap pieces live.',
+  'Chamada de voz e vídeo dentro da sala, sem abrir outro app.':
+    'Voice and video chat inside the room, no other app needed.',
+  'Mande o link: quem recebe entra direto na mesa.':
+    'Send the link: whoever gets it joins the table right away.',
+  'Quatro amigos montando juntos, com a chamada de vídeo':
+    'Four friends solving together, with the video call',
+  'Sua foto vira quebra-cabeça': 'Your photo becomes a puzzle',
+  'Envie uma foto sua, monte com quem quiser e publique para todo mundo jogar.':
+    'Upload a photo of yours, solve it with anyone and publish it for everyone to play.',
+  'Enviar sua foto': 'Upload your photo',
+  'Uma foto enviada vira quebra-cabeça e é publicada':
+    'An uploaded photo becomes a puzzle and gets published',
+  'Seu perfil, suas conquistas': 'Your profile, your achievements',
+  'Suba de nível com os pontos de cada partida.': 'Level up with the points from every game.',
+  'Desbloqueie conquistas e mantenha a sequência de dias.':
+    'Unlock achievements and keep your daily streak going.',
+  'Seus recordes, amigos e partidas salvas num lugar só.':
+    'Your records, friends and saved games in one place.',
+  'O ranking e o perfil de uma jogadora': "The ranking and a player's profile",
+  'Como funciona': 'How it works',
+  'Da foto à última peça em três passos': 'From photo to last piece in three steps',
+  'Escolha a foto e o tamanho': 'Pick the photo and the size',
+  'Do catálogo, da comunidade ou uma sua, de 24 a 1.000 peças.':
+    'From the catalog, the community or your own, from 24 to 1,000 pieces.',
+  'Mande o link': 'Send the link',
+  'Cada sala tem um código. Quem recebe o link entra direto, sem instalar nada.':
+    'Every room has a code. Whoever gets the link joins right away, nothing to install.',
+  'Montem juntos': 'Solve it together',
+  'Todo mundo mexe nas mesmas peças, ao mesmo tempo.':
+    'Everyone moves the same pieces, at the same time.',
+  Perguntas: 'Questions',
+  'Perguntas frequentes': 'Frequently asked questions',
+  'É grátis?': 'Is it free?',
+  'Sim. É só abrir o site e jogar.': 'Yes. Just open the site and play.',
+  'Precisa instalar alguma coisa?': 'Do I need to install anything?',
+  'Não. Tudo funciona no navegador, inclusive a chamada de voz e vídeo.':
+    'No. Everything runs in the browser, including the voice and video chat.',
+  'Funciona no celular?': 'Does it work on phones?',
+  'Funciona. No celular, toque duas vezes numa peça para girá-la.':
+    'It does. On a phone, double-tap a piece to rotate it.',
+  'Quantas pessoas cabem numa sala?': 'How many people fit in a room?',
+  'Até {n} jogadores montando juntos, no clássico, no Bullet e na batalha (2 contra 2).':
+    'Up to {n} players solving together, in classic, Bullet and battle (2 vs 2).',
+  'Preciso de conta?': 'Do I need an account?',
+  'Não: dá para jogar como convidado. Entrando com o Google, você tem perfil, amigos, favoritos e partidas salvas.':
+    'No: you can play as a guest. Signing in with Google gives you a profile, friends, favorites and saved games.',
+  'Junta a galera e abre a primeira sala.': 'Gather your friends and open your first room.',
+  'Leva menos de um minuto.': 'It takes less than a minute.',
 } satisfies Record<string, string>;
