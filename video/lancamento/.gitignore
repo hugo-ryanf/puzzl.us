@@ -9,3 +9,5 @@ footage/*.webm
 footage/frames/
 *.log
 _frames/
+footage_en/*.webm
+footage_en/frames/
