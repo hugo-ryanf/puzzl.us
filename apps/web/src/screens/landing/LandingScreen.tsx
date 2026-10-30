@@ -1,4 +1,4 @@
-import { CATALOG, type GeneralRankingEntry } from '@puzzle/shared';
+import { CATALOG } from '@puzzle/shared';
 import {
   useEffect,
   useRef,
@@ -11,8 +11,7 @@ import bannerDarkUrl from '../../assets/landing-camaleao-escuro.webp';
 import bannerUrl from '../../assets/landing-camaleao.webp';
 import logoUrl from '../../assets/logo.webp';
 import { catalogThumbUrl, localizedCatalogImage, puzzleImageUrl } from '../../board/images';
-import { formatNumber, locale, setLocale, t, tRich } from '../../i18n';
-import { fetchGeneralRanking } from '../../net/ranking';
+import { locale, setLocale, t, tRich } from '../../i18n';
 import {
   ArrowRightIcon,
   ChevronLeftIcon,
@@ -21,7 +20,6 @@ import {
   MoonIcon,
   SunIcon,
 } from '../../ui/icons';
-import { Avatar } from '../../ui/UserAvatar';
 import { useTheme } from '../../ui/theme';
 import type { PuzzleChoice } from '../explore/CreateRoomDialog';
 import { DARK_ART, LIGHT_ART, type BannerArt } from './landingArt';
@@ -40,7 +38,8 @@ const GALLERY: PuzzleChoice[] = CATALOG.slice(0, 10).map((image) => {
 export interface LandingScreenProps {
   /** Entra no app: com uma foto, abre o "Criar sala" dela; sem, o "Criar sala" livre. */
   onStart: (choice?: PuzzleChoice) => void;
-  onShowRanking: () => void;
+  /** A tela de Ranking do app (pódio, filtros e lista), mostrada como uma seção. */
+  ranking: ReactNode;
   /** Login com Google disponível neste servidor. */
   googleLogin: boolean;
 }
@@ -50,7 +49,7 @@ export interface LandingScreenProps {
  * tema e o idioma por cima), a galeria, o ranking e o rodapé. O tema claro (verde) e o escuro
  * (neon) trocam pelo CSS, junto com o resto do site.
  */
-export function LandingScreen({ onStart, onShowRanking, googleLogin }: LandingScreenProps) {
+export function LandingScreen({ onStart, ranking, googleLogin }: LandingScreenProps) {
   return (
     <div className="landing">
       <section className="lp-hero" aria-label={t('Apresentação')}>
@@ -97,7 +96,9 @@ export function LandingScreen({ onStart, onShowRanking, googleLogin }: LandingSc
       </section>
 
       <Gallery onPlay={onStart} />
-      <RankingSection onShowRanking={onShowRanking} />
+      <section id="ranking" className="lp-ranking-section">
+        <div className="lp-container">{ranking}</div>
+      </section>
 
       <footer className="lp-footer">
         <div className="lp-container lp-footer-row">
@@ -428,74 +429,5 @@ function Backdrop({ variant }: { variant: 'light' | 'dark' }) {
         />
       ))}
     </svg>
-  );
-}
-
-/** As medalhas do pódio: ouro, prata e bronze (do 4º em diante, só o número). */
-const MEDALS = ['lp-medal-1', 'lp-medal-2', 'lp-medal-3'];
-
-/** O ranking por pontos (solo, desde sempre): os cinco primeiros e o caminho para o completo. */
-function RankingSection({ onShowRanking }: { onShowRanking: () => void }) {
-  const [top, setTop] = useState<GeneralRankingEntry[]>([]);
-
-  useEffect(() => {
-    let current = true;
-    fetchGeneralRanking({ players: 1, period: 'all' })
-      .then((page) => current && setTop(page.entries.slice(0, 5)))
-      .catch(() => {
-        // sem ranking (servidor sem banco): a seção fica só com o convite
-      });
-    return () => {
-      current = false;
-    };
-  }, []);
-
-  return (
-    <section className="lp-ranking-section" aria-labelledby="lp-ranking-title">
-      <div className="lp-container">
-        <div className="lp-ranking">
-          <div className="lp-ranking-copy">
-            <span className="lp-eyebrow">Ranking</span>
-            <h2 id="lp-ranking-title">{t('Quem monta mais rápido?')}</h2>
-            <p>
-              {t(
-                'O tempo é medido pelo servidor, então não tem como trapacear. Dispute por foto, em solo ou em equipe, e suba de nível a cada partida.',
-              )}
-            </p>
-            <button type="button" className="lp-btn lp-btn-light" onClick={onShowRanking}>
-              {t('Ranking completo')}
-              <ArrowRightIcon size={18} />
-            </button>
-          </div>
-          {top.length > 0 && (
-            <ol className="lp-ranking-list">
-              {top.map((row) => {
-                const name = row.players.join(' & ');
-                return (
-                  <li key={row.position}>
-                    <span className={`lp-medal ${MEDALS[row.position - 1] ?? ''}`}>
-                      {row.position}
-                    </span>
-                    <Avatar
-                      name={row.players[0] ?? name}
-                      url={row.avatars[0]?.url}
-                      color={row.avatars[0]?.color}
-                      size={36}
-                    />
-                    <span className="lp-ranking-name">
-                      <b>{name}</b>
-                      <span>{t('{n} quebra-cabeças', { n: row.puzzles })}</span>
-                    </span>
-                    <span className="lp-ranking-points">
-                      {t('{n} pts', { n: formatNumber(row.points) })}
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }

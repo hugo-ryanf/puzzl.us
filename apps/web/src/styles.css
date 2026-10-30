@@ -6204,12 +6204,6 @@ button.profile-number:hover {
   --lp-bg: #f6faf7;
   --lp-ink: #10231e;
   --lp-ink-2: #3d5a52;
-  --lp-rank-bg: #0d3b32;
-  --lp-rank-border: transparent;
-  --lp-rank-mute: #cfe3da;
-  --lp-rank-eyebrow: #9ee0bf;
-  --lp-light-bg: #ffffff;
-  --lp-light-fg: #0d3b32;
   --lp-line: #e3ece7;
   --lp-hero-bg: #fdfdfd;
   --lp-brand: #0d3b32;
@@ -6245,12 +6239,6 @@ button.profile-number:hover {
   --lp-bg: #0b0920;
   --lp-ink: #f4f1ff;
   --lp-ink-2: #f1ecff;
-  --lp-rank-bg: rgba(23, 19, 46, 0.88);
-  --lp-rank-border: rgba(255, 255, 255, 0.09);
-  --lp-rank-mute: #b9b3d6;
-  --lp-rank-eyebrow: #ffffff;
-  --lp-light-bg: #ffffff;
-  --lp-light-fg: #0b0920;
   --lp-line: rgba(255, 255, 255, 0.08);
   --lp-hero-bg: #0b0920;
   --lp-brand: #ffffff;
@@ -6281,12 +6269,6 @@ button.profile-number:hover {
     --lp-bg: #0b0920;
     --lp-ink: #f4f1ff;
     --lp-ink-2: #f1ecff;
-    --lp-rank-bg: rgba(23, 19, 46, 0.88);
-    --lp-rank-border: rgba(255, 255, 255, 0.09);
-    --lp-rank-mute: #b9b3d6;
-    --lp-rank-eyebrow: #ffffff;
-    --lp-light-bg: #ffffff;
-    --lp-light-fg: #0b0920;
     --lp-line: rgba(255, 255, 255, 0.08);
     --lp-hero-bg: #0b0920;
     --lp-brand: #ffffff;
@@ -6699,134 +6681,33 @@ button.profile-number:hover {
   font-weight: 600;
 }
 
-.lp-btn-light {
-  background: var(--lp-light-bg);
-  color: var(--lp-light-fg);
-}
-
-.lp-btn-light:hover {
-  transform: translateY(-1px);
-}
-
-/* ranking: os primeiros por pontos num cartão escuro */
+/* ranking: a mesma tela de Ranking do app; no escuro, as superfícies dela no tom da landing */
 .lp-ranking-section {
   padding: 8px 0 96px;
 }
 
-.lp-ranking {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
-  align-items: center;
-  gap: 48px;
-  padding: clamp(28px, 5vw, 56px);
-  border: 1px solid var(--lp-rank-border);
-  border-radius: 28px;
-  background: var(--lp-rank-bg);
-  color: #ffffff;
+:root[data-theme='dark'] .lp-ranking-section {
+  --bg: #0b0920;
+  --surface: #17132e;
+  --surface-2: #1d1838;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --divider: rgba(255, 255, 255, 0.07);
+  --hover: #241e45;
+  --segmented: #1d1838;
 }
 
-.lp-ranking-copy {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 18px;
-}
-
-.lp-ranking-copy .lp-eyebrow {
-  color: var(--lp-rank-eyebrow);
-}
-
-.lp-ranking-copy h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(30px, 3.6vw, 44px);
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-}
-
-.lp-ranking-copy p {
-  margin: 0;
-  color: var(--lp-rank-mute);
-  font-size: 17px;
-  line-height: 1.55;
-}
-
-.lp-ranking-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.lp-ranking-list li {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.lp-medal {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 800;
-}
-
-.lp-medal-1 {
-  border-color: transparent;
-  background: #f7e3a1;
-  color: #6b4e00;
-}
-
-.lp-medal-2 {
-  border-color: transparent;
-  background: #e3e7ec;
-  color: #3f4451;
-}
-
-.lp-medal-3 {
-  border-color: transparent;
-  background: #f3d3b8;
-  color: #7a3e12;
-}
-
-.lp-ranking-name {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.lp-ranking-name b {
-  overflow: hidden;
-  font-size: 15px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.lp-ranking-name span {
-  color: var(--lp-rank-mute);
-  font-size: 13px;
-}
-
-.lp-ranking-points {
-  font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .lp-ranking-section {
+    --bg: #0b0920;
+    --surface: #17132e;
+    --surface-2: #1d1838;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --divider: rgba(255, 255, 255, 0.07);
+    --hover: #241e45;
+    --segmented: #1d1838;
+  }
 }
 
 .lp-footer {
@@ -6958,26 +6839,6 @@ button.profile-number:hover {
   }
 
   .lp-login {
-    font-size: 14px;
-  }
-
-  .lp-ranking {
-    gap: 28px;
-    padding: 24px 16px;
-  }
-
-  .lp-ranking-list li {
-    gap: 10px;
-    padding: 10px 12px;
-  }
-
-  .lp-ranking-name span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .lp-ranking-points {
     font-size: 14px;
   }
 

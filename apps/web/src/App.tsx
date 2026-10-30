@@ -162,19 +162,31 @@ export function App() {
   // Ainda não se sabe se tem login: a tela fica vazia em vez de piscar a landing para quem tem.
   if (landing && !room && account.user === undefined) return null;
   if (landing && !room && account.user === null) {
+    /** Sai da landing para o app: com uma foto, o "Criar sala" dela; sem, o "Criar sala" livre. */
+    const startFromLanding = (choice?: PuzzleChoice) => {
+      scrollTo(0, 0); // o Explorar começa do topo, não da altura em que a landing estava
+      setLanding(false);
+      if (choice) setStartChoice(choice);
+      else setCreateRequested(true);
+    };
     return (
       <LandingScreen
         googleLogin={account.googleLogin}
-        onStart={(choice) => {
-          scrollTo(0, 0); // o Explorar começa do topo, não da altura em que a landing estava
-          setLanding(false);
-          if (choice) setStartChoice(choice);
-          else setCreateRequested(true);
-        }}
-        onShowRanking={() => {
-          setLanding(false);
-          setRanking({ ...DEFAULT_RANKING, tab: 'general' });
-        }}
+        onStart={startFromLanding}
+        ranking={
+          <RankingScreen
+            initial={{ ...DEFAULT_RANKING, tab: 'general' }}
+            community={community.puzzles}
+            onCreateRoom={() => startFromLanding()}
+            onOpenProfile={(code) => {
+              scrollTo(0, 0);
+              setLanding(false);
+              setProfileCode(code);
+              setSection('profile');
+              history.replaceState(null, '', `/perfil/${code}`);
+            }}
+          />
+        }
       />
     );
   }
