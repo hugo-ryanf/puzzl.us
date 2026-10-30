@@ -779,4 +779,17 @@ export const en = {
   'Canal com barcos no meio da cidade': 'Canal with boats in the middle of the city',
   'Entardecer na cidade': 'Dusk in the city',
   'Ponte sobre a água na cidade': 'Bridge over the water in the city',
+  // Landing
+  Seções: 'Sections',
+  Galeria: 'Gallery',
+  Apresentação: 'Introduction',
+  'Multiplayer em tempo real': 'Real-time multiplayer',
+  'Cada peça se encaixa melhor {group}.': 'Every piece fits better {group}.',
+  'em grupo': 'together',
+  'Crie uma sala, mande o link e montem o mesmo quebra-cabeça ao mesmo tempo, conversando por voz.':
+    'Create a room, send the link and solve the same puzzle at the same time, talking over voice chat.',
+  'Criar uma sala': 'Create a room',
+  'Ver a galeria': 'See the gallery',
+  'Escolha por onde começar': 'Pick where to start',
+  Jogar: 'Play',
 } satisfies Record<string, string>;
