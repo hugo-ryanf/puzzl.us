@@ -18,7 +18,9 @@ import {
   type PuzzleRoom,
 } from './net/connection';
 import { loadPlayerName } from './net/playerName';
+import type { PuzzleChoice } from './screens/explore/CreateRoomDialog';
 import { ExploreScreen } from './screens/explore/ExploreScreen';
+import { LandingScreen } from './screens/landing/LandingScreen';
 import { PrivacyScreen } from './screens/PrivacyScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { RankingScreen } from './screens/RankingScreen';
@@ -82,6 +84,11 @@ export function App() {
     account.user === undefined ? undefined : (account.user?.id ?? null),
   );
   const [createRequested, setCreateRequested] = useState(false);
+  // Sem login, "/" abre a landing; dali um clique leva ao app (e a foto escolhida, se houver).
+  const [landing, setLanding] = useState(
+    () => location.pathname === '/' && !location.search && !location.hash,
+  );
+  const [startChoice, setStartChoice] = useState<PuzzleChoice | null>(null);
   // Link de convite (/K7QF2) sem sessão salva: abre "Entrar com código" já preenchido.
   const [joinOpen, setJoinOpen] = useState(() => codeFromUrl() !== '');
   /** Código digitado no campo da barra lateral (vale mais que o do link). */
@@ -101,6 +108,7 @@ export function App() {
     history.replaceState(null, '', `/${joined.roomId}`);
     setNotice(undefined);
     setCreateRequested(false);
+    setStartChoice(null);
     setJoinOpen(false);
     setRanking(null);
     setRoom(joined);
@@ -151,6 +159,25 @@ export function App() {
     );
   }
   if (resuming) return <p className="loading">{t('Voltando para a sala…')}</p>;
+  // Ainda não se sabe se tem login: a tela fica vazia em vez de piscar a landing para quem tem.
+  if (landing && !room && account.user === undefined) return null;
+  if (landing && !room && account.user === null) {
+    return (
+      <LandingScreen
+        googleLogin={account.googleLogin}
+        onStart={(choice) => {
+          scrollTo(0, 0); // o Explorar começa do topo, não da altura em que a landing estava
+          setLanding(false);
+          if (choice) setStartChoice(choice);
+          else setCreateRequested(true);
+        }}
+        onShowRanking={() => {
+          setLanding(false);
+          setRanking({ ...DEFAULT_RANKING, tab: 'general' });
+        }}
+      />
+    );
+  }
   if (room) {
     // Ranking aberto do fim da partida: sem barra lateral (o "Explorar" voltaria para a sala).
     if (ranking) {
@@ -286,9 +313,13 @@ export function App() {
             name={playerName}
             onNameChange={setName}
             createRequested={createRequested}
+            initialChoice={startChoice}
             joinOpen={joinOpen}
             initialCode={joinCode || codeFromUrl()}
-            onCloseCreate={() => setCreateRequested(false)}
+            onCloseCreate={() => {
+              setCreateRequested(false);
+              setStartChoice(null);
+            }}
             onCloseJoin={() => setJoinOpen(false)}
             onEnter={enter}
             onShowRanking={(image) => setRanking({ ...DEFAULT_RANKING, image })}
