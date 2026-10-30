@@ -10,6 +10,7 @@ import { CloseIcon, ImageIcon, PartyIcon, TrophyIcon } from '../../ui/icons';
 import { PlayAgainButton } from './PlayAgainButton';
 import { PublishSection, type Publisher } from './PublishSection';
 import { formatNumber, ordinal, t } from '../../i18n';
+import { track } from '../../net/analytics';
 
 interface CompletedModalProps {
   room: PuzzleRoom;
@@ -61,6 +62,16 @@ export function CompletedModal({
   useEffect(() => {
     const timer = setTimeout(() => setOpen(true), OPEN_DELAY_MS);
     return () => clearTimeout(timer);
+  }, []);
+
+  // uma vez por partida concluída (a análise de uso: tamanho, tempo, equipe)
+  useEffect(() => {
+    track('partida_concluida', {
+      pecas: pieceCount,
+      segundos: Math.round(durationMs / 1000),
+      jogadores: teamSize,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
