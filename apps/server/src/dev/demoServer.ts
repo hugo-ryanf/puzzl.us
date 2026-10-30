@@ -34,6 +34,8 @@ import { createUploadStore } from '../uploads/uploadStore';
 import { createVoiceTokenIssuer, voiceConfigFromEnv } from '../voice';
 
 const PORT = Number(process.env.PORT ?? 2567);
+// DEMO_LANG=en: os textos que os jogadores escreveram (títulos, bio) em inglês, para o vídeo em inglês
+const EN = process.env.DEMO_LANG === 'en';
 const CATALOG_DIR = fileURLToPath(new URL('../../../web/public/catalog/', import.meta.url));
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -48,9 +50,16 @@ const friends = createFriendStore(db);
 
 // ── jogadores fictícios ─────────────────────────────────────────────────────────────────────────
 const PEOPLE = [
-  ['Ana Souza', 'Ana'], ['Bia Lima', 'Bia'], ['Caio Rocha', 'Caio'], ['Duda Alves', 'Duda'],
-  ['Enzo Prado', 'Enzo'], ['Lia Torres', 'Lia'], ['Theo Nunes', 'Theo'], ['Malu Dias', 'Malu'],
-  ['Rafa Costa', 'Rafa'], ['Gabi Melo', 'Gabi'],
+  ['Ana Souza', 'Ana'],
+  ['Bia Lima', 'Bia'],
+  ['Caio Rocha', 'Caio'],
+  ['Duda Alves', 'Duda'],
+  ['Enzo Prado', 'Enzo'],
+  ['Lia Torres', 'Lia'],
+  ['Theo Nunes', 'Theo'],
+  ['Malu Dias', 'Malu'],
+  ['Rafa Costa', 'Rafa'],
+  ['Gabi Melo', 'Gabi'],
 ] as const;
 const users: Array<{ id: string; nick: string; code: string; guestId: string }> = [];
 for (const [i, [full, nick]] of PEOPLE.entries()) {
@@ -59,7 +68,7 @@ for (const [i, [full, nick]] of PEOPLE.entries()) {
   const preset = i % 2 === 0;
   await accounts.updateProfile(account.id, {
     nickname: nick,
-    bio: i === 0 ? 'Montando um quebra-cabeça por dia.' : null,
+    bio: i === 0 ? (EN ? 'One puzzle a day.' : 'Montando um quebra-cabeça por dia.') : null,
     avatarStyle: preset ? 'preset' : 'initials',
     avatarPreset: preset ? AVATAR_PRESETS[(i / 2) % AVATAR_PRESETS.length]! : null,
     avatarColor: preset ? null : AVATAR_COLORS[i % AVATAR_COLORS.length]!,
@@ -79,13 +88,17 @@ for (const other of [1, 2, 3, 5]) {
 }
 
 // ── fotos da comunidade: fotos do catálogo publicadas por eles ─────────────────────────────────
-// [dono, índice da foto no catálogo, título, autor] — títulos que combinam com cada foto
+// [dono, índice da foto no catálogo, título, título em inglês, autor] — títulos que combinam com cada foto
 const COMMUNITY = [
-  [1, 8, 'Passeio em Hanói', 'Bia Lima'], [2, 15, 'Minha lambreta', 'Caio Rocha'],
-  [3, 1, 'Férias na serra', 'Duda Alves'], [5, 17, 'Rua da minha avó', 'Lia Torres'],
-  [6, 11, 'Viagem a Roma', 'Theo Nunes'], [0, 3, 'Fim de semana no porto', 'Ana Souza'],
+  [1, 8, 'Passeio em Hanói', 'A walk in Hanoi', 'Bia Lima'],
+  [2, 15, 'Minha lambreta', 'My scooter', 'Caio Rocha'],
+  [3, 1, 'Férias na serra', 'Mountain holiday', 'Duda Alves'],
+  [5, 17, 'Rua da minha avó', "Grandma's street", 'Lia Torres'],
+  [6, 11, 'Viagem a Roma', 'Trip to Rome', 'Theo Nunes'],
+  [0, 3, 'Fim de semana no porto', 'Weekend at the harbor', 'Ana Souza'],
 ] as const;
-for (const [owner, index, title, authorName] of COMMUNITY) {
+for (const [owner, index, titlePt, titleEn, authorName] of COMMUNITY) {
+  const title = EN ? titleEn : titlePt;
   const image = CATALOG[index]!;
   const processed = await processUpload(readFileSync(`${CATALOG_DIR}${image.id}.webp`));
   const id = await uploads.save(processed, users[owner]!.id);
@@ -98,11 +111,17 @@ for (const [owner, index, title, authorName] of COMMUNITY) {
 // ── partidas: ranking por tempo e por pontos (hoje, semana, sempre) ─────────────────────────────
 const rnd = (() => {
   let s = 12345;
-  return () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  return () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
 })();
 const now = Date.now();
 let room = 0;
-async function game(players: number[], imageIndex: number, pieceCount: number, daysAgo: number, seconds: number) {
+async function game(
+  players: number[],
+  imageIndex: number,
+  pieceCount: number,
+  daysAgo: number,
+  seconds: number,
+) {
   const image = CATALOG[imageIndex % CATALOG.length]!;
   const { rows, cols } = gridForPieceCount(pieceCount, image.width / image.height);
   const finishedAt = new Date(now - daysAgo * DAY - rnd() * 3 * 60 * 60 * 1000);
@@ -125,7 +144,13 @@ for (let day = 0; day < 9; day++) {
   for (let p = 0; p < users.length; p++) {
     if (rnd() < 0.25 && p > 1) continue;
     for (const pieces of [48, 100, 24]) {
-      await game([p], day * 3 + p, pieces, day, Math.round(pieces * 9 * skill[p]! * (0.85 + rnd() * 0.3)));
+      await game(
+        [p],
+        day * 3 + p,
+        pieces,
+        day,
+        Math.round(pieces * 9 * skill[p]! * (0.85 + rnd() * 0.3)),
+      );
     }
   }
   // em dupla e em equipe
@@ -140,16 +165,28 @@ for (let p = 0; p < users.length; p++) {
     const solved = Math.max(1, Math.round((minutes === 3 ? 7 : 11) / skill[p]!));
     const finishedAt = new Date(now - (p % 3) * DAY);
     await bullet.saveRun({
-      roomCode: `B${p}${minutes}`, minutes, pieceCount: 12, solved, partial: Math.round(rnd() * 8),
-      startedAt: new Date(finishedAt.getTime() - minutes * 60 * 1000), finishedAt, players: [member(p)],
+      roomCode: `B${p}${minutes}`,
+      minutes,
+      pieceCount: 12,
+      solved,
+      partial: Math.round(rnd() * 8),
+      startedAt: new Date(finishedAt.getTime() - minutes * 60 * 1000),
+      finishedAt,
+      players: [member(p)],
     });
   }
 }
 for (let k = 0; k < 14; k++) {
-  const a = k % 4, b = 4 + (k % 5);
+  const a = k % 4,
+    b = 4 + (k % 5);
   await battles.saveResult({
-    roomCode: `X${k}`, format: '1v1', timed: k % 2 === 0, winner: rnd() < 0.62 ? 'a' : 'b',
-    walkover: false, comeback: k % 5 === 0, finishedAt: new Date(now - (k % 6) * DAY),
+    roomCode: `X${k}`,
+    format: '1v1',
+    timed: k % 2 === 0,
+    winner: rnd() < 0.62 ? 'a' : 'b',
+    walkover: false,
+    comeback: k % 5 === 0,
+    finishedAt: new Date(now - (k % 6) * DAY),
     teams: { a: [member(a)], b: [member(b)] },
   });
 }
@@ -176,6 +213,8 @@ createGameServer({
     profiles: createProfileStore(db),
   },
 }).listen(PORT);
-console.log(`[demo] ${users.length} jogadores, ${room} partidas, ${COMMUNITY.length} fotos da comunidade`);
+console.log(
+  `[demo] ${users.length} jogadores, ${room} partidas, ${COMMUNITY.length} fotos da comunidade`,
+);
 console.log(`[demo] perfil de exemplo: ${users[0]!.nick} · código ${users[0]!.code}`);
 console.log(`[demo] ouvindo em http://localhost:${PORT} (site: http://localhost:5173)`);
