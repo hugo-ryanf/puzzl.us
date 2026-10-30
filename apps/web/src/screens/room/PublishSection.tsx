@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { GlobeIcon } from '../../ui/icons';
 import { t } from '../../i18n';
+import { track } from '../../net/analytics';
 
 export interface Publisher {
   /** Nome que aparece como autor, se a pessoa não trocar. */
@@ -27,6 +28,7 @@ export function PublishSection({ defaultAuthor, publish }: Publisher) {
     setError(undefined);
     try {
       await publish(title.trim(), author.trim());
+      track('foto_publicada');
       setDone(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
