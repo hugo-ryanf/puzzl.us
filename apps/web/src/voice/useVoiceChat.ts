@@ -10,6 +10,7 @@ import type {
 import type { VoiceTokenResponse } from '@puzzle/shared';
 import type { PuzzleRoom } from '../net/connection';
 import { t } from '../i18n';
+import { track } from '../net/analytics';
 
 export type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'unavailable' | 'error';
 
@@ -258,6 +259,7 @@ export function useVoiceChat(room: PuzzleRoom, enabled = true): VoiceChat {
     }
     setNeedsAudioUnlock(!call.canPlaybackAudio);
     setStatus('connected');
+    track('chamada_entrou');
     refresh();
     refreshDevices();
   }, [room]);
