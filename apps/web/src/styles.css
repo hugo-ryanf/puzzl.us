@@ -4395,6 +4395,14 @@ a.btn {
   font-size: 14px;
 }
 
+/* privacidade: o botão para não registrar as visitas (PostHog) */
+.legal-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
 .legal ul {
   padding-left: 20px;
 }
@@ -7038,5 +7046,340 @@ button.profile-number:hover {
     height: 36px;
     padding: 0 12px;
     font-size: 14px;
+  }
+}
+
+/* ── Landing: seções com os trechos do vídeo ─────────────────────────────────────────────────── */
+.lp-section {
+  padding: 88px 0;
+}
+
+.lp-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 680px;
+  margin-bottom: 32px;
+}
+
+.lp-head h2,
+.lp-cta h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.6vw, 44px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.lp-head p,
+.lp-cta p {
+  margin: 4px 0 0;
+  color: var(--lp-ink-2);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+/* os vídeos: quadro de cantos retos, como a galeria */
+.lp-video {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lp-frame-border);
+  background: var(--lp-frame-bg);
+  box-shadow: var(--lp-frame-shadow);
+}
+
+.lp-video video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.lp-video-play {
+  position: absolute;
+  inset: auto auto 14px 14px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 12px;
+  background: rgba(5, 8, 20, 0.55);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* modos: três cartões */
+.lp-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 24px;
+}
+
+.lp-mode {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-ghost-bg);
+}
+
+.lp-mode .lp-video {
+  border: 0;
+  border-bottom: 1px solid var(--lp-line);
+  box-shadow: none;
+}
+
+.lp-mode-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 20px 22px 22px;
+}
+
+.lp-mode-body h3,
+.lp-steps h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.lp-mode-body p,
+.lp-steps p {
+  flex: 1;
+  margin: 0;
+  color: var(--lp-ink-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.lp-mode-body .lp-btn {
+  height: 44px;
+  margin-top: 6px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* texto de um lado, vídeo do outro */
+.lp-split {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  gap: 56px;
+}
+
+.lp-split-reverse {
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+}
+
+.lp-split-reverse .lp-split-copy {
+  order: 2;
+}
+
+.lp-split-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.lp-split-copy .lp-head {
+  margin-bottom: 8px;
+}
+
+.lp-points {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--lp-ink-2);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.lp-point-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--lp-accent);
+  color: var(--lp-bg);
+}
+
+/* comunidade: as fotos publicadas */
+.lp-community {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: 16px;
+  margin: 40px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-community button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 0 0 10px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-ghost-bg);
+  color: var(--lp-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.lp-community button:hover {
+  transform: translateY(-2px);
+}
+
+.lp-community img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  margin-bottom: 8px;
+  object-fit: cover;
+}
+
+.lp-community b,
+.lp-community span {
+  padding: 0 12px;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-community span {
+  color: var(--lp-ink-2);
+  font-size: 13px;
+}
+
+/* como funciona: três passos */
+.lp-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lp-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lp-step-number {
+  margin-top: 10px;
+  color: var(--lp-accent);
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* perguntas */
+.lp-faq-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: 48px;
+}
+
+.lp-faq {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--lp-line);
+}
+
+.lp-faq details {
+  border-bottom: 1px solid var(--lp-line);
+}
+
+.lp-faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 0;
+  font-size: 18px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.lp-faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.lp-faq summary::after {
+  flex: none;
+  color: var(--lp-ink-2);
+  font-size: 24px;
+  font-weight: 400;
+  content: '+';
+  transition: transform 0.2s ease;
+}
+
+.lp-faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.lp-faq p {
+  margin: 0 0 20px;
+  color: var(--lp-ink-2);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* convite final */
+.lp-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: clamp(40px, 6vw, 72px) 24px;
+  border: 1px solid var(--lp-line);
+  background: var(--lp-ghost-bg);
+  text-align: center;
+}
+
+.lp-cta .lp-btn {
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .lp-section {
+    padding: 56px 0;
+  }
+
+  .lp-split,
+  .lp-split-reverse,
+  .lp-faq-wrap {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .lp-split-reverse .lp-split-copy {
+    order: 0;
   }
 }
