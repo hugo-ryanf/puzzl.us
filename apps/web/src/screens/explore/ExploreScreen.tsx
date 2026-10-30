@@ -66,6 +66,8 @@ export interface ExploreScreenProps {
   onNameChange: (name: string) => void;
   /** Diálogos abertos pela barra lateral (que fica no App). */
   createRequested: boolean;
+  /** Foto escolhida na landing: o "Criar sala" dela já abre. */
+  initialChoice?: PuzzleChoice | null;
   joinOpen: boolean;
   initialCode: string;
   onCloseCreate: () => void;
@@ -88,6 +90,7 @@ export function ExploreScreen({
   name,
   onNameChange,
   createRequested,
+  initialChoice = null,
   joinOpen,
   initialCode,
   onCloseCreate,
@@ -103,7 +106,7 @@ export function ExploreScreen({
 }: ExploreScreenProps) {
   const [query, setQuery] = useState('');
   const [orientation, setOrientation] = useState<Orientation>('Todas');
-  const [choice, setChoice] = useState<PuzzleChoice | null>(null);
+  const [choice, setChoice] = useState<PuzzleChoice | null>(initialChoice);
 
   const favoritesOnly = view === 'favorites';
   const q = normalize(query);
