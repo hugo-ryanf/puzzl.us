@@ -18,6 +18,9 @@ export interface Mover {
   dy: number;
   rotate: number;
   delay: number;
+  /** Centro da peça: em volta dele ela gira (a caixa do grupo é a arte inteira). */
+  centerX: number;
+  centerY: number;
   cursorX: number;
   cursorY: number;
   name: string;
@@ -108,7 +111,7 @@ function mesh(
   return out;
 }
 
-/** O contorno de uma peça (lado de 120 no banner 1440×600), com encaixes de um hash da posição. */
+/** O contorno de uma peça (lado de 100 no banner 1440×600), com encaixes de um hash da posição. */
 function piecePath(row: number, col: number, rows: number, cols: number, size: number): string {
   const hash = (a: number, b: number, c: number) =>
     ((((a + 3) * 73856093) ^ ((b + 5) * 19349663) ^ (c * 83492791)) >>> 4) & 1 ? 1 : -1;
@@ -147,23 +150,28 @@ function piecePath(row: number, col: number, rows: number, cols: number, size: n
   );
 }
 
-/** As três peças que saem do lugar, cada uma com o cursor de um amigo. */
-function movers(prefix: string, colors: [string, string, string]): Mover[] {
+/** As quatro peças que saem do lugar, cada uma com o cursor de um amigo. */
+function movers(prefix: string, colors: [string, string, string, string]): Mover[] {
+  // um T de cabeça para baixo: três na última linha, rentes à borda do banner, e uma em cima da
+  // do meio; cada uma sai para o espaço livre ao lado do texto (nunca para dentro da galeria)
   const defs = [
-    { r: 3, c: 9, dx: -90, dy: 210, rotate: -14, delay: 0, name: 'Ana' },
-    { r: 3, c: 10, dx: 120, dy: 180, rotate: 12, delay: -2.3, name: 'Léo' },
-    { r: 4, c: 10, dx: 20, dy: 150, rotate: 18, delay: -4.6, name: 'Bia' },
+    { r: 4, c: 12, dx: 130, dy: -40, rotate: 12, delay: 0, name: 'Ana' },
+    { r: 5, c: 11, dx: -150, dy: -20, rotate: -10, delay: -1.75, name: 'Léo' },
+    { r: 5, c: 12, dx: 40, dy: -110, rotate: -8, delay: -3.5, name: 'Bia' },
+    { r: 5, c: 13, dx: 30, dy: -150, rotate: 14, delay: -5.25, name: 'Caio' },
   ];
-  const size = 120;
+  const size = 100;
   return defs.map((m, i) => ({
     id: `${prefix}${i}`,
-    path: piecePath(m.r, m.c, 5, 12, size),
+    path: piecePath(m.r, m.c, 6, 15, size),
     dx: m.dx,
     dy: m.dy,
     rotate: m.rotate,
     delay: m.delay,
-    cursorX: m.c * size + 70,
-    cursorY: m.r * size + 62,
+    centerX: m.c * size + size / 2,
+    centerY: m.r * size + size / 2,
+    cursorX: m.c * size + 58,
+    cursorY: m.r * size + 52,
     name: m.name,
     color: colors[i]!,
     tagWidth: m.name.length * 9 + 24,
@@ -194,7 +202,7 @@ export const LIGHT_ART: BannerArt = {
     const accent = rnd() < 0.05;
     return { fill, stroke: accent ? 'rgba(18,138,94,0.55)' : fill, width: accent ? 1.3 : 0.6 };
   }),
-  movers: movers('lp-light-', ['#2B59FF', '#B4235A', '#E5862D']),
+  movers: movers('lp-light-', ['#2B59FF', '#B4235A', '#E5862D', '#7B3FE4']),
   shards: [
     {
       points: '980,520 1040,470 1060,560',
@@ -249,7 +257,7 @@ export const DARK_ART: BannerArt = {
     const neon = rnd() < 0.05;
     return { fill, stroke: neon ? 'rgba(125,249,255,0.55)' : fill, width: neon ? 1.4 : 0.6 };
   }),
-  movers: movers('lp-dark-', ['#2F6BFF', '#E52BBF', '#8B3DFF']),
+  movers: movers('lp-dark-', ['#2F6BFF', '#E52BBF', '#8B3DFF', '#00B8C9']),
   shards: [
     {
       points: '980,520 1040,470 1060,560',

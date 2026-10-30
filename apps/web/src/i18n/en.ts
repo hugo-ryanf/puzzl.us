@@ -790,6 +790,8 @@ export const en = {
   'Ver a galeria': 'See the gallery',
   'Escolha por onde começar': 'Pick where to start',
   Jogar: 'Play',
+  'Foto anterior': 'Previous photo',
+  'Próxima foto': 'Next photo',
   'Quem monta mais rápido?': 'Who solves fastest?',
   'O tempo é medido pelo servidor, então não tem como trapacear. Dispute por foto, em solo ou em equipe, e suba de nível a cada partida.':
     'Time is measured by the server, so there is no cheating. Compete per photo, solo or as a team, and level up with every game.',

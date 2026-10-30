@@ -1,9 +1,16 @@
 import { CATALOG, type GeneralRankingEntry } from '@puzzle/shared';
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import bannerDarkUrl from '../../assets/landing-camaleao-escuro.webp';
 import bannerUrl from '../../assets/landing-camaleao.webp';
 import logoUrl from '../../assets/logo.webp';
-import { catalogThumbUrl, localizedCatalogImage } from '../../board/images';
+import { catalogThumbUrl, localizedCatalogImage, puzzleImageUrl } from '../../board/images';
 import { formatNumber, locale, setLocale, t, tRich } from '../../i18n';
 import { fetchGeneralRanking } from '../../net/ranking';
 import {
@@ -170,7 +177,8 @@ function Banner({
       className={`lp-banner lp-only-${variant}`}
       aria-hidden="true"
       viewBox="0 0 1440 600"
-      preserveAspectRatio="xMidYMid slice"
+      // ancorado na base: as peças de baixo ficam sempre rentes à borda do banner
+      preserveAspectRatio="xMidYMax slice"
     >
       <defs>
         <clipPath id={`lp-clip-${variant}`}>
@@ -241,6 +249,7 @@ function Banner({
               '--dx': `${m.dx}px`,
               '--dy': `${m.dy}px`,
               '--r': `${m.rotate}deg`,
+              transformOrigin: `${m.centerX}px ${m.centerY}px`,
               animationDelay: `${m.delay}s`,
             } as CSSProperties
           }
@@ -270,34 +279,18 @@ function Banner({
   );
 }
 
-/** A galeria em carrossel: setas, rolagem com encaixe e a barrinha de progresso. */
+/** A galeria: uma foto por vez, grande, num quadro; as setas passam para a anterior e a próxima. */
 function Gallery({ onPlay }: { onPlay: (choice: PuzzleChoice) => void }) {
-  const track = useRef<HTMLDivElement>(null);
-  const [scroll, setScroll] = useState({ progress: 0, visible: 1 });
+  const [index, setIndex] = useState(0);
+  const count = GALLERY.length;
+  const choice = GALLERY[index]!;
+  const go = (step: number) => setIndex((current) => (current + step + count) % count);
 
-  const measure = useCallback(() => {
-    const el = track.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    setScroll({
-      progress: max > 0 ? el.scrollLeft / max : 0,
-      visible: el.scrollWidth > 0 ? Math.min(1, el.clientWidth / el.scrollWidth) : 1,
-    });
-  }, []);
-
+  // a próxima foto já vem carregando, para a troca não piscar
   useEffect(() => {
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [measure]);
-
-  const go = (direction: number) => {
-    const el = track.current;
-    if (el)
-      el.scrollBy({ left: direction * Math.max(320, el.clientWidth - 160), behavior: 'smooth' });
-  };
-  const atStart = scroll.progress <= 0.01;
-  const atEnd = scroll.progress >= 0.99 || scroll.visible >= 1;
+    const next = new Image();
+    next.src = puzzleImageUrl(GALLERY[(index + 1) % count]!.imageId);
+  }, [index, count]);
 
   return (
     <section id="galeria" className="lp-gallery" aria-labelledby="lp-gallery-title">
@@ -305,58 +298,114 @@ function Gallery({ onPlay }: { onPlay: (choice: PuzzleChoice) => void }) {
       <Backdrop variant="dark" />
       <div className="lp-container lp-gallery-inner">
         <div className="lp-gallery-head">
-          <div>
-            <span className="lp-eyebrow">{t('Galeria')}</span>
-            <h2 id="lp-gallery-title">{t('Escolha por onde começar')}</h2>
-          </div>
-          <div className="lp-arrows">
-            <button
-              type="button"
-              className="lp-square"
-              aria-label={t('Anteriores')}
-              disabled={atStart}
-              onClick={() => go(-1)}
-            >
-              <ChevronLeftIcon size={18} />
-            </button>
-            <button
-              type="button"
-              className="lp-square"
-              aria-label={t('Próximos')}
-              disabled={atEnd}
-              onClick={() => go(1)}
-            >
-              <ChevronRightIcon size={18} />
-            </button>
-          </div>
+          <span className="lp-eyebrow">{t('Galeria')}</span>
+          <h2 id="lp-gallery-title">{t('Escolha por onde começar')}</h2>
         </div>
 
-        <div className="lp-track" ref={track} onScroll={measure}>
-          {GALLERY.map((choice) => (
-            <article key={choice.imageId} className="lp-card">
-              <img className="lp-card-photo" src={choice.thumbUrl} alt="" loading="lazy" />
-              <div className="lp-card-body">
-                <h3>{choice.title}</h3>
-                <div className="lp-card-row">
-                  <span className="lp-card-credit">{choice.subtitle}</span>
-                  <button type="button" className="lp-play" onClick={() => onPlay(choice)}>
-                    {t('Jogar')}
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
+        <div className="lp-slider">
+          <button
+            type="button"
+            className="lp-arrow"
+            aria-label={t('Foto anterior')}
+            onClick={() => go(-1)}
+          >
+            <ChevronLeftIcon size={30} />
+          </button>
+          <Frame>
+            <img
+              key={choice.imageId}
+              className="lp-frame-photo"
+              src={puzzleImageUrl(choice.imageId)}
+              alt={choice.title}
+            />
+          </Frame>
+          <button
+            type="button"
+            className="lp-arrow"
+            aria-label={t('Próxima foto')}
+            onClick={() => go(1)}
+          >
+            <ChevronRightIcon size={30} />
+          </button>
         </div>
-        <div className="lp-progress" aria-hidden="true">
-          <div
-            style={{
-              left: `${scroll.progress * (1 - scroll.visible) * 100}%`,
-              width: `${scroll.visible * 100}%`,
-            }}
-          />
+
+        <div className="lp-caption">
+          <div className="lp-caption-text">
+            <h3>{choice.title}</h3>
+            <span>{choice.subtitle}</span>
+          </div>
+          <span className="lp-counter" aria-live="polite">
+            {index + 1} / {count}
+          </span>
+          <button type="button" className="lp-btn lp-btn-primary" onClick={() => onPlay(choice)}>
+            {t('Jogar')}
+            <ArrowRightIcon size={18} />
+          </button>
         </div>
       </div>
     </section>
+  );
+}
+
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Moldura de quadro (cantos retos, borda fina, sombra larga). Com o mouse em cima, inclina em
+ * perspectiva conforme a posição do cursor e a sombra cresce (só acima de 500 px de largura); ao
+ * sair, volta devagar. A foto acompanha a rolagem em até 14 px (parallax), um pouco ampliada para
+ * não mostrar borda vazia. Quem pede menos movimento no sistema vê o quadro parado.
+ */
+function Frame({ children }: { children: ReactNode }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const layer = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const box = frame.current;
+    const photo = layer.current;
+    if (!box || !photo || reducedMotion()) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const r = box.getBoundingClientRect();
+      const offset = (r.top + r.height / 2 - innerHeight / 2) / innerHeight;
+      const shift = Math.max(-1, Math.min(1, offset)) * 14;
+      photo.style.transform = `translateY(${shift.toFixed(2)}px) scale(1.012)`;
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    addEventListener('scroll', schedule, { passive: true });
+    addEventListener('resize', schedule);
+    return () => {
+      removeEventListener('scroll', schedule);
+      removeEventListener('resize', schedule);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const tilt = (event: MouseEvent<HTMLDivElement>) => {
+    const box = frame.current;
+    if (!box || box.offsetWidth <= 500 || reducedMotion()) return;
+    const r = box.getBoundingClientRect();
+    const x = ((event.clientX - r.left) / r.width) * 2 - 1;
+    const y = ((event.clientY - r.top) / r.height) * 2 - 1;
+    box.classList.add('is-tilted');
+    box.style.transform = `perspective(1400px) rotateY(${(x * 2.2).toFixed(2)}deg) rotateX(${(-y * 1.6).toFixed(2)}deg)`;
+  };
+  const settle = () => {
+    const box = frame.current;
+    if (!box) return;
+    box.classList.remove('is-tilted');
+    box.style.transform = '';
+  };
+
+  return (
+    <div ref={frame} className="lp-frame" onMouseMove={tilt} onMouseLeave={settle}>
+      <div ref={layer} className="lp-frame-layer">
+        {children}
+      </div>
+    </div>
   );
 }
 
