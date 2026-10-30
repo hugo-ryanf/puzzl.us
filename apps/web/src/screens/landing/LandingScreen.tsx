@@ -24,16 +24,21 @@ import { useTheme } from '../../ui/theme';
 import type { PuzzleChoice } from '../explore/CreateRoomDialog';
 import { DARK_ART, LIGHT_ART, type BannerArt } from './landingArt';
 
-/** As fotos da galeria: as primeiras do catálogo, cada uma abre o "Criar sala" com ela. */
-const GALLERY: PuzzleChoice[] = CATALOG.slice(0, 10).map((image) => {
-  const local = localizedCatalogImage(image);
-  return {
-    imageId: image.id,
-    title: local.title,
-    subtitle: local.credit || t('Foto do catálogo'),
-    thumbUrl: catalogThumbUrl(image.id),
-  };
-});
+/**
+ * As fotos da galeria: só as horizontais do catálogo (3:2 ou mais largas), que preenchem o quadro
+ * sem margem; cada uma abre o "Criar sala" com ela.
+ */
+const GALLERY: PuzzleChoice[] = CATALOG.filter((image) => image.width / image.height >= 1.45)
+  .slice(0, 10)
+  .map((image) => {
+    const local = localizedCatalogImage(image);
+    return {
+      imageId: image.id,
+      title: local.title,
+      subtitle: local.credit || t('Foto do catálogo'),
+      thumbUrl: catalogThumbUrl(image.id),
+    };
+  });
 
 export interface LandingScreenProps {
   /** Entra no app: com uma foto, abre o "Criar sala" dela; sem, o "Criar sala" livre. */
@@ -379,10 +384,7 @@ function Gallery({ onPlay }: { onPlay: (choice: PuzzleChoice) => void }) {
   );
 }
 
-/**
- * Uma foto do quadro: inteira (sem corte), sobre uma cópia dela desfocada que preenche as sobras.
- * Ao entrar, avisa quando o slide termina (a anterior pode sair de baixo).
- */
+/** Uma foto do quadro, preenchendo-o. Ao entrar, avisa quando o slide termina (a anterior sai). */
 function Slide({
   choice,
   className,
@@ -400,7 +402,6 @@ function Slide({
         if (event.target === event.currentTarget) onEntered?.();
       }}
     >
-      <img className="lp-slide-fill" src={url} alt="" aria-hidden="true" />
       <img className="lp-slide-photo" src={url} alt={choice.title} />
     </div>
   );

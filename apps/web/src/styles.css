@@ -6577,7 +6577,7 @@ button.profile-number:hover {
      ocupa quase a altura da janela, para ver bem a foto */
   position: relative;
   left: 50%;
-  width: min(calc(100vw - 220px), calc((100vh - 70px) * 16 / 9));
+  width: min(calc(100vw - 220px), calc((100vh - 70px) * 3 / 2));
   min-width: min(100%, 560px);
   margin-top: 8px;
   transform: translateX(-50%);
@@ -6586,8 +6586,8 @@ button.profile-number:hover {
 
 .lp-arrow {
   position: absolute;
-  /* no meio da altura do quadro (16:9 da largura) */
-  top: calc(100cqw * 9 / 32 - 27px);
+  /* no meio da altura do quadro (3:2: a altura é 2/3 da largura) */
+  top: calc(100cqw / 3 - 27px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6620,7 +6620,7 @@ button.profile-number:hover {
 
 .lp-frame {
   position: relative;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 3 / 2;
   overflow: hidden;
   border: 1px solid var(--lp-frame-border);
   background: var(--lp-frame-bg);
@@ -6645,7 +6645,7 @@ button.profile-number:hover {
   will-change: transform;
 }
 
-/* cada foto: inteira (contain) sobre uma cópia dela, desfocada e escura, que preenche as sobras */
+/* cada foto preenche o quadro (todas são horizontais, na proporção dele) */
 .lp-slide {
   position: absolute;
   inset: 0;
@@ -6653,21 +6653,12 @@ button.profile-number:hover {
   background: var(--lp-frame-bg);
 }
 
-.lp-slide-fill {
-  position: absolute;
-  inset: -40px;
-  width: calc(100% + 80px);
-  height: calc(100% + 80px);
-  object-fit: cover;
-  filter: blur(28px) brightness(0.55);
-}
-
 .lp-slide-photo {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 /* a troca: a nova entra pelo lado, como arrastada, e cobre a anterior, que recua e escurece */
@@ -6987,7 +6978,7 @@ button.profile-number:hover {
 
   /* no celular, as setas ficam sobre as bordas da foto */
   .lp-arrow {
-    top: calc(100cqw * 5 / 8 - 22px);
+    top: calc(100cqw * 3 / 8 - 22px);
     width: 44px;
     height: 44px;
   }
@@ -7001,20 +6992,27 @@ button.profile-number:hover {
   }
 
   .lp-frame {
-    aspect-ratio: 4 / 5;
+    aspect-ratio: 4 / 3;
   }
 
+  /* legenda compacta: o quadro é pequeno; as setas já trocam a foto */
   .lp-caption {
-    gap: 8px 12px;
-    padding: 40px 14px 14px;
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 32px 12px 12px;
+  }
+
+  .lp-dots {
+    display: none;
   }
 
   .lp-caption-text {
-    flex-basis: 100%;
-    white-space: normal;
+    font-size: 14px;
   }
 
   .lp-play {
-    height: 40px;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 14px;
   }
 }
