@@ -117,7 +117,7 @@ export function LandingScreen({ onStart, ranking, googleLogin }: LandingScreenPr
 }
 
 const LIGHT_IMAGE: CSSProperties = { mixBlendMode: 'multiply' };
-const DARK_IMAGE: CSSProperties = { filter: 'drop-shadow(0 0 40px rgba(255, 61, 207, 0.35))' };
+const DARK_IMAGE: CSSProperties = { filter: 'drop-shadow(0 0 40px rgba(80, 130, 255, 0.35))' };
 
 /**
  * Tema e idioma, só os ícones sobre o banner: o mesmo tema e o mesmo idioma da barra lateral do
@@ -187,8 +187,8 @@ function Banner({
         </clipPath>
         {variant === 'dark' && (
           <linearGradient id="lp-fade-dark" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0.72" stopColor="#0B0920" stopOpacity="0" />
-            <stop offset="1" stopColor="#0B0920" stopOpacity="0.85" />
+            <stop offset="0.72" stopColor="#0B1024" stopOpacity="0" />
+            <stop offset="1" stopColor="#0B1024" stopOpacity="0.85" />
           </linearGradient>
         )}
         {art.movers.map((m) => (
@@ -280,12 +280,25 @@ function Banner({
   );
 }
 
-/** A galeria: uma foto por vez, grande, num quadro; as setas passam para a anterior e a próxima. */
+/**
+ * A galeria: uma foto por vez, quase do tamanho da tela, num quadro. As setas (e as bolinhas)
+ * trocam a foto com um "slide": a nova entra pelo lado, como arrastada, e cobre a anterior.
+ */
 function Gallery({ onPlay }: { onPlay: (choice: PuzzleChoice) => void }) {
   const [index, setIndex] = useState(0);
+  // a foto que está saindo (fica por baixo até a nova terminar de entrar) e de que lado vem a nova
+  const [leaving, setLeaving] = useState<number | null>(null);
+  const [direction, setDirection] = useState<1 | -1>(1);
   const count = GALLERY.length;
   const choice = GALLERY[index]!;
-  const go = (step: number) => setIndex((current) => (current + step + count) % count);
+
+  const show = (next: number, step: 1 | -1) => {
+    if (next === index) return;
+    setDirection(step);
+    setLeaving(reducedMotion() ? null : index);
+    setIndex(next);
+  };
+  const go = (step: 1 | -1) => show((index + step + count) % count, step);
 
   // a próxima foto já vem carregando, para a troca não piscar
   useEffect(() => {
@@ -293,6 +306,7 @@ function Gallery({ onPlay }: { onPlay: (choice: PuzzleChoice) => void }) {
     next.src = puzzleImageUrl(GALLERY[(index + 1) % count]!.imageId);
   }, [index, count]);
 
+  const side = direction > 0 ? 'from-right' : 'from-left';
   return (
     <section id="galeria" className="lp-gallery" aria-labelledby="lp-gallery-title">
       <Backdrop variant="light" />
@@ -303,48 +317,92 @@ function Gallery({ onPlay }: { onPlay: (choice: PuzzleChoice) => void }) {
           <h2 id="lp-gallery-title">{t('Escolha por onde começar')}</h2>
         </div>
 
-        <div className="lp-slider">
-          <button
-            type="button"
-            className="lp-arrow"
-            aria-label={t('Foto anterior')}
-            onClick={() => go(-1)}
+        {/* o quadro no centro; as setas do lado de fora, na altura do meio dele */}
+        <div className="lp-stage">
+          <Frame
+            overlay={
+              <div className="lp-caption">
+                <div className="lp-dots" role="group" aria-label={t('Galeria')}>
+                  {GALLERY.map((item, i) => (
+                    <button
+                      key={item.imageId}
+                      type="button"
+                      aria-label={t('Foto {n}', { n: i + 1 })}
+                      aria-current={i === index ? 'true' : undefined}
+                      onClick={() => show(i, i > index ? 1 : -1)}
+                    />
+                  ))}
+                </div>
+                <p className="lp-caption-text" aria-live="polite">
+                  <b>{choice.title}</b> · {choice.subtitle}
+                </p>
+                <button type="button" className="lp-play" onClick={() => onPlay(choice)}>
+                  {t('Jogar')}
+                  <ArrowRightIcon size={18} />
+                </button>
+              </div>
+            }
           >
-            <ChevronLeftIcon size={30} />
-          </button>
-          <Frame>
-            <img
+            {leaving !== null && (
+              <Slide
+                key={GALLERY[leaving]!.imageId}
+                choice={GALLERY[leaving]!}
+                className={`is-leaving ${side}`}
+              />
+            )}
+            <Slide
               key={choice.imageId}
-              className="lp-frame-photo"
-              src={puzzleImageUrl(choice.imageId)}
-              alt={choice.title}
+              choice={choice}
+              className={leaving !== null ? `is-entering ${side}` : ''}
+              onEntered={() => setLeaving(null)}
             />
           </Frame>
           <button
             type="button"
-            className="lp-arrow"
+            className="lp-arrow lp-arrow-prev"
+            aria-label={t('Foto anterior')}
+            onClick={() => go(-1)}
+          >
+            <ChevronLeftIcon size={22} />
+          </button>
+          <button
+            type="button"
+            className="lp-arrow lp-arrow-next"
             aria-label={t('Próxima foto')}
             onClick={() => go(1)}
           >
-            <ChevronRightIcon size={30} />
-          </button>
-        </div>
-
-        <div className="lp-caption">
-          <div className="lp-caption-text">
-            <h3>{choice.title}</h3>
-            <span>{choice.subtitle}</span>
-          </div>
-          <span className="lp-counter" aria-live="polite">
-            {index + 1} / {count}
-          </span>
-          <button type="button" className="lp-btn lp-btn-primary" onClick={() => onPlay(choice)}>
-            {t('Jogar')}
-            <ArrowRightIcon size={18} />
+            <ChevronRightIcon size={22} />
           </button>
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Uma foto do quadro: inteira (sem corte), sobre uma cópia dela desfocada que preenche as sobras.
+ * Ao entrar, avisa quando o slide termina (a anterior pode sair de baixo).
+ */
+function Slide({
+  choice,
+  className,
+  onEntered,
+}: {
+  choice: PuzzleChoice;
+  className: string;
+  onEntered?: () => void;
+}) {
+  const url = puzzleImageUrl(choice.imageId);
+  return (
+    <div
+      className={`lp-slide ${className}`}
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget) onEntered?.();
+      }}
+    >
+      <img className="lp-slide-fill" src={url} alt="" aria-hidden="true" />
+      <img className="lp-slide-photo" src={url} alt={choice.title} />
+    </div>
   );
 }
 
@@ -354,9 +412,10 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
  * Moldura de quadro (cantos retos, borda fina, sombra larga). Com o mouse em cima, inclina em
  * perspectiva conforme a posição do cursor e a sombra cresce (só acima de 500 px de largura); ao
  * sair, volta devagar. A foto acompanha a rolagem em até 14 px (parallax), um pouco ampliada para
- * não mostrar borda vazia. Quem pede menos movimento no sistema vê o quadro parado.
+ * não mostrar borda vazia; `overlay` (a legenda) fica parado por cima dela. Quem pede menos
+ * movimento no sistema vê o quadro parado.
  */
-function Frame({ children }: { children: ReactNode }) {
+function Frame({ children, overlay }: { children: ReactNode; overlay?: ReactNode }) {
   const frame = useRef<HTMLDivElement>(null);
   const layer = useRef<HTMLDivElement>(null);
 
@@ -406,6 +465,7 @@ function Frame({ children }: { children: ReactNode }) {
       <div ref={layer} className="lp-frame-layer">
         {children}
       </div>
+      {overlay}
     </div>
   );
 }

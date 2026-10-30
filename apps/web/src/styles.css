@@ -6220,7 +6220,9 @@ button.profile-number:hover {
   --lp-copy-shadow: none;
   --lp-hole: rgba(11, 42, 35, 0.55);
   --lp-hole-line: rgba(255, 255, 255, 0.9);
-  --lp-frame-border: rgba(15, 23, 42, 0.12);
+  --lp-frame-border: rgba(15, 23, 42, 0.8);
+  --lp-arrow-bg: #ffffff;
+  --lp-arrow-border: rgba(15, 23, 42, 0.06);
   --lp-frame-bg: #e3ece7;
   --lp-frame-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
   --lp-frame-shadow-hover: 0 34px 80px rgba(15, 23, 42, 0.2);
@@ -6236,61 +6238,65 @@ button.profile-number:hover {
 }
 
 :root[data-theme='dark'] .landing {
-  --lp-bg: #0b0920;
-  --lp-ink: #f4f1ff;
-  --lp-ink-2: #f1ecff;
+  --lp-bg: #0b1024;
+  --lp-ink: #f1f4ff;
+  --lp-ink-2: #e8ecfa;
   --lp-line: rgba(255, 255, 255, 0.08);
-  --lp-hero-bg: #0b0920;
+  --lp-hero-bg: #0b1024;
   --lp-brand: #ffffff;
   --lp-brand-dot: #ffffff;
   --lp-accent: #ffffff;
   --lp-eyebrow: #ffffff;
   --lp-primary-bg: #ffffff;
-  --lp-primary-fg: #0b0920;
+  --lp-primary-fg: #0b1024;
   --lp-primary-hover: #ffffff;
-  --lp-primary-shadow: 0 10px 30px -8px rgba(255, 61, 207, 0.6);
-  --lp-ghost-bg: rgba(11, 9, 32, 0.3);
+  --lp-primary-shadow: 0 10px 30px -8px rgba(80, 130, 255, 0.5);
+  --lp-ghost-bg: rgba(11, 16, 36, 0.3);
   --lp-ghost-border: rgba(255, 255, 255, 0.3);
   --lp-ghost-hover: rgba(255, 255, 255, 0.08);
-  --lp-copy-shadow: 0 2px 24px rgba(11, 9, 32, 0.5);
+  --lp-copy-shadow: 0 2px 24px rgba(11, 16, 36, 0.5);
   --lp-hole: rgba(5, 3, 15, 0.72);
   --lp-hole-line: rgba(255, 255, 255, 0.7);
-  --lp-frame-border: rgba(255, 255, 255, 0.14);
-  --lp-frame-bg: #17132e;
+  --lp-frame-border: rgba(255, 255, 255, 0.4);
+  --lp-arrow-bg: #151b38;
+  --lp-arrow-border: rgba(255, 255, 255, 0.14);
+  --lp-frame-bg: #151b38;
   --lp-frame-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
   --lp-frame-shadow-hover: 0 34px 80px rgba(0, 0, 0, 0.6);
-  --lp-footer-bg: #07061a;
-  --lp-footer-fg: #b9b3d6;
+  --lp-footer-bg: #070b1a;
+  --lp-footer-fg: #aab3d6;
   --lp-focus: #3df5ff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .landing {
-    --lp-bg: #0b0920;
-    --lp-ink: #f4f1ff;
-    --lp-ink-2: #f1ecff;
+    --lp-bg: #0b1024;
+    --lp-ink: #f1f4ff;
+    --lp-ink-2: #e8ecfa;
     --lp-line: rgba(255, 255, 255, 0.08);
-    --lp-hero-bg: #0b0920;
+    --lp-hero-bg: #0b1024;
     --lp-brand: #ffffff;
     --lp-brand-dot: #ffffff;
     --lp-accent: #ffffff;
     --lp-eyebrow: #ffffff;
     --lp-primary-bg: #ffffff;
-    --lp-primary-fg: #0b0920;
+    --lp-primary-fg: #0b1024;
     --lp-primary-hover: #ffffff;
-    --lp-primary-shadow: 0 10px 30px -8px rgba(255, 61, 207, 0.6);
-    --lp-ghost-bg: rgba(11, 9, 32, 0.3);
+    --lp-primary-shadow: 0 10px 30px -8px rgba(80, 130, 255, 0.5);
+    --lp-ghost-bg: rgba(11, 16, 36, 0.3);
     --lp-ghost-border: rgba(255, 255, 255, 0.3);
     --lp-ghost-hover: rgba(255, 255, 255, 0.08);
-    --lp-copy-shadow: 0 2px 24px rgba(11, 9, 32, 0.5);
+    --lp-copy-shadow: 0 2px 24px rgba(11, 16, 36, 0.5);
     --lp-hole: rgba(5, 3, 15, 0.72);
     --lp-hole-line: rgba(255, 255, 255, 0.7);
-    --lp-frame-border: rgba(255, 255, 255, 0.14);
-    --lp-frame-bg: #17132e;
+    --lp-frame-border: rgba(255, 255, 255, 0.4);
+    --lp-arrow-bg: #151b38;
+    --lp-arrow-border: rgba(255, 255, 255, 0.14);
+    --lp-frame-bg: #151b38;
     --lp-frame-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
     --lp-frame-shadow-hover: 0 34px 80px rgba(0, 0, 0, 0.6);
-    --lp-footer-bg: #07061a;
-    --lp-footer-fg: #b9b3d6;
+    --lp-footer-bg: #070b1a;
+    --lp-footer-fg: #aab3d6;
     --lp-focus: #3df5ff;
   }
 }
@@ -6565,48 +6571,56 @@ button.profile-number:hover {
   letter-spacing: -0.03em;
 }
 
-/* a galeria: uma foto por vez num quadro (cantos retos), setas dos lados */
-.lp-slider {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
-  align-items: center;
-  gap: 12px;
+/* a galeria: uma foto por vez num quadro (cantos retos), centralizado; as setas do lado de fora */
+.lp-stage {
+  /* quase a tela toda: passa da largura do conteúdo, deixa espaço para as setas dos lados e
+     ocupa quase a altura da janela, para ver bem a foto */
+  position: relative;
+  left: 50%;
+  width: min(calc(100vw - 220px), calc((100vh - 70px) * 16 / 9));
+  min-width: min(100%, 560px);
+  margin-top: 8px;
+  transform: translateX(-50%);
+  container-type: inline-size;
 }
 
 .lp-arrow {
+  position: absolute;
+  /* no meio da altura do quadro (16:9 da largura) */
+  top: calc(100cqw * 9 / 32 - 27px);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
   padding: 0;
-  border: 0;
-  background: none;
+  border: 1px solid var(--lp-arrow-border);
+  border-radius: 50%;
+  background: var(--lp-arrow-bg);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.14);
   color: var(--lp-ink);
-  opacity: 0.7;
   cursor: pointer;
   transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.lp-arrow-prev {
+  left: -88px;
+}
+
+.lp-arrow-next {
+  right: -88px;
 }
 
 .lp-arrow:hover {
-  opacity: 1;
-}
-
-.lp-arrow:first-child:hover {
-  transform: translateX(-3px);
-}
-
-.lp-arrow:last-child:hover {
-  transform: translateX(3px);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.2);
+  transform: scale(1.05);
 }
 
 .lp-frame {
   position: relative;
   aspect-ratio: 16 / 9;
-  /* título, quadro e legenda cabem juntos na tela */
-  max-height: max(320px, calc(100vh - 300px));
   overflow: hidden;
   border: 1px solid var(--lp-frame-border);
   background: var(--lp-frame-bg);
@@ -6631,54 +6645,176 @@ button.profile-number:hover {
   will-change: transform;
 }
 
-.lp-frame-photo {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  animation: lp-photo-in 0.45s ease;
+/* cada foto: inteira (contain) sobre uma cópia dela, desfocada e escura, que preenche as sobras */
+.lp-slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--lp-frame-bg);
 }
 
-@keyframes lp-photo-in {
+.lp-slide-fill {
+  position: absolute;
+  inset: -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 80px);
+  object-fit: cover;
+  filter: blur(28px) brightness(0.55);
+}
+
+.lp-slide-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* a troca: a nova entra pelo lado, como arrastada, e cobre a anterior, que recua e escurece */
+.lp-slide.is-entering {
+  z-index: 1;
+  animation: 0.7s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+.lp-slide.is-entering.from-right {
+  animation-name: lp-slide-in-right;
+  box-shadow: -30px 0 60px rgba(0, 0, 0, 0.35);
+}
+
+.lp-slide.is-entering.from-left {
+  animation-name: lp-slide-in-left;
+  box-shadow: 30px 0 60px rgba(0, 0, 0, 0.35);
+}
+
+.lp-slide.is-leaving {
+  animation: 0.7s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+.lp-slide.is-leaving.from-right {
+  animation-name: lp-slide-away-left;
+}
+
+.lp-slide.is-leaving.from-left {
+  animation-name: lp-slide-away-right;
+}
+
+@keyframes lp-slide-in-right {
   from {
-    opacity: 0;
+    transform: translateX(100%);
   }
 }
 
+@keyframes lp-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes lp-slide-away-left {
+  to {
+    filter: brightness(0.6);
+    transform: translateX(-22%);
+  }
+}
+
+@keyframes lp-slide-away-right {
+  to {
+    filter: brightness(0.6);
+    transform: translateX(22%);
+  }
+}
+
+/* dentro do quadro, sobre a foto: as bolinhas (uma por foto), o nome da foto e o "Jogar" */
 .lp-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px 24px;
-  margin: 0 68px;
+  gap: 12px 20px;
+  padding: 56px 28px 22px;
+  background: linear-gradient(to top, rgba(5, 8, 20, 0.72), rgba(5, 8, 20, 0));
+  color: #ffffff;
+}
+
+.lp-dots {
+  display: flex;
+}
+
+.lp-dots button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.lp-dots button::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  content: '';
+  transition:
+    background 0.2s ease,
+    width 0.2s ease;
+}
+
+.lp-dots button[aria-current='true'] {
+  width: 30px;
+}
+
+.lp-dots button[aria-current='true']::before {
+  width: 20px;
+  border-radius: 999px;
+  background: #ffffff;
 }
 
 .lp-caption-text {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
-}
-
-.lp-caption-text h3 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
 }
 
-.lp-caption-text span {
-  color: var(--lp-ink-2);
-  font-size: 14px;
-}
-
-.lp-counter {
-  color: var(--lp-ink-2);
-  font-family: 'JetBrains Mono Variable', ui-monospace, monospace;
-  font-size: 14px;
+.lp-caption-text b {
+  color: #ffffff;
   font-weight: 600;
+}
+
+/* "Jogar": transparente, só o contorno, sobre a foto */
+.lp-play {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.lp-play:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 /* ranking: a mesma tela de Ranking do app; no escuro, as superfícies dela no tom da landing */
@@ -6687,26 +6823,26 @@ button.profile-number:hover {
 }
 
 :root[data-theme='dark'] .lp-ranking-section {
-  --bg: #0b0920;
-  --surface: #17132e;
-  --surface-2: #1d1838;
+  --bg: #0b1024;
+  --surface: #151b38;
+  --surface-2: #1a2142;
   --border: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.16);
   --divider: rgba(255, 255, 255, 0.07);
-  --hover: #241e45;
-  --segmented: #1d1838;
+  --hover: #222a50;
+  --segmented: #1a2142;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .lp-ranking-section {
-    --bg: #0b0920;
-    --surface: #17132e;
-    --surface-2: #1d1838;
+    --bg: #0b1024;
+    --surface: #151b38;
+    --surface-2: #1a2142;
     --border: rgba(255, 255, 255, 0.09);
     --border-strong: rgba(255, 255, 255, 0.16);
     --divider: rgba(255, 255, 255, 0.07);
-    --hover: #241e45;
-    --segmented: #1d1838;
+    --hover: #222a50;
+    --segmented: #1a2142;
   }
 }
 
@@ -6813,7 +6949,7 @@ button.profile-number:hover {
     transition: none;
   }
 
-  .lp-frame-photo {
+  .lp-slide {
     animation: none;
   }
 }
@@ -6842,13 +6978,26 @@ button.profile-number:hover {
     font-size: 14px;
   }
 
-  .lp-slider {
-    grid-template-columns: 36px minmax(0, 1fr) 36px;
-    gap: 4px;
+  .lp-stage {
+    left: 0;
+    width: 100%;
+    min-width: 0;
+    transform: none;
   }
 
+  /* no celular, as setas ficam sobre as bordas da foto */
   .lp-arrow {
-    width: 36px;
+    top: calc(100cqw * 5 / 8 - 22px);
+    width: 44px;
+    height: 44px;
+  }
+
+  .lp-arrow-prev {
+    left: 8px;
+  }
+
+  .lp-arrow-next {
+    right: 8px;
   }
 
   .lp-frame {
@@ -6856,10 +7005,16 @@ button.profile-number:hover {
   }
 
   .lp-caption {
-    margin: 0 40px;
+    gap: 8px 12px;
+    padding: 40px 14px 14px;
   }
 
   .lp-caption-text {
     flex-basis: 100%;
+    white-space: normal;
+  }
+
+  .lp-play {
+    height: 40px;
   }
 }

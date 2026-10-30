@@ -792,4 +792,5 @@ export const en = {
   Jogar: 'Play',
   'Foto anterior': 'Previous photo',
   'Próxima foto': 'Next photo',
+  'Foto {n}': 'Photo {n}',
 } satisfies Record<string, string>;

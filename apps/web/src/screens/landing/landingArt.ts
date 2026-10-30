@@ -153,12 +153,12 @@ function piecePath(row: number, col: number, rows: number, cols: number, size: n
 /** As quatro peças que saem do lugar, cada uma com o cursor de um amigo. */
 function movers(prefix: string, colors: [string, string, string, string]): Mover[] {
   // um T de cabeça para baixo: três na última linha, rentes à borda do banner, e uma em cima da
-  // do meio; cada uma sai para o espaço livre ao lado do texto (nunca para dentro da galeria)
+  // do meio; cada uma sai por baixo, atravessando a borda do banner (por cima da galeria)
   const defs = [
-    { r: 4, c: 12, dx: 130, dy: -40, rotate: 12, delay: 0, name: 'Ana' },
-    { r: 5, c: 11, dx: -150, dy: -20, rotate: -10, delay: -1.75, name: 'Léo' },
-    { r: 5, c: 12, dx: 40, dy: -110, rotate: -8, delay: -3.5, name: 'Bia' },
-    { r: 5, c: 13, dx: 30, dy: -150, rotate: 14, delay: -5.25, name: 'Caio' },
+    { r: 4, c: 12, dx: -40, dy: 230, rotate: -14, delay: 0, name: 'Ana' },
+    { r: 5, c: 11, dx: -150, dy: 140, rotate: -10, delay: -1.75, name: 'Léo' },
+    { r: 5, c: 12, dx: 30, dy: 170, rotate: 12, delay: -3.5, name: 'Bia' },
+    { r: 5, c: 13, dx: 130, dy: 130, rotate: 16, delay: -5.25, name: 'Caio' },
   ];
   const size = 100;
   return defs.map((m, i) => ({
@@ -242,13 +242,13 @@ export const LIGHT_ART: BannerArt = {
 };
 
 const NEON: Array<[number, [number, number, number]]> = [
-  [0, [18, 54, 210]],
-  [0.45, [92, 30, 196]],
-  [0.75, [184, 36, 178]],
-  [1, [236, 52, 196]],
+  [0, [14, 28, 92]],
+  [0.45, [24, 46, 140]],
+  [0.75, [40, 58, 170]],
+  [1, [58, 72, 196]],
 ];
 
-/** Tema escuro: do azul ao rosa, com alguns traços ciano. */
+/** Tema escuro: do azul-marinho ao índigo, com alguns traços ciano. */
 export const DARK_ART: BannerArt = {
   mesh: mesh(20, 9, 1440, 600, 91, 0.75, (cx, cy, side, rnd) => {
     const base = mix(NEON, cx * 0.7 + (1 - cy) * 0.45 - 0.08);
@@ -261,8 +261,8 @@ export const DARK_ART: BannerArt = {
   shards: [
     {
       points: '980,520 1040,470 1060,560',
-      fill: 'rgba(255,61,207,0.18)',
-      stroke: 'rgba(255,61,207,0.8)',
+      fill: 'rgba(61,140,255,0.16)',
+      stroke: 'rgba(110,170,255,0.8)',
       delay: 0,
     },
     {
@@ -273,8 +273,8 @@ export const DARK_ART: BannerArt = {
     },
     {
       points: '900,60 940,30 950,90',
-      fill: 'rgba(139,61,255,0.2)',
-      stroke: 'rgba(170,120,255,0.8)',
+      fill: 'rgba(90,110,255,0.2)',
+      stroke: 'rgba(130,150,255,0.8)',
       delay: -4,
     },
     {
@@ -291,7 +291,7 @@ export const DARK_ART: BannerArt = {
     },
   ],
   backdrop: mesh(18, 8, 1440, 640, 17, 0.75, (cx, cy, side, rnd) => {
-    const fill = `hsl(${(252 + cx * 40).toFixed(0)}, 52%, ${(8 + cy * 4 + side * 1.2 + rnd() * 2.6).toFixed(1)}%)`;
+    const fill = `hsl(${(222 + cx * 14).toFixed(0)}, 48%, ${(8 + cy * 4 + side * 1.2 + rnd() * 2.6).toFixed(1)}%)`;
     return { fill, stroke: fill, width: 0.6 };
   }),
 };

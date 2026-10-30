@@ -51,6 +51,8 @@ interface RankingScreenProps {
   onCreateRoom?: () => void;
   /** Clicar no nome de quem tem conta abre o perfil (sem ele, os nomes são só texto). */
   onOpenProfile?: (code: string) => void;
+  /** Mostra os "Mais jogados da semana" no topo (a landing esconde). */
+  trending?: boolean;
 }
 
 /**
@@ -192,6 +194,7 @@ export function RankingScreen({
   community,
   onCreateRoom,
   onOpenProfile,
+  trending: showTrending = true,
 }: RankingScreenProps) {
   const images: ImageOption[] = [
     ...CATALOG.map(localizedCatalogImage).map((image) => ({
@@ -255,6 +258,7 @@ export function RankingScreen({
   const [trending, setTrending] = useState<TrendingItem[]>();
   const [showAllTrending, setShowAllTrending] = useState(false);
   useEffect(() => {
+    if (!showTrending) return;
     let current = true;
     fetchPopularImages({ period: 'week', limit: showAllTrending ? TRENDING_ALL : TRENDING })
       .then((list) => {
@@ -272,7 +276,7 @@ export function RankingScreen({
     };
     // `byId` muda a cada render; a lista da comunidade é o que importa.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [community, showAllTrending]);
+  }, [community, showAllTrending, showTrending]);
 
   // Fotos para o seletor do ranking por foto: as mais jogadas da modalidade no período.
   const [popular, setPopular] = useState<string[]>();
@@ -334,7 +338,7 @@ export function RankingScreen({
     <div className="rk">
       <h1 className="sr-only">Ranking</h1>
 
-      {!!trending?.length && (
+      {showTrending && !!trending?.length && (
         <Trending
           items={trending}
           selected={tab === 'puzzle' ? query.image : undefined}

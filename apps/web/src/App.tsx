@@ -177,6 +177,7 @@ export function App() {
           <RankingScreen
             initial={{ ...DEFAULT_RANKING, tab: 'general' }}
             community={community.puzzles}
+            trending={false}
             onCreateRoom={() => startFromLanding()}
             onOpenProfile={(code) => {
               scrollTo(0, 0);
