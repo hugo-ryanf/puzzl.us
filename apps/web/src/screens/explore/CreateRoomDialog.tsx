@@ -30,6 +30,7 @@ import {
   UsersIcon,
 } from '../../ui/icons';
 import { formatNumber, t, tRich } from '../../i18n';
+import { track } from '../../net/analytics';
 
 /** A imagem escolhida na grade do catálogo. */
 export interface PuzzleChoice {
@@ -53,9 +54,12 @@ interface CreateRoomDialogProps {
   nameLocked?: boolean;
   onClose: () => void;
   onCreated: (room: PuzzleRoom) => void;
+  /** O modo já escolhido ao abrir (os "Jogar" dos modos na landing). */
+  initialMode?: CreateRoomMode;
 }
 
-type Mode = 'solo' | 'multi' | 'battle' | 'bullet';
+export type CreateRoomMode = 'solo' | 'multi' | 'battle' | 'bullet';
+type Mode = CreateRoomMode;
 type BattleFormat = '1v1' | '2v2';
 const PLAYER_OPTIONS = Array.from({ length: MAX_PLAYERS - 1 }, (_, i) => i + 2); // 2, 3, 4
 /** No Bullet dá para jogar sozinho também. */
@@ -72,9 +76,10 @@ export function CreateRoomDialog({
   nameLocked = false,
   onClose,
   onCreated,
+  initialMode = 'solo',
 }: CreateRoomDialogProps) {
   const custom = source === 'custom';
-  const [mode, setMode] = useState<Mode>('solo');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [minutes, setMinutes] = useState<(typeof BULLET_MINUTES)[number]>(5);
   const [bulletPieces, setBulletPieces] = useState<(typeof BULLET_PIECES)[number]>(12);
   const [bulletPlayers, setBulletPlayers] = useState(1);
@@ -114,6 +119,17 @@ export function CreateRoomDialog({
       }
     : (source ?? undefined);
 
+  /** A sala nasceu: conta para a análise de uso (modo, tamanho, foto) e entra nela. */
+  function created(room: PuzzleRoom) {
+    track('sala_criada', {
+      modo: mode,
+      pecas: bullet || timedBattle ? bulletPieces : pieceCount,
+      jogadores: bullet ? bulletPlayers : mode === 'solo' ? 1 : mode === 'battle' ? 2 : players,
+      foto: custom ? 'propria' : random ? 'aleatoria' : 'escolhida',
+    });
+    onCreated(room);
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!source) return;
@@ -125,7 +141,7 @@ export function CreateRoomDialog({
       setBusy(true);
       setError(undefined);
       try {
-        onCreated(
+        created(
           await createBulletRoom({
             name: trimmed,
             minutes,
@@ -144,7 +160,7 @@ export function CreateRoomDialog({
       setBusy(true);
       setError(undefined);
       try {
-        onCreated(
+        created(
           await createBattleRoom({
             name: trimmed,
             pieceCount: bulletPieces,
@@ -167,11 +183,11 @@ export function CreateRoomDialog({
     setError(undefined);
     try {
       if (mode === 'battle') {
-        onCreated(await createBattleRoom({ name: trimmed, pieceCount, imageId, format, powers }));
+        created(await createBattleRoom({ name: trimmed, pieceCount, imageId, format, powers }));
         return;
       }
       const maxPlayers = mode === 'solo' ? 1 : players;
-      onCreated(await createRoom({ name: trimmed, pieceCount, imageId, maxPlayers }));
+      created(await createRoom({ name: trimmed, pieceCount, imageId, maxPlayers }));
     } catch (e) {
       setError(friendlyError(e));
       setBusy(false);
