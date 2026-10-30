@@ -6223,6 +6223,7 @@ button.profile-number:hover {
   --lp-frame-border: rgba(15, 23, 42, 0.8);
   --lp-arrow-bg: #ffffff;
   --lp-arrow-border: rgba(15, 23, 42, 0.06);
+  --lp-dot-off: rgba(16, 35, 30, 0.25);
   --lp-frame-bg: #e3ece7;
   --lp-frame-shadow: 0 22px 60px rgba(15, 23, 42, 0.12);
   --lp-frame-shadow-hover: 0 34px 80px rgba(15, 23, 42, 0.2);
@@ -6260,6 +6261,7 @@ button.profile-number:hover {
   --lp-frame-border: rgba(255, 255, 255, 0.4);
   --lp-arrow-bg: #151b38;
   --lp-arrow-border: rgba(255, 255, 255, 0.14);
+  --lp-dot-off: rgba(255, 255, 255, 0.3);
   --lp-frame-bg: #151b38;
   --lp-frame-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
   --lp-frame-shadow-hover: 0 34px 80px rgba(0, 0, 0, 0.6);
@@ -6292,6 +6294,7 @@ button.profile-number:hover {
     --lp-frame-border: rgba(255, 255, 255, 0.4);
     --lp-arrow-bg: #151b38;
     --lp-arrow-border: rgba(255, 255, 255, 0.14);
+    --lp-dot-off: rgba(255, 255, 255, 0.3);
     --lp-frame-bg: #151b38;
     --lp-frame-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
     --lp-frame-shadow-hover: 0 34px 80px rgba(0, 0, 0, 0.6);
@@ -6404,9 +6407,32 @@ button.profile-number:hover {
 }
 
 .lp-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  margin-left: 6px;
+  padding: 0 16px;
+  border: 1px solid var(--lp-ghost-border);
+  border-radius: 12px;
+  background: var(--lp-ghost-bg);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  color: var(--lp-ink);
   font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.lp-login-short {
+  display: none;
+}
+
+.lp-login:hover {
+  background: var(--lp-ghost-hover);
+  transform: translateY(-1px);
 }
 
 .lp-btn {
@@ -6456,9 +6482,8 @@ button.profile-number:hover {
   position: relative;
   z-index: 2;
   background: var(--lp-hero-bg);
-  aspect-ratio: 12 / 5;
-  min-height: 560px;
-  max-height: 760px;
+  /* proporção 12:5 entre 560 e 760 px de altura (com aspect-ratio, o limite encolhia a largura) */
+  height: clamp(560px, calc(100vw * 5 / 12), 760px);
 }
 
 .lp-hero-art {
@@ -6529,6 +6554,7 @@ button.profile-number:hover {
 .lp-gallery {
   position: relative;
   overflow: hidden;
+  padding-bottom: 64px;
 }
 
 .lp-backdrop {
@@ -6542,9 +6568,9 @@ button.profile-number:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
   padding-top: 96px;
-  padding-bottom: 88px;
+  padding-bottom: 18px;
 }
 
 .lp-gallery-head {
@@ -6571,23 +6597,53 @@ button.profile-number:hover {
   letter-spacing: -0.03em;
 }
 
-/* a galeria: uma foto por vez num quadro (cantos retos), centralizado; as setas do lado de fora */
-.lp-stage {
-  /* quase a tela toda: passa da largura do conteúdo, deixa espaço para as setas dos lados e
-     ocupa quase a altura da janela, para ver bem a foto */
+/* a galeria: carrossel circular; a foto atual no centro, metade das vizinhas dos lados */
+.lp-carousel {
+  /* largura de cada foto: metade das vizinhas cabe nos lados, e a altura cabe na janela */
+  --w: min(46vw, calc((100vh - 240px) * 3 / 2));
+  --gap: 28px;
   position: relative;
-  left: 50%;
-  width: min(calc(100vw - 220px), calc((100vh - 70px) * 3 / 2));
-  min-width: min(100%, 560px);
-  margin-top: 8px;
-  transform: translateX(-50%);
-  container-type: inline-size;
+  overflow: hidden;
+  padding: 8px 0 28px;
 }
 
+.lp-carousel-track {
+  display: flex;
+  gap: var(--gap);
+  width: max-content;
+  margin-left: 50%;
+  transform: translateX(calc(var(--pos) * -1 * (var(--w) + var(--gap)) - var(--w) / 2));
+  transition: transform 0.8s cubic-bezier(0.22, 0.7, 0.2, 1);
+}
+
+.lp-cslide {
+  flex: none;
+  width: var(--w);
+  opacity: 0.5;
+  transform: scale(0.88);
+  cursor: pointer;
+  transition:
+    transform 0.8s cubic-bezier(0.22, 0.7, 0.2, 1),
+    opacity 0.8s ease;
+}
+
+.lp-cslide.is-active {
+  opacity: 1;
+  transform: none;
+  cursor: default;
+}
+
+/* o salto da cópia da ponta para a foto original: sem animação */
+.lp-carousel-track.is-instant,
+.lp-carousel-track.is-instant .lp-cslide {
+  transition: none;
+}
+
+/* as setas no vão entre a foto do centro e as dos lados, na altura do meio */
 .lp-arrow {
   position: absolute;
-  /* no meio da altura do quadro (3:2: a altura é 2/3 da largura) */
-  top: calc(100cqw / 3 - 27px);
+  top: calc(8px + var(--w) / 3 - 27px);
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6606,11 +6662,11 @@ button.profile-number:hover {
 }
 
 .lp-arrow-prev {
-  left: -88px;
+  left: calc(50% - var(--w) / 2 - var(--gap) / 2 - 27px);
 }
 
 .lp-arrow-next {
-  right: -88px;
+  right: calc(50% - var(--w) / 2 - var(--gap) / 2 - 27px);
 }
 
 .lp-arrow:hover {
@@ -6646,13 +6702,6 @@ button.profile-number:hover {
 }
 
 /* cada foto preenche o quadro (todas são horizontais, na proporção dele) */
-.lp-slide {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background: var(--lp-frame-bg);
-}
-
 .lp-slide-photo {
   position: absolute;
   inset: 0;
@@ -6661,61 +6710,7 @@ button.profile-number:hover {
   object-fit: cover;
 }
 
-/* a troca: a nova entra pelo lado, como arrastada, e cobre a anterior, que recua e escurece */
-.lp-slide.is-entering {
-  z-index: 1;
-  animation: 0.7s cubic-bezier(0.22, 0.7, 0.2, 1) both;
-}
-
-.lp-slide.is-entering.from-right {
-  animation-name: lp-slide-in-right;
-  box-shadow: -30px 0 60px rgba(0, 0, 0, 0.35);
-}
-
-.lp-slide.is-entering.from-left {
-  animation-name: lp-slide-in-left;
-  box-shadow: 30px 0 60px rgba(0, 0, 0, 0.35);
-}
-
-.lp-slide.is-leaving {
-  animation: 0.7s cubic-bezier(0.22, 0.7, 0.2, 1) both;
-}
-
-.lp-slide.is-leaving.from-right {
-  animation-name: lp-slide-away-left;
-}
-
-.lp-slide.is-leaving.from-left {
-  animation-name: lp-slide-away-right;
-}
-
-@keyframes lp-slide-in-right {
-  from {
-    transform: translateX(100%);
-  }
-}
-
-@keyframes lp-slide-in-left {
-  from {
-    transform: translateX(-100%);
-  }
-}
-
-@keyframes lp-slide-away-left {
-  to {
-    filter: brightness(0.6);
-    transform: translateX(-22%);
-  }
-}
-
-@keyframes lp-slide-away-right {
-  to {
-    filter: brightness(0.6);
-    transform: translateX(22%);
-  }
-}
-
-/* dentro do quadro, sobre a foto: as bolinhas (uma por foto), o nome da foto e o "Jogar" */
+/* dentro do quadro do centro, sobre a foto: o nome da foto e o "Jogar" */
 .lp-caption {
   position: absolute;
   right: 0;
@@ -6723,49 +6718,11 @@ button.profile-number:hover {
   left: 0;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 12px 20px;
-  padding: 56px 28px 22px;
+  padding: 56px 24px 20px;
   background: linear-gradient(to top, rgba(5, 8, 20, 0.72), rgba(5, 8, 20, 0));
   color: #ffffff;
-}
-
-.lp-dots {
-  display: flex;
-}
-
-.lp-dots button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
-.lp-dots button::before {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.45);
-  content: '';
-  transition:
-    background 0.2s ease,
-    width 0.2s ease;
-}
-
-.lp-dots button[aria-current='true'] {
-  width: 30px;
-}
-
-.lp-dots button[aria-current='true']::before {
-  width: 20px;
-  border-radius: 999px;
-  background: #ffffff;
 }
 
 .lp-caption-text {
@@ -6806,6 +6763,46 @@ button.profile-number:hover {
 
 .lp-play:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+
+/* embaixo do carrossel: uma bolinha por foto */
+.lp-dots {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.lp-dots button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.lp-dots button::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lp-dot-off);
+  content: '';
+  transition:
+    background 0.2s ease,
+    width 0.2s ease;
+}
+
+.lp-dots button[aria-current='true'] {
+  width: 30px;
+}
+
+.lp-dots button[aria-current='true']::before {
+  width: 20px;
+  border-radius: 999px;
+  background: var(--lp-ink);
 }
 
 /* ranking: a mesma tela de Ranking do app; no escuro, as superfícies dela no tom da landing */
@@ -6887,18 +6884,44 @@ button.profile-number:hover {
   }
 }
 
+/* o cursor só some quando a peça está parada: chega, arrasta para o encaixe, solta e sai; volta,
+   pega a peça encaixada e a arrasta para fora */
 @keyframes lp-cursor {
   0%,
-  4% {
+  3% {
     opacity: 0;
   }
   8%,
-  40% {
+  36% {
     opacity: 1;
   }
-  48%,
+  42%,
+  62% {
+    opacity: 0;
+  }
+  67%,
+  92% {
+    opacity: 1;
+  }
+  97%,
   100% {
     opacity: 0;
+  }
+}
+
+/* o mesmo deslocamento da peça (mesmos tempos e curva do lp-lift), sem girar */
+@keyframes lp-follow {
+  0%,
+  10% {
+    transform: translate(var(--dx), var(--dy));
+  }
+  34%,
+  70% {
+    transform: translate(0, 0);
+  }
+  90%,
+  100% {
+    transform: translate(var(--dx), var(--dy));
   }
 }
 
@@ -6922,6 +6945,10 @@ button.profile-number:hover {
   animation: lp-cursor 7s ease infinite;
 }
 
+.lp-follow {
+  animation: lp-follow 7s cubic-bezier(0.55, 0, 0.25, 1) infinite;
+}
+
 .lp-drift {
   animation: lp-drift 8s ease-in-out infinite;
   transform-box: fill-box;
@@ -6930,6 +6957,7 @@ button.profile-number:hover {
 
 @media (prefers-reduced-motion: reduce) {
   .lp-lift,
+  .lp-follow,
   .lp-cursor,
   .lp-drift {
     animation: none;
@@ -6940,17 +6968,16 @@ button.profile-number:hover {
     transition: none;
   }
 
-  .lp-slide {
-    animation: none;
+  .lp-carousel-track,
+  .lp-cslide {
+    transition: none;
   }
 }
 
 /* celular: a arte numa faixa e o texto embaixo dela */
 @media (max-width: 760px) {
   .lp-hero {
-    aspect-ratio: auto;
-    min-height: 0;
-    max-height: none;
+    height: auto;
   }
 
   .lp-hero-art {
@@ -6966,44 +6993,41 @@ button.profile-number:hover {
   }
 
   .lp-login {
+    gap: 8px;
+    height: 40px;
+    padding: 0 12px;
     font-size: 14px;
+    white-space: nowrap;
   }
 
-  .lp-stage {
-    left: 0;
-    width: 100%;
-    min-width: 0;
-    transform: none;
+  .lp-login-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
-  /* no celular, as setas ficam sobre as bordas da foto */
+  .lp-login-short {
+    display: inline;
+  }
+
+  /* no celular, a foto do centro quase da largura toda; as vizinhas só espiam */
+  .lp-carousel {
+    --w: 78vw;
+    --gap: 12px;
+  }
+
   .lp-arrow {
-    top: calc(100cqw * 3 / 8 - 22px);
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
+    margin-top: 7px;
   }
 
-  .lp-arrow-prev {
-    left: 8px;
-  }
-
-  .lp-arrow-next {
-    right: 8px;
-  }
-
-  .lp-frame {
-    aspect-ratio: 4 / 3;
-  }
-
-  /* legenda compacta: o quadro é pequeno; as setas já trocam a foto */
+  /* legenda compacta: o quadro é pequeno */
   .lp-caption {
-    flex-wrap: nowrap;
     gap: 10px;
     padding: 32px 12px 12px;
-  }
-
-  .lp-dots {
-    display: none;
   }
 
   .lp-caption-text {

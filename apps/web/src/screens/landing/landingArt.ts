@@ -153,12 +153,13 @@ function piecePath(row: number, col: number, rows: number, cols: number, size: n
 /** As quatro peças que saem do lugar, cada uma com o cursor de um amigo. */
 function movers(prefix: string, colors: [string, string, string, string]): Mover[] {
   // um T de cabeça para baixo: três na última linha, rentes à borda do banner, e uma em cima da
-  // do meio; cada uma sai por baixo, atravessando a borda do banner (por cima da galeria)
+  // do meio, do lado do camaleão; cada uma sai por baixo, atravessando a borda do banner, e para
+  // antes do título da galeria
   const defs = [
-    { r: 4, c: 12, dx: -40, dy: 230, rotate: -14, delay: 0, name: 'Ana' },
-    { r: 5, c: 11, dx: -150, dy: 140, rotate: -10, delay: -1.75, name: 'Léo' },
-    { r: 5, c: 12, dx: 30, dy: 170, rotate: 12, delay: -3.5, name: 'Bia' },
-    { r: 5, c: 13, dx: 130, dy: 130, rotate: 16, delay: -5.25, name: 'Caio' },
+    { r: 4, c: 2, dx: 180, dy: 140, rotate: 14, delay: 0, name: 'Ana' },
+    { r: 5, c: 1, dx: -40, dy: 80, rotate: -10, delay: -1.75, name: 'Léo' },
+    { r: 5, c: 2, dx: 20, dy: 95, rotate: 12, delay: -3.5, name: 'Bia' },
+    { r: 5, c: 3, dx: 140, dy: 70, rotate: 16, delay: -5.25, name: 'Caio' },
   ];
   const size = 100;
   return defs.map((m, i) => ({
@@ -170,8 +171,9 @@ function movers(prefix: string, colors: [string, string, string, string]): Mover
     delay: m.delay,
     centerX: m.c * size + size / 2,
     centerY: m.r * size + size / 2,
-    cursorX: m.c * size + 58,
-    cursorY: m.r * size + 52,
+    // a ponta do cursor no centro da peça: ela gira em volta dele, então a "mão" não escorrega
+    cursorX: m.c * size + size / 2 - 3,
+    cursorY: m.r * size + size / 2 - 3,
     name: m.name,
     color: colors[i]!,
     tagWidth: m.name.length * 9 + 24,
