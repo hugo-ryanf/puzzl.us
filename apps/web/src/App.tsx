@@ -18,7 +18,7 @@ import {
   type PuzzleRoom,
 } from './net/connection';
 import { loadPlayerName } from './net/playerName';
-import type { PuzzleChoice } from './screens/explore/CreateRoomDialog';
+import type { CreateRoomMode, PuzzleChoice } from './screens/explore/CreateRoomDialog';
 import { ExploreScreen } from './screens/explore/ExploreScreen';
 import { LandingScreen } from './screens/landing/LandingScreen';
 import { PrivacyScreen } from './screens/PrivacyScreen';
@@ -32,6 +32,7 @@ import { AppShell, type Section } from './ui/AppShell';
 import { ArrowLeftIcon } from './ui/icons';
 import { InviteToasts } from './ui/InviteToasts';
 import { t } from './i18n';
+import { identify, track } from './net/analytics';
 
 /** Laboratório (/lab): só no ambiente de desenvolvimento; some do build de produção. */
 const LabScreen = import.meta.env.DEV ? lazy(() => import('./screens/lab/LabScreen')) : null;
@@ -74,6 +75,11 @@ export function App() {
   const [notice, setNotice] = useState<string>();
   const [name, setName] = useState(loadPlayerName);
   const account = useAccount();
+  // Entrou com a conta: as visitas ficam ligadas a ela no PostHog (pela id, nunca o e-mail).
+  const accountId = account.user?.id;
+  useEffect(() => {
+    if (accountId) identify(accountId);
+  }, [accountId]);
   // Logado, o nome nas salas é sempre o nickname do perfil (o servidor também garante isso).
   const playerName = account.user ? account.user.name : name;
   const library = useLibrary(account.user);
@@ -89,6 +95,7 @@ export function App() {
     () => location.pathname === '/' && !location.search && !location.hash,
   );
   const [startChoice, setStartChoice] = useState<PuzzleChoice | null>(null);
+  const [startMode, setStartMode] = useState<CreateRoomMode>();
   // Link de convite (/K7QF2) sem sessão salva: abre "Entrar com código" já preenchido.
   const [joinOpen, setJoinOpen] = useState(() => codeFromUrl() !== '');
   /** Código digitado no campo da barra lateral (vale mais que o do link). */
@@ -109,6 +116,7 @@ export function App() {
     setNotice(undefined);
     setCreateRequested(false);
     setStartChoice(null);
+    setStartMode(undefined);
     setJoinOpen(false);
     setRanking(null);
     setRoom(joined);
@@ -162,10 +170,15 @@ export function App() {
   // Ainda não se sabe se tem login: a tela fica vazia em vez de piscar a landing para quem tem.
   if (landing && !room && account.user === undefined) return null;
   if (landing && !room && account.user === null) {
-    /** Sai da landing para o app: com uma foto, o "Criar sala" dela; sem, o "Criar sala" livre. */
-    const startFromLanding = (choice?: PuzzleChoice) => {
+    /**
+     * Sai da landing para o app: com uma foto, o "Criar sala" dela (no modo, se veio de um modo);
+     * sem foto, o "Criar sala" livre (foto própria).
+     */
+    const startFromLanding = (choice?: PuzzleChoice, mode?: CreateRoomMode) => {
+      track('landing_jogar', { origem: mode ?? (choice ? 'foto' : 'criar_sala') });
       scrollTo(0, 0); // o Explorar começa do topo, não da altura em que a landing estava
       setLanding(false);
+      setStartMode(mode);
       if (choice) setStartChoice(choice);
       else setCreateRequested(true);
     };
@@ -173,6 +186,7 @@ export function App() {
       <LandingScreen
         googleLogin={account.googleLogin}
         onStart={startFromLanding}
+        community={community.puzzles}
         ranking={
           <RankingScreen
             initial={{ ...DEFAULT_RANKING, tab: 'general' }}
@@ -327,11 +341,13 @@ export function App() {
             onNameChange={setName}
             createRequested={createRequested}
             initialChoice={startChoice}
+            initialMode={startMode}
             joinOpen={joinOpen}
             initialCode={joinCode || codeFromUrl()}
             onCloseCreate={() => {
               setCreateRequested(false);
               setStartChoice(null);
+              setStartMode(undefined);
             }}
             onCloseJoin={() => setJoinOpen(false)}
             onEnter={enter}
