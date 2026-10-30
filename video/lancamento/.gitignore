@@ -1,0 +1,11 @@
+# Renders e áudio gerados (refaça com render.py / score.py)
+*.mp4
+*.wav
+*.render.json
+stills*.png
+probe/
+sfx-src/
+footage/*.webm
+footage/frames/
+*.log
+_frames/

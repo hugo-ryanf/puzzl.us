@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<!-- puzzl.us · vídeo de lançamento (30 s, 16:9) · feito com a skill onetake (PolyForm Noncommercial) -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>puzzl.us · lançamento</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#f4f5f7}
+canvas{position:absolute;left:0;top:0;width:1920px;height:1080px}
+#hud{position:absolute;right:14px;bottom:10px;font:14px monospace;color:#c00;display:none}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="hud"></div>
+<script src="motion.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════════════════════════════════
+// "Uma peça só": uma peça de quebra-cabeça atravessa o filme e vira cada parte do puzzl.us.
+// Tudo abaixo é função pura de t (segundos). Contrato onetake: __seek, __ready, __meta, __track, __motion,
+// __events. Consulta: ?play (ao vivo), ?t=6.4&hud (um quadro).
+// ════════════════════════════════════════════════════════════════════════════════════════════
+const DUR = 51.4;
+window.__meta = { dur: DUR, fps: 30, w: 1920, h: 1080,
+  inFrame: { piece: [0.95, 31.9], mark: [47.7, 51.4, 'whole'] } };
+const { clamp, lerp, sstep, ssstep, seg, spring, ease } = OM;
+const W = 1920, H = 1080;
+
+// ── cores do site ───────────────────────────────────────────────────────────────────────────
+const C = { ground: '#f4f5f7', dot: '#c3c8d1', ink: '#15171c', mute: '#5b6170', accent: '#3a9aad',
+  accentDeep: '#2b7d8e', gold: '#f5a300', danger: '#e03131', fire1: '#ffd166', fire2: '#ff7a00',
+  ice: '#74c0fc', yellow: '#ffd43b', line: '#d5d9e0', card: '#ffffff',
+  friends: ['#e8590c', '#7048e8', '#2f9e44'] };
+const DISPLAY = 'Brico', BODY = 'Fig';
+
+// ── canvas ──────────────────────────────────────────────────────────────────────────────────
+const cv = document.getElementById('cv'), g = cv.getContext('2d');
+const DPR = window.devicePixelRatio || 1;
+cv.width = W * DPR; cv.height = H * DPR;
+const setM = M => g.setTransform(M[0] * DPR, M[1] * DPR, M[2] * DPR, M[3] * DPR, M[4] * DPR, M[5] * DPR);
+const screen = () => g.setTransform(DPR, 0, 0, DPR, 0, 0);
+const img = new Image(); img.src = 'camaleao.webp';
+// gravações do site de demonstração: footage/frames/<nome>/NNNN.jpg a 30 fps; mark = quadro em que o comando começou
+const FOOT = { explorar: { n: 347, mark: 90 }, ranking: { n: 385, mark: 176 }, sala: { n: 2788, mark: 1645 } };
+const frameCache = new Map();
+let PENDING = [];
+function footFrame(name, f) {
+  const { n } = FOOT[name], k = Math.max(0, Math.min(n - 1, f)), src = `footage/frames/${name}/${String(k + 1).padStart(4, '0')}.jpg`;
+  let im = frameCache.get(src);
+  if (!im) { im = new Image(); im.src = src; frameCache.set(src, im); }
+  if (!im.complete || !im.naturalWidth) PENDING.push(im.decode().catch(() => {}));
+  return im;
+}
+// a janela do site no mundo: a gravação 1920×1080 a 2/3
+const WIN = { x: 320, y: 236, w: 1280, h: 720 }, WS = WIN.w / 1920;
+const inWin = (x, y) => ({ x: WIN.x + x * WS, y: WIN.y + y * WS });
+
+// ── a peça: quadrado com abas (1 = para fora, −1 = para dentro, 0 = reta), knob 0…1 ────────────────
+const TAB = [[0.35, 0], [0.40, 0.00], [0.43, 0.08], [0.38, 0.15], [0.33, 0.22], [0.40, 0.30], [0.50, 0.30],
+  [0.60, 0.30], [0.67, 0.22], [0.62, 0.15], [0.57, 0.08], [0.60, 0.00], [0.65, 0]];
+function piecePath(x, y, s, tabs, knob = 1) {
+  const corners = [[x, y], [x + s, y], [x + s, y + s], [x, y + s]];
+  g.beginPath(); g.moveTo(x, y);
+  for (let e = 0; e < 4; e++) {
+    const [ax, ay] = corners[e], [bx, by] = corners[(e + 1) % 4];
+    const dx = (bx - ax) / s, dy = (by - ay) / s, ox = dy, oy = -dx, v = tabs[e] * knob;
+    const P = ([u, w]) => [ax + dx * u * s + ox * w * s * v, ay + dy * u * s + oy * w * s * v];
+    if (v === 0) { g.lineTo(bx, by); continue; }
+    g.lineTo(...P(TAB[0]));
+    for (let i = 1; i < TAB.length; i += 3) g.bezierCurveTo(...P(TAB[i]), ...P(TAB[i + 1]), ...P(TAB[i + 2]));
+    g.lineTo(bx, by);
+  }
+  g.closePath();
+}
+
+// grade R×C: abas determinísticas e o lugar de cada célula
+function board(R, Cn, x, y, s, seed) {
+  const r = OM.rng(seed), Hs = [], Vs = [];
+  for (let i = 0; i < R; i++) { Hs.push([]); Vs.push([]); for (let j = 0; j < Cn; j++) { Hs[i].push(r() < 0.5 ? 1 : -1); Vs[i].push(r() < 0.5 ? 1 : -1); } }
+  const cells = [];
+  for (let i = 0; i < R; i++) for (let j = 0; j < Cn; j++) {
+    cells.push({ i, j, x: x + j * s, y: y + i * s, s, cx: x + j * s + s / 2, cy: y + i * s + s / 2,
+      tabs: [i > 0 ? -Hs[i - 1][j] : 0, j < Cn - 1 ? Vs[i][j] : 0, i < R - 1 ? Hs[i][j] : 0, j > 0 ? -Vs[i][j - 1] : 0] });
+  }
+  return { R, C: Cn, x, y, s, w: Cn * s, h: R * s, cells };
+}
+
+/** Desenha a célula `cell` no lugar `pose` {cx, cy, rot (quartos de volta), sc}; a foto vem do `photo` da grade. */
+function drawPiece(cell, pose, o = {}) {
+  const { photo, fill, alpha = 1, outline = 1, glow = 0, knob = 1, shadow = 1 } = o;
+  if (alpha <= 0.001) return;
+  g.save();
+  g.globalAlpha = alpha;
+  g.translate(pose.cx, pose.cy); g.rotate((pose.rot || 0) * Math.PI / 2); const sc = pose.sc ?? 1; g.scale(sc, sc);
+  g.translate(-cell.cx, -cell.cy);
+  piecePath(cell.x, cell.y, cell.s, cell.tabs, knob);
+  if (shadow > 0) { g.save(); g.shadowColor = `rgba(21,23,28,${0.18 * shadow})`; g.shadowBlur = 18 * DPR * zoomNow * sc; g.shadowOffsetY = 6 * DPR * zoomNow * sc; g.fillStyle = C.card; g.fill(); g.restore(); }
+  if (photo && img.complete && img.naturalWidth) {
+    g.save(); g.clip(); g.fillStyle = C.card; g.fill();
+    g.globalAlpha = alpha * (photo.op ?? 1); g.drawImage(img, photo.x, photo.y, photo.w, photo.h); g.restore();
+  }
+  if (fill) { g.save(); g.globalAlpha = alpha * (fill.op ?? 1); g.fillStyle = fill.color; g.fill(); g.restore(); }
+  if (outline > 0) { g.lineWidth = 2.2 / (zoomNow * sc); g.strokeStyle = `rgba(21,23,28,${0.55 * outline})`; g.stroke(); }
+  if (glow > 0) { g.lineWidth = 7 / (zoomNow * sc); g.strokeStyle = C.gold; g.globalAlpha = alpha * glow; g.stroke(); }
+  g.restore();
+}
+
+// ── texto ─────────────────────────────────────────────────────────────────────────────────────
+function word(text, x, y, t, t0, { size = 96, weight = 800, color = C.ink, align = 'left', font = DISPLAY, out = Infinity, rise = {} } = {}) {
+  if (t < t0 - 0.05) return 0;
+  const w = OM.wordRise(t, t0, { dist: size * 0.32, ...rise });
+  const o = Number.isFinite(out) ? OM.liftOut(t, out, { dist: 40, blur: 0 }) : { op: 1, dy: 0 };
+  const op = w.op * o.op; if (op <= 0.001) return 0;
+  g.save(); g.globalAlpha = op; g.translate(x, y + w.y + o.dy); g.scale(w.s, w.s);
+  g.font = `${weight} ${size}px ${font}`; g.textAlign = align; g.textBaseline = 'alphabetic'; g.fillStyle = color;
+  g.fillText(text, 0, 0); g.restore();
+  return op;
+}
+const measure = (text, size, weight = 800, font = DISPLAY) => { g.font = `${weight} ${size}px ${font}`; return g.measureText(text).width; };
+/** Legenda das telas do site: no alto da tela (não do mundo), num cartão claro. */
+function caption(text, t, t0, out, color = C.ink) {
+  if (t < t0 - 0.05 || t > out + 0.4) return;
+  const op = OM.wordRise(t, t0).op * OM.liftOut(t, out, { dist: 40, blur: 0 }).op;
+  if (op <= 0.001) return;
+  screen();
+  const w = measure(text, 50) + 64;
+  g.save(); g.globalAlpha = op * 0.94; g.fillStyle = C.card; g.shadowColor = 'rgba(21,23,28,0.14)'; g.shadowBlur = 28 * DPR;
+  g.beginPath(); g.roundRect(960 - w / 2, 52, w, 88, 44); g.fill(); g.restore();
+  word(text, 960, 113, t, t0, { size: 50, align: 'center', color, out });
+  setM(OM.view(CAM));
+}
+
+// ── cursor (a causa visível): tamanho constante na tela ────────────────────────────────────────
+function cursor(x, y, s = 1, color = C.ink, op = 1) {
+  if (op <= 0.001) return;
+  g.save(); g.globalAlpha = op; g.translate(x, y); g.scale(0.95 * s / zoomNow, 0.95 * s / zoomNow); g.translate(-4, -3);
+  g.beginPath(); g.moveTo(4, 3); g.lineTo(30, 22); g.lineTo(18, 24); g.lineTo(26, 40); g.lineTo(20, 43); g.lineTo(12, 27); g.lineTo(4, 36); g.closePath();
+  g.fillStyle = color; g.fill(); g.lineWidth = 2.5; g.strokeStyle = '#fff'; g.lineJoin = 'round'; g.stroke(); g.restore();
+}
+
+// ════════════════════════════════════════ linha do tempo ════════════════════════════════════════
+// Ato 1 (0–17 s): a peça → o bloco → o relógio → a linha da batalha → a grade do relâmpago → o olho.
+// Ato 2 (17–30 s): do outro lado do olho, peças tortas → o tabuleiro → a peça de novo → o ponto de "puzzl.us".
+// D1: o trecho do Explorar entra entre o bloco e o relógio; tudo do relógio em diante anda D1.
+const D1 = 7.4, L = v => v + D1;
+const T = {
+  drop: 0.6, land: 1.0, rclick: 1.55, monte: 1.75,
+  snaps: [2.25, 2.75, 3.25], junto: 2.3,
+  // o bloco se abre na janela do site (Explorar gravado), que depois se fecha no relógio
+  win0: 5.0, win1: 5.7, expFoot: 5.6, cap1: 6.0, cap2: 8.55, cap3: 10.35,
+  expMove: [[5.8, 9.0, 960, 540], [9.0, 9.9, 875, 430], [10.6, 11.3, 1210, 365], [11.77, 12.2, 1074, 484]], expClick: [9.9, 11.33, 12.22],
+  ring0: 12.3, ring1: 13.0, relogio: 13.05,
+  count0: L(6.0), count1: L(8.0), fire: L(8.0), collapse0: L(9.2), collapse1: L(9.85),
+  battle: L(10.0), voce: L(10.15), bia: L(10.3), lado: L(10.6), fog: L(11.15), ice: L(12.25),
+  flash: L(13.5), grid0: L(13.6), grid1: L(14.05), slides: [14.2, 14.55, 14.9].map(L), tileIn: L(15.15), seamOut: L(15.3),
+  dive0: L(15.7), dive1: L(16.9), iris0: L(16.95), iris1: L(17.55),
+  gire: L(17.55), rot: [17.75, 18.0, 18.25, 18.5, 18.75].map(L), encaixe: L(18.95), hop0: L(19.0), vença: L(19.65),
+  words2: [[L(20.25), 'Solo'], [L(20.7), 'Batalha'], [L(21.15), 'Bullet']], words2End: L(21.75),
+  gather0: L(20.05), boardDone: L(22.35), seams0: L(22.45), seams1: L(22.95),
+  // o tabuleiro se abre na janela do ranking (gravado), o cursor entra no perfil da Ana
+  rk0: 31.6, rk1: 32.3, rkFoot: 32.0, rkCap1: 32.45, rkCap2: 35.5,
+  rkMove: [[32.2, 33.4, 960, 540], [33.4, 34.3, 559, 640]], rkClick: [34.3],
+  // a janela se dobra numa peça, que salta e vira o ponto de "puzzl.us"
+  fold0: 38.0, fold1: 38.85, solid0: 38.2, solid1: 38.7, hopDot0: 39.05, dotLand: 39.65, mark0: 39.15, us0: 39.7, tag: 40.3,
+};
+
+
+// ── ato 1: o bloco 2×2 (a peça principal é a célula 0) ─────────────────────────────────────────
+const P = 180;
+const BLK = board(2, 2, 870, 450, P, 7);
+const BLK_PHOTO = { x: 870 - 80, y: 450 - 70, w: 600, h: 600 };
+const MAIN = BLK.cells[0];
+// as três vizinhas chegam trazidas por cursores de amigos, de fora do quadro
+const NEIGH = [
+  { cell: BLK.cells[1], from: { x: 1900, y: 300 }, color: C.friends[0] },
+  { cell: BLK.cells[2], from: { x: 520, y: 1180 }, color: C.friends[1] },
+  { cell: BLK.cells[3], from: { x: 1820, y: 1160 }, color: C.friends[2] },
+];
+const RING = { x: 840, y: 420, w: 420, h: 420 };
+
+// batalha: dois tabuleiros 3×2
+const SIDE = [board(2, 3, 300, 300, 120, 21), board(2, 3, 1260, 300, 120, 21)];
+const SIDE_POP = [[10.45, 10.8, 11.05, 11.55, 11.9, 12.6].map(L), [10.7, 11.3, 11.75, 12.85, 99, 99].map(L)];
+const PULL = [[10.0, 0], [10.55, -110], [11.1, 60], [11.7, -150], [12.4, -40], [12.95, -210], [13.4, -230]].map(([t, x]) => [L(t), x]);
+
+// relâmpago: 3×3, a três movimentos do fim (8 = vazio)
+const GRID = { x: 760, y: 340, w: 400, h: 400 };
+const START = [0, 1, 2, 8, 3, 5, 6, 4, 7];
+const SLIDE_AT = [[4, 3], [7, 4], [8, 7]];   // [de onde a peça sai, para onde vai] em cada clique
+const EYE = { x: GRID.x + 255 / 600 * GRID.w, y: GRID.y + 250 / 600 * GRID.h, r: 30 / 600 * GRID.w };
+
+// ── ato 2: tabuleiro 4×4 do camaleão; as 8 de cima começam espalhadas e tortas ─────────────────
+const BIG = board(4, 4, 680, 250, 140, 33);
+// a foto um pouco ampliada no camaleão: as peças da borda não caem no fundo branco
+const BIG_PHOTO = { x: 680 - 50, y: 250 - 30, w: 690, h: 690 };
+const SCAT = [
+  { x: 520, y: 360, r: 1 }, { x: 830, y: 300, r: 0 }, { x: 1120, y: 330, r: 3 }, { x: 1420, y: 400, r: 2 },
+  { x: 610, y: 640, r: 2 }, { x: 900, y: 700, r: 1 }, { x: 1230, y: 650, r: 0 }, { x: 1380, y: 720, r: 3 },
+];
+const TURN_ORDER = [0, 2, 3, 4, 7];             // as viradas, na ordem dos cliques
+const FROM2 = [{ x: -200, y: 700 }, { x: 300, y: 1250 }, { x: 960, y: 1300 }, { x: 1650, y: 1250 },
+  { x: 2150, y: 650 }, { x: 2150, y: 1000 }, { x: -200, y: 1000 }, { x: 1600, y: -200 }];
+
+// ── câmera: dois mundos (antes e depois do olho) ───────────────────────────────────────────────
+// onde o Explorar deixa a câmera: a sala começa e termina aqui
+const SALA_CAM = { x: inWin(1150, 430).x, y: inWin(1150, 430).y, zoom: 1.38 };
+const KA = [
+  { t: 0, x: 960, y: 540, zoom: 1.7 }, { t: 0.6, x: 960, y: 540, zoom: 1.7 },
+  { t: 1.9, x: 940, y: 560, zoom: 1.55, curve: ease.sineInOut },
+  { t: 3.4, x: 900, y: 630, zoom: 1.05, curve: ease.sineInOut }, { t: 5.0, x: 900, y: 630, zoom: 1.05 },
+  // a janela do Explorar: abre, rola (parada), chega perto do card e do diálogo
+  { t: 5.75, x: 960, y: 560, zoom: 1.0, curve: ease.expoInOut }, { t: 8.4, x: 960, y: 560, zoom: 1.0 },
+  { t: 9.75, x: inWin(875, 430).x, y: inWin(875, 430).y, zoom: 1.3, curve: ease.sineInOut },
+  { t: 10.45, x: inWin(1060, 500).x, y: inWin(1060, 500).y, zoom: 1.32, curve: ease.sineInOut },
+  { t: 11.4, x: SALA_CAM.x, y: SALA_CAM.y, zoom: SALA_CAM.zoom, curve: ease.sineInOut }, { t: 12.2, ...SALA_CAM },
+  { t: 13.0, x: 1050, y: 620, zoom: 1.18, curve: ease.expoInOut },
+  { t: L(8.0), x: 1050, y: 630, zoom: 1.32, curve: ease.sineInOut }, { t: L(9.2), x: 1050, y: 630, zoom: 1.32 },
+  { t: L(9.9), x: 960, y: 540, zoom: 1.0, curve: ease.expoInOut },
+  { t: L(13.4), x: 960, y: 540, zoom: 1.04, curve: ease.sineInOut }, { t: L(13.55), x: 960, y: 540, zoom: 1.04 },
+  { t: L(14.05), x: 960, y: 540, zoom: 1.22, curve: ease.expoOut }, { t: L(15.7), x: 960, y: 540, zoom: 1.22 },
+];
+const KB = [
+  { t: L(16.95), x: 960, y: 540, zoom: 1.12 }, { t: L(17.55), x: 960, y: 540, zoom: 1.12 },
+  { t: L(19.6), x: 960, y: 530, zoom: 1.16, curve: ease.sineInOut },
+  { t: L(22.3), x: 960, y: 500, zoom: 0.94, curve: ease.sineInOut }, { t: T.rk0, x: 960, y: 500, zoom: 0.94 },
+  // o ranking: o pódio, o clique na Ana, o perfil e as conquistas
+  { t: T.rk1, x: 960, y: 580, zoom: 1.0, curve: ease.expoInOut }, { t: 32.7, x: 960, y: 580, zoom: 1.0 },
+  { t: 33.5, x: inWin(1079, 600).x, y: inWin(1079, 600).y, zoom: 1.28, curve: ease.sineInOut },
+  { t: 34.3, x: inWin(700, 620).x, y: inWin(700, 620).y, zoom: 1.32, curve: ease.sineInOut }, { t: 34.6, x: inWin(700, 620).x, y: inWin(700, 620).y, zoom: 1.32 },
+  { t: 35.4, x: 960, y: 580, zoom: 1.0, curve: ease.expoInOut },
+  { t: 37.6, x: inWin(720, 700).x, y: inWin(720, 700).y, zoom: 1.22, curve: ease.sineInOut }, { t: T.fold0, x: inWin(720, 700).x, y: inWin(720, 700).y, zoom: 1.22 },
+  { t: T.fold1, x: 960, y: 530, zoom: 1.25, curve: ease.expoInOut },
+  { t: 39.6, x: 960, y: 560, zoom: 1.0, curve: ease.expoInOut }, { t: DUR, x: 960, y: 560, zoom: 1.0 },
+];
+const HITS = [[T.land, 9, 9], [T.snaps[2], 6, 10], [T.fire, 10, 8], [T.flash, 12, 9], [T.vença, 7, 10], [T.dotLand, 9, 9]];
+// a mão do operador: só onde há movimento (as pausas ficam paradas de verdade)
+const HAND_ON = [[0.6, 3.4], [5.0, 5.8], [8.4, 12.2], [12.3, L(9.9)], [L(10.0), L(13.35)], [L(17.0), L(19.9)],
+  [L(20.0), L(22.3)], [T.rk0, T.rk1], [32.7, 35.4], [35.4, 37.6], [T.fold0, 39.6]];
+const handEnv = t => HAND_ON.reduce((m, [a, b]) => Math.max(m, sstep(a, a + 0.4, t) * (1 - sstep(b - 0.4, b, t))), 0);
+function camAt(t) { return t >= SA && t < SB ? camSala(t) : camOld(old(t)); }
+function camOld(t) {
+  if (t >= T.dive0 && t < T.iris0) {
+    // mergulho no olho: zoom em escala log, o olho vai para o centro da tela
+    const k = ease.cubicInOut(seg(t, T.dive0, T.dive1)), z0 = 1.22, z1 = 40;
+    const zoom = Math.exp(lerp(Math.log(z0), Math.log(z1), k));
+    const sx = lerp(960 + (EYE.x - 960) * z0, 960, k), sy = lerp(540 + (EYE.y - 540) * z0, 540, k);
+    return { x: EYE.x + (960 - sx) / zoom, y: EYE.y + (540 - sy) / zoom, zoom, rot: 0 };
+  }
+  const c = OM.camera(t, t < T.iris0 ? KA : KB), e = handEnv(t) * 4.5;
+  let x = c.x + e * (Math.sin(1.7 * t) + 0.6 * Math.sin(2.9 * t + 1)) / c.zoom;
+  let y = c.y + e * (Math.sin(1.3 * t + 2) + 0.5 * Math.sin(3.3 * t)) / c.zoom, rot = c.rot;
+  for (const [th, amp, decay] of HITS) { const s = OM.shake(t, th, { amp, decay, seed: Math.round(th * 100) }); x += s.x / c.zoom; y += s.y / c.zoom; rot += s.rot; }
+  return { x, y, zoom: c.zoom, rot };
+}
+let zoomNow = 1, CAM = { x: 960, y: 540, zoom: 1, rot: 0 }, TRACK = {};
+
+// ── fundo ─────────────────────────────────────────────────────────────────────────────────────
+function ground(cam, color = C.ground) {
+  screen(); g.fillStyle = color; g.fillRect(0, 0, W, H);
+  const L = OM.lattice(cam, { depth: 1.2, spacing: 48, px: 1.5 });
+  setM(L.matrix); g.fillStyle = C.dot;
+  for (let x = L.x0; x <= L.x1; x += L.spacing) for (let y = L.y0; y <= L.y1; y += L.spacing) { g.beginPath(); g.arc(x, y, L.r, 0, Math.PI * 2); g.fill(); }
+}
+
+// ════════════════════════════════════════ ato 1 ════════════════════════════════════════════════
+function act1(t) {
+  // 1 · a peça cai deitada, quica e se assenta; o clique direito a desvira
+  let mainPose = null;
+  if (t >= T.drop && t < T.win0 + 0.45) {
+    const fall = ease.expoIn(seg(t, T.drop, T.land)), land = OM.impact(t, T.land, { decay: 8, omega: 24, sqx: 0.16, sqy: 0.2 });
+    const y = t < T.land ? lerp(-260, MAIN.cy, fall) : MAIN.cy + land.r * 10;
+    const turn = t < T.rclick ? 1 : 1 - spring(t - T.rclick, 0.55, 22);
+    mainPose = { cx: MAIN.cx, cy: y, rot: turn, sc: 1 };
+    const sqx = t < T.land ? 1 - 0.08 * fall : land.sx, sqy = t < T.land ? 1 + 0.12 * fall : land.sy;
+    g.save(); g.translate(MAIN.cx, y); g.scale(sqx, sqy); g.translate(-MAIN.cx, -y);
+    drawPiece(MAIN, mainPose, { photo: BLK_PHOTO, glow: 0, fill: null, alpha: 1 - sstep(T.win0 + 0.1, T.win0 + 0.4, t) });
+    g.restore();
+    TRACK.piece = { x: MAIN.x, y: y - P / 2, w: P, h: P };
+  }
+  // o cursor que dá o clique direito
+  if (t >= 1.05 && t < 2.1) {
+    const k = ease.expoOut(seg(t, 1.05, 1.5)), out = ease.expoIn(seg(t, 1.75, 2.1));
+    const x = lerp(1250, MAIN.cx + 40, k) + out * 300, y = lerp(860, MAIN.cy + 30, k) + out * 260;
+    const p = OM.press(t, T.rclick, { depth: 0.2 });
+    cursor(x, y, 1 - p.sq * 0.8, C.ink, 1 - out);
+  }
+  // as vizinhas: cada uma num cursor de amigo; encaixa com brilho dourado
+  NEIGH.forEach((n, i) => {
+    const ts = T.snaps[i], t0 = ts - 0.7;
+    if (t < t0 || t >= T.win0 + 0.45) return;
+    const h = OM.hop(t, t0, ts, n.from, { x: n.cell.cx, y: n.cell.cy }, { height: 90, curve: ease.expoOut });
+    const pose = { cx: h.x, cy: h.y, rot: 0, sc: 1 };
+    const glow = t >= ts ? 1 - seg(t, ts, ts + 0.45) : 0;
+    drawPiece(n.cell, pose, { photo: BLK_PHOTO, glow, alpha: 1 - sstep(T.win0 + 0.1, T.win0 + 0.4, t) });
+    // o cursor solta e sai
+    const leave = ease.expoIn(seg(t, ts + 0.05, ts + 0.4));
+    cursor(h.x + 30 + leave * (n.from.x - n.cell.cx) * 0.4, h.y + 24 + leave * (n.from.y - n.cell.cy) * 0.4, 1, n.color, 1 - leave);
+  });
+  // combo
+  [[T.snaps[1], 'x2'], [T.snaps[2], 'x3']].forEach(([ts, s], i) => {
+    if (t < ts || t > ts + 0.9) return;
+    word(s, 1255, 470 + i * 6, t, ts, { size: 40, weight: 800, color: i ? '#e8590c' : C.accent, out: ts + 0.55 });
+  });
+  // "Monte." / "junto."
+  const textOut = T.win0;
+  word('Monte', 800, 610, t, T.monte, { size: 108, align: 'right', out: textOut });
+  const dotOp = 1 - sstep(T.junto, T.junto + 0.15, t);
+  if (t >= T.monte) word('.', 800 + measure('.', 108) * 0.5 + 2, 610, t, T.monte + 0.05, { size: 108, align: 'center', color: C.accent, out: Math.min(textOut, T.junto) });
+  word('junto.', 800, 725, t, T.junto, { size: 108, align: 'right', color: C.accent, out: textOut });
+  void dotOp;
+
+  // 2 · o bloco vira o relógio do Bullet
+  explorar(t);
+  if (t >= T.ring1 && t < T.collapse1 + 0.05) {
+    const m = { ...RING, r: RING.w / 2, cx: RING.x + RING.w / 2, cy: RING.y + RING.h / 2 };
+    const danger = sstep(T.fire - 0.05, T.fire + 0.1, t);
+    // colapso: o anel vira uma linha vertical (a divisória da batalha)
+    const ck = ease.expoInOut(seg(t, T.collapse0, T.collapse1));
+    const cx = lerp(m.cx, 960, ck), cy = lerp(m.cy, 540, ck), rx = lerp(m.w / 2, 2, ck), ry = lerp(m.h / 2, 560, ck);
+    // fogo atrás do anel nos "últimos segundos"
+    const fireOp = sstep(T.fire, T.fire + 0.25, t) * (1 - sstep(T.collapse0, T.collapse0 + 0.3, t));
+    if (fireOp > 0) flame(cx, cy - ry * 0.15, ry, t, fireOp);
+    g.save(); g.beginPath();
+    if (ck > 0) g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    else g.roundRect(m.x, m.y, m.w, m.h, m.r);
+    g.fillStyle = C.card; g.globalAlpha = 1 - ck; g.fill(); g.globalAlpha = 1;
+    g.lineWidth = 16 * (1 - ck * 0.75);
+    g.strokeStyle = danger > 0.5 ? C.danger : C.accent; g.stroke(); g.restore();
+    // o arco do tempo que falta
+    const left = clockLeft(t);
+    if (t >= T.ring1 && ck < 0.2) {
+      g.save(); g.lineWidth = 16; g.lineCap = 'round'; g.strokeStyle = danger > 0.5 ? '#ffb4b4' : '#bfe3ea';
+      g.beginPath(); g.arc(cx, cy, rx, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - left / 180)); g.stroke(); g.restore();
+    }
+    // os números
+    const digOp = sstep(T.ring1 - 0.1, T.ring1 + 0.15, t) * (1 - sstep(T.collapse0 - 0.1, T.collapse0 + 0.1, t));
+    if (digOp > 0) {
+      const big = t >= T.fire, s = Math.ceil(left), txt = big ? String(Math.max(0, s)) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      const beat = big ? OM.impact(t, T.fire + Math.floor((t - T.fire) / 0.5) * 0.5, { decay: 9, omega: 22, sqx: 0.1, sqy: 0.12 }) : { sx: 1, sy: 1 };
+      g.save(); g.globalAlpha = digOp; g.translate(cx, cy + (big ? 52 : 40)); g.scale(beat.sx, beat.sy);
+      g.font = `800 ${big ? 150 : 116}px ${DISPLAY}`; g.textAlign = 'center'; g.fillStyle = big ? C.danger : C.ink;
+      g.fillText(txt, 0, 0); g.restore();
+    }
+    // "+1": cada quebra-cabeça montado vira uma pecinha na fileira
+    const PLUS = [6.3, 6.75, 7.05, 7.35, 7.58, 7.76, 7.9].map(L);
+    PLUS.forEach((tp, i) => {
+      if (t < tp) return;
+      const op = 1 - sstep(T.collapse0 - 0.2, T.collapse0, t), pop = OM.popIn(t, tp, { rise: 24 });
+      const x = RING.x + RING.w / 2 + (i - 3) * 52, y = RING.y + RING.h + 66;
+      g.save(); g.globalAlpha = op * pop.op; g.translate(x, y + pop.dy); g.scale(pop.s * 0.24, pop.s * 0.24);
+      piecePath(-90, -90, 180, [1, -1, 1, -1]); g.fillStyle = C.accent; g.fill(); g.restore();
+      if (t < tp + 0.5) word('+1', x, y - 50, t, tp, { size: 34, weight: 800, color: C.accent, align: 'center', out: tp + 0.3 });
+    });
+    TRACK.piece = { x: cx - rx, y: cy - ry, w: rx * 2, h: ry * 2 };
+  }
+  word('Contra o relógio.', 1050, 360, t, T.relogio, { size: 72, align: 'center', out: T.collapse0 - 0.1 });
+
+  // 3 · lado contra lado
+  if (t >= T.collapse1 - 0.05 && t < T.grid1 + 0.05) battle(t);
+
+  // 4 · o relâmpago: a linha se abre numa grade 3×3
+  if (t >= T.grid0 && t < T.iris0) lightning(t);
+
+  // flash do relâmpago (tela)
+  if (t >= T.flash && t < T.flash + 0.45) { screen(); g.fillStyle = `rgba(255,255,255,${0.9 * (1 - seg(t, T.flash, T.flash + 0.45))})`; g.fillRect(0, 0, W, H); setM(OM.view(CAM)); }
+}
+
+/**
+ * A janela do site: um retângulo arredondado (`R`) com a gravação dentro. Sombra de cartão, borda leve.
+ * `under` desenha o que fica por baixo da gravação (a foto do bloco, o tabuleiro) enquanto ela entra.
+ */
+function siteWindow(R, name, f, footOp, under) {
+  g.save();
+  g.save(); g.shadowColor = 'rgba(21,23,28,0.22)'; g.shadowBlur = 40 * DPR * zoomNow; g.shadowOffsetY = 18 * DPR * zoomNow;
+  g.beginPath(); g.roundRect(R.x, R.y, R.w, R.h, R.r); g.fillStyle = C.card; g.fill(); g.restore();
+  g.beginPath(); g.roundRect(R.x, R.y, R.w, R.h, R.r); g.clip();
+  if (under) under();
+  if (footOp > 0) { const im = footFrame(name, f); if (im.complete && im.naturalWidth) { g.globalAlpha = footOp; g.drawImage(im, R.x, R.y, R.w, R.h); } }
+  g.restore();
+  g.save(); g.beginPath(); g.roundRect(R.x, R.y, R.w, R.h, R.r); g.lineWidth = 1.5 / zoomNow; g.strokeStyle = C.line; g.stroke(); g.restore();
+}
+
+/** O cursor sobre a gravação: os movimentos gravados (no espaço 1920×1080 da janela). */
+function footCursor(t, moves, clicks, show) {
+  if (!show) return;
+  let x = moves[0][2], y = moves[0][3];
+  for (let i = 0; i < moves.length; i++) {
+    const [t0, t1, mx, my] = moves[i], [px, py] = i ? [moves[i - 1][2], moves[i - 1][3]] : [mx, my];
+    if (t >= t0) { const k = ssstep(t0, t1, t); x = lerp(px, mx, k); y = lerp(py, my, k); }
+  }
+  let sc = 1;
+  for (const c of clicks) if (t >= c && t < c + 0.14) sc = 0.84;
+  const p = inWin(x, y);
+  cursor(p.x, p.y, sc, C.ink, 1);
+}
+
+// o bloco se abre na janela do Explorar; ela rola até a comunidade, abre o "Criar sala" e escolhe Multiplayer
+// para 4; a janela segue na sala (abaixo) e depois se fecha no relógio
+function explorar(t) {
+  if (t < T.win0 || t >= T.ring1 + 0.02) return;
+  const A = { x: BLK.x, y: BLK.y, w: BLK.w, h: BLK.h, r: 4 }, B = { ...WIN, r: 18 }, Cr = { ...RING, r: RING.w / 2 };
+  const R = t < T.ring0 ? OM.morphRect(t, T.win0, T.win1, A, B, { curve: ease.expoInOut }) : OM.morphRect(t, T.ring0, T.ring1, B, Cr, { curve: ease.expoInOut });
+  const footOp = sstep(T.win0 + 0.2, T.win1, t) * (1 - sstep(T.ring0 + 0.05, T.ring0 + 0.4, t));
+  const f = AFTER_SALA ? SALA_END : explorarFrame(t);
+  siteWindow(R, AFTER_SALA ? 'sala' : 'explorar', f, footOp, () => {
+    const op = 1 - sstep(T.win0 + 0.2, T.win1, t);
+    if (op > 0 && img.complete) { g.globalAlpha = op; g.drawImage(img, BLK_PHOTO.x, BLK_PHOTO.y, BLK_PHOTO.w, BLK_PHOTO.h); g.globalAlpha = 1; }
+  });
+  // fechando no relógio: a borda engrossa na cor da marca
+  if (t >= T.ring0) {
+    const k = sstep(T.ring0, T.ring1, t);
+    g.save(); g.beginPath(); g.roundRect(R.x, R.y, R.w, R.h, R.r); g.lineWidth = lerp(2, 16, k); g.strokeStyle = C.accent; g.globalAlpha = k; g.stroke(); g.restore();
+  }
+  if (!AFTER_SALA) {
+    footCursor(t, T.expMove, T.expClick, t >= 5.85 && t < T.ring0);
+    explorarCaptions(t);
+  }
+  TRACK.piece = { x: R.x, y: R.y, w: R.w, h: R.h };
+}
+const explorarFrame = t => FOOT.explorar.mark - 6 + Math.round((t - T.expFoot) * 30);
+function explorarCaptions(t) {
+  caption('Escolha uma foto.', t, T.cap1, T.cap2 - 0.12);
+  caption('…ou uma da comunidade.', t, T.cap2, T.cap3 - 0.12, C.accent);
+  caption('E escolha como jogar.', t, T.cap3, SA + 0.3);
+}
+
+// ── a sala com os amigos ─────────────────────────────────────────────────────────────────────
+// Entra entre o Explorar e o relógio (SA → SB); do relógio em diante tudo anda DS. A janela fica:
+// o "Criar sala" abre a sala de espera, os amigos chegam um a um com a câmera, todos montam juntos.
+const SA = 12.3, DS = 7.9, SB = SA + DS;
+const old = t => (t < SA ? t : t - DS);
+let AFTER_SALA = false;
+// a gravação (record_sala.py): sala de espera (300), Bia (734), Caio (950), Duda (1284), Ana (1356),
+// "Começar" (1540), a partida a 2,5× (1558 em diante)
+function salaFrame(t) {
+  const u = t - SA;
+  if (u < 1.3) return 300 + Math.round((u - 0.5) * 30);
+  if (u < 1.9) return 734 + Math.round((u - 1.3) * 30);
+  if (u < 2.5) return 950 + Math.round((u - 1.9) * 30);
+  if (u < 3.0) return 1284 + Math.round((u - 2.5) * 30);
+  if (u < 3.5) return 1356 + Math.round((u - 3.0) * 30);
+  if (u < 4.1) return 1540 + Math.round((u - 3.5) * 30);
+  const f = 1558 + Math.round((u - 4.1) * 75);
+  return f >= 1644 && f <= 1650 ? 1651 : f;   // pula a marca magenta da gravação
+}
+const SALA_END = salaFrame(SB - 1 / 30);
+const SALA_JOIN = [1.3, 1.9, 2.5, 3.0].map(u => SA + u), SALA_CLICK = [SA + 0.48, SA + 3.5], SALA_GO = SA + 4.1;
+const TILES = inWin(1794, 340);
+const KS = [
+  { t: SA, ...SALA_CAM }, { t: SA + 0.5, ...SALA_CAM },
+  // a sala de espera: recua para ver a mesa e a coluna das câmeras
+  { t: SA + 1.2, x: inWin(1250, 520).x, y: inWin(1250, 520).y, zoom: 1.12, curve: ease.expoInOut },
+  // os amigos chegando: a câmera vai encostando nas câmeras
+  { t: SA + 3.2, x: inWin(1440, 440).x, y: inWin(1440, 440).y, zoom: 1.28, curve: ease.sineInOut },
+  // "Começar": a mesa inteira
+  { t: SA + 4.0, x: inWin(960, 560).x, y: inWin(960, 560).y, zoom: 1.04, curve: ease.expoInOut },
+  { t: SA + 5.7, x: inWin(880, 560).x, y: inWin(880, 560).y, zoom: 1.16, curve: ease.sineInOut },
+  // a chamada: as quatro câmeras
+  { t: SA + 6.4, x: TILES.x, y: TILES.y, zoom: 2.0, curve: ease.expoInOut }, { t: SB - 0.55, x: TILES.x, y: TILES.y, zoom: 2.0 },
+  { t: SB, ...SALA_CAM, curve: ease.expoInOut },
+];
+const HAND_SALA = [[SA + 1.2, SA + 3.3], [SA + 4.0, SA + 6.3], [SA + 6.4, SB - 0.55]];
+function camSala(t) {
+  const c = OM.camera(t, KS);
+  const e = HAND_SALA.reduce((m, [a, b]) => Math.max(m, sstep(a, a + 0.4, t) * (1 - sstep(b - 0.4, b, t))), 0) * 4.5;
+  return {
+    x: c.x + e * (Math.sin(1.7 * t) + 0.6 * Math.sin(2.9 * t + 1)) / c.zoom,
+    y: c.y + e * (Math.sin(1.3 * t + 2) + 0.5 * Math.sin(3.3 * t)) / c.zoom, zoom: c.zoom, rot: c.rot,
+  };
+}
+function sala(t) {
+  const R = { ...WIN, r: 18 }, toRoom = sstep(SA + 0.5, SA + 0.72, t);
+  siteWindow(R, 'sala', salaFrame(t), toRoom, toRoom < 1 ? () => {
+    const im = footFrame('explorar', explorarFrame(t));
+    if (im.complete && im.naturalWidth) g.drawImage(im, R.x, R.y, R.w, R.h);
+  } : null);
+  // o cursor da Ana: "Criar sala", depois "Começar" (os dos amigos estão na gravação)
+  footCursor(t, [[SA - 1, SA - 0.9, 1074, 484], [SA + 0.05, SA + 0.45, 1256, 942], [SA + 2.9, SA + 3.45, 960, 637]],
+    SALA_CLICK, t < SA + 3.9);
+  explorarCaptions(t);
+  caption('Chame os amigos.', t, SA + 0.8, SA + 3.45);
+  caption('Todos na mesma mesa, ao mesmo tempo.', t, SA + 3.75, SA + 5.8, C.accent);
+  caption('Com chamada de voz e vídeo.', t, SA + 5.95, SB - 0.3);
+  TRACK.piece = { x: R.x, y: R.y, w: R.w, h: R.h };
+}
+function seekSala(t) {
+  TRACK = {}; PENDING = [];
+  CAM = camSala(t); zoomNow = CAM.zoom;
+  ground(CAM); setM(OM.view(CAM));
+  sala(t);
+  screen();
+  document.getElementById('hud').textContent = 't=' + t.toFixed(3);
+  return Promise.all(PENDING);
+}
+
+// tempo do Bullet: 3:00 → 0:10 em 2 s (acelerando), depois um "segundo" a cada 0,5 s
+function clockLeft(t) {
+  if (t < T.count0) return 180;
+  if (t < T.count1) return lerp(180, 10, seg(t, T.count0, T.count1) ** 3);
+  return Math.max(0, 10 - Math.floor((t - T.count1) / 0.5) - 0.001);
+}
+
+// chama: elipses quentes que tremulam (determinístico: senos de t)
+function flame(cx, cy, r, t, op) {
+  g.save(); g.globalAlpha = op;
+  for (let i = 0; i < 3; i++) {
+    const f = 1 + 0.06 * Math.sin(t * 23 + i * 2) + 0.04 * Math.sin(t * 37 + i), h = r * (1.55 - i * 0.22) * f, w = r * (1.05 - i * 0.16);
+    const grd = g.createRadialGradient(cx, cy + r * 0.5, r * 0.1, cx, cy, h);
+    grd.addColorStop(0, i === 2 ? 'rgba(255,240,180,0.95)' : 'rgba(255,209,102,0.9)');
+    grd.addColorStop(0.45, 'rgba(255,122,0,0.75)'); grd.addColorStop(1, 'rgba(224,49,49,0)');
+    g.fillStyle = grd; g.beginPath(); g.ellipse(cx + Math.sin(t * 11 + i) * 6, cy - h * 0.25, w, h, Math.sin(t * 9 + i) * 0.04, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+}
+
+function battle(t) {
+  const dim = sstep(T.flash, T.flash + 0.1, t) * 0.55;
+  // a divisória
+  const lineOp = 1 - sstep(T.grid0, T.grid0 + 0.05, t);
+  g.save(); g.fillStyle = C.ink; g.globalAlpha = lineOp; g.fillRect(958, -200, 4, 1480); g.restore();
+  word('Você', 480, 170, t, T.voce, { size: 54, weight: 700, align: 'center' });
+  word('Bia', 1440, 170, t, T.bia, { size: 54, weight: 700, align: 'center', color: C.friends[0] });
+  // os dois tabuleiros enchendo
+  SIDE.forEach((b, s) => {
+    g.save(); g.fillStyle = C.card; g.strokeStyle = C.line; g.lineWidth = 2;
+    const pop = OM.popIn(t, T.battle + 0.1 + s * 0.1);
+    g.globalAlpha = pop.op; g.beginPath(); g.roundRect(b.x - 24, b.y - 24 + pop.dy, b.w + 48, b.h + 48, 18); g.fill(); g.stroke(); g.restore();
+    b.cells.forEach((c, i) => {
+      const tp = SIDE_POP[s][i]; if (t < tp) return;
+      const p = OM.popIn(t, tp, { rise: 20 });
+      drawPiece(c, { cx: c.cx, cy: c.cy + p.dy, rot: 0, sc: p.s }, { photo: { x: b.x - 40, y: b.y - 60, w: 400, h: 400 }, alpha: p.op, glow: 1 - seg(t, tp, tp + 0.4), shadow: 0 });
+    });
+  });
+  // cabo de guerra: a peça é o nó
+  let px = 0;
+  for (let i = 1; i < PULL.length; i++) { const [ta, a] = PULL[i - 1], [tb, b] = PULL[i]; if (t >= ta) px = lerp(a, b, ease.expoOut(seg(t, ta, tb))); }
+  const ropeOp = OM.popIn(t, T.battle + 0.2).op;
+  g.save(); g.globalAlpha = ropeOp; g.strokeStyle = '#a8adb7'; g.lineWidth = 6; g.setLineDash([16, 10]);
+  g.beginPath(); g.moveTo(220, 760); g.lineTo(1700, 760); g.stroke(); g.setLineDash([]); g.restore();
+  g.save(); g.globalAlpha = ropeOp; g.translate(960 + px, 760); g.scale(0.42, 0.42);
+  piecePath(-90, -90, 180, [1, -1, 1, -1]); g.fillStyle = px < -100 ? C.accent : C.ink; g.fill(); g.restore();
+  TRACK.piece = { x: 960 + px - 38, y: 722, w: 76, h: 76 };
+  // a frase fica sobre um recorte do fundo: a divisória passa por trás dela
+  if (t >= T.lado - 0.05) {
+    const wl = measure('Lado contra lado.', 80), op = OM.wordRise(t, T.lado).op;
+    g.save(); g.globalAlpha = op; g.fillStyle = C.ground; g.beginPath(); g.roundRect(960 - wl / 2 - 28, 880, wl + 56, 112, 20); g.fill(); g.restore();
+  }
+  word('Lado contra lado.', 960, 960, t, T.lado, { size: 80, align: 'center' });
+  // neblina: atravessa da esquerda para a mesa da Bia
+  const fogK = ease.expoOut(seg(t, T.fog, T.fog + 0.7)), fogOp = sstep(T.fog, T.fog + 0.2, t) * (1 - sstep(L(12.7), L(13.1), t));
+  if (fogOp > 0) {
+    g.save(); g.globalAlpha = fogOp * 0.88; g.filter = `blur(${(26 * DPR * zoomNow).toFixed(1)}px)`; g.fillStyle = '#e9ecf1';
+    g.beginPath(); g.ellipse(lerp(560, 1440, fogK), 420, 330, 210, 0, 0, Math.PI * 2); g.fill(); g.restore();
+    word('Neblina →', lerp(700, 1440, fogK), 650, t, T.fog, { size: 34, weight: 700, color: C.mute, align: 'center', out: L(12.6) });
+  }
+  // gelo: a Bia congela o meu lado
+  const iceOp = sstep(T.ice, T.ice + 0.12, t) * (1 - sstep(L(13.15), L(13.45), t));
+  if (iceOp > 0) {
+    const b = SIDE[0];
+    g.save(); g.globalAlpha = iceOp; g.fillStyle = 'rgba(165,216,255,0.42)'; g.strokeStyle = C.ice; g.lineWidth = 8;
+    g.beginPath(); g.roundRect(b.x - 24, b.y - 24, b.w + 48, b.h + 48, 18); g.fill(); g.stroke();
+    snowflake(b.x + b.w / 2, b.y + b.h / 2, 56); g.restore();
+    word('← Congelar', 480, 650, t, T.ice, { size: 34, weight: 700, color: '#1c7ed6', align: 'center', out: L(13.1) });
+  }
+  if (dim > 0) { screen(); g.fillStyle = `rgba(230,232,236,${dim})`; g.fillRect(0, 0, W, H); setM(OM.view(CAM)); }
+}
+
+function snowflake(x, y, r) {
+  g.save(); g.translate(x, y); g.strokeStyle = '#1c7ed6'; g.lineWidth = 7; g.lineCap = 'round';
+  for (let i = 0; i < 3; i++) { g.rotate(Math.PI / 3); g.beginPath(); g.moveTo(-r, 0); g.lineTo(r, 0); for (const s of [-1, 1]) { g.moveTo(s * r * 0.6, 0); g.lineTo(s * r * 0.85, -r * 0.22); g.moveTo(s * r * 0.6, 0); g.lineTo(s * r * 0.85, r * 0.22); } g.stroke(); }
+  g.restore();
+}
+
+function lightning(t) {
+  const A = { x: 958, y: -200, w: 4, h: 1480, r: 2 }, B = { ...GRID, r: 14 };
+  const m = OM.morphRect(t, T.grid0, T.grid1, A, B, { curve: ease.expoOut });
+  const tileOp = sstep(T.grid1 - 0.15, T.grid1 + 0.05, t), seam = 1 - sstep(T.seamOut, T.seamOut + 0.3, t);
+  g.save(); g.beginPath(); g.roundRect(m.x, m.y, m.w, m.h, m.r); g.fillStyle = C.ink; g.fill();
+  g.strokeStyle = C.yellow; g.lineWidth = lerp(4, 10, m.k); g.stroke(); g.restore();
+  if (tileOp > 0 && img.complete) {
+    const s = GRID.w / 3;
+    // estado da grade: cada clique desliza uma casa para o vazio
+    const tiles = START.slice();
+    let anim = null;
+    SLIDE_AT.forEach(([from, to], i) => {
+      const ts = T.slides[i];
+      if (t >= ts + 0.16) { tiles[to] = tiles[from]; tiles[from] = 8; }
+      else if (t >= ts) anim = { from, to, tile: tiles[from], k: ease.expoOut(seg(t, ts, ts + 0.16)) };
+    });
+    for (let pos = 0; pos < 9; pos++) {
+      let tile = tiles[pos], x = GRID.x + (pos % 3) * s, y = GRID.y + Math.floor(pos / 3) * s;
+      if (anim && pos === anim.from) {
+        const tx = GRID.x + (anim.to % 3) * s, ty = GRID.y + Math.floor(anim.to / 3) * s;
+        x = lerp(x, tx, anim.k); y = lerp(y, ty, anim.k); tile = anim.tile;
+      }
+      if (tile === 8) {
+        // a última casa entra quando a grade se completa
+        if (t < T.tileIn || pos !== 8) continue;
+        const p = OM.popIn(t, T.tileIn, { rise: 0, s0: 0.6, ds: 0.4 }); g.save(); g.globalAlpha = tileOp * p.op;
+        g.translate(x + s / 2, y + s / 2); g.scale(p.s, p.s); g.translate(-(x + s / 2), -(y + s / 2));
+        g.drawImage(img, 400, 400, 200, 200, x, y, s, s); g.restore(); continue;
+      }
+      const sxI = (tile % 3) * 200, syI = Math.floor(tile / 3) * 200;
+      g.save(); g.globalAlpha = tileOp; g.drawImage(img, sxI, syI, 200, 200, x, y, s, s);
+      if (seam > 0) { g.globalAlpha = tileOp * seam; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 2.5; g.strokeRect(x + 1, y + 1, s - 2, s - 2); }
+      g.restore();
+    }
+    // o cursor que desliza as casas
+    const knots = [{ t: T.grid1, x: 1300, y: 900 }];
+    SLIDE_AT.forEach(([from], i) => knots.push({ t: T.slides[i] - 0.06, x: GRID.x + (from % 3) * s + s * 0.6, y: GRID.y + Math.floor(from / 3) * s + s * 0.6 }));
+    knots.push({ t: T.tileIn + 0.3, x: 1350, y: 980 });
+    if (t < T.tileIn + 0.3) { const cu = OM.cursor(t, knots, T.slides); cursor(cu.x, cu.y, cu.s, C.ink, sstep(T.grid1, T.grid1 + 0.1, t)); }
+  }
+  // a pupila: escurece o mergulho até virar a tela inteira
+  if (t >= T.dive0) {
+    const k = sstep(T.dive0 + 0.35, T.dive1 - 0.1, t);
+    g.save(); g.globalAlpha = k; g.fillStyle = C.ink; g.beginPath(); g.arc(EYE.x, EYE.y, EYE.r * lerp(1, 1.6, k), 0, Math.PI * 2); g.fill(); g.restore();
+  }
+  word('Relâmpago.', 960, 300, t, T.grid1 - 0.1, { size: 64, align: 'center', color: C.ink, out: T.dive0 });
+  TRACK.piece = { x: m.x, y: Math.max(m.y, 0), w: m.w, h: Math.min(m.h, 1080) };
+}
+
+// ════════════════════════════════════════ ato 2 ════════════════════════════════════════════════
+function act2(t) {
+  // as 8 peças de cima: tortas → desviradas (cliques) → encaixadas
+  const done = sstep(T.seams0, T.seams1, t);
+  if (t < T.rk0 + 0.02) {
+    for (let i = 0; i < 8; i++) {
+      const cell = BIG.cells[i], sc = SCAT[i];
+      let rot = sc.r;
+      const ord = TURN_ORDER.indexOf(i);
+      if (ord >= 0 && t >= T.rot[ord]) rot = sc.r * (1 - spring(t - T.rot[ord], 0.6, 22)); else if (ord < 0) rot = 0;
+      if (ord >= 0 && t >= T.rot[ord] + 0.6) rot = 0;
+      const h = OM.hop(t, T.hop0 + i * 0.05, T.hop0 + 0.45 + i * 0.05, { x: sc.x, y: sc.y }, { x: cell.cx, y: cell.cy }, { height: 70, curve: ease.expoOut });
+      const landed = t >= T.hop0 + 0.45 + i * 0.05;
+      drawPiece(cell, { cx: h.x, cy: h.y, rot, sc: 1 }, { photo: BIG_PHOTO, glow: landed ? 1 - seg(t, T.hop0 + 0.45 + i * 0.05, T.hop0 + 0.9 + i * 0.05) : 0, outline: 1 - done, shadow: 1 - done });
+    }
+    // as 8 de baixo chegam de fora do quadro
+    for (let i = 8; i < 16; i++) {
+      const cell = BIG.cells[i], j = i - 8, t0 = T.gather0 + j * 0.22, t1 = t0 + 0.55;
+      if (t < t0) continue;
+      const gth = OM.gather(t, t0, t1, 0, 1, FROM2[j], { x: cell.cx, y: cell.cy }, { arc: 80, spin: 0, curve: ease.expoOut });
+      drawPiece(cell, { cx: gth.x, cy: gth.y, rot: 0, sc: 1 }, { photo: BIG_PHOTO, glow: t >= t1 ? 1 - seg(t, t1, t1 + 0.4) : 0, outline: 1 - done, shadow: 1 - done });
+    }
+    // os cliques direitos que desviram
+    if (t >= T.gire - 0.1 && t < T.hop0) {
+      const knots = [{ t: T.gire - 0.1, x: 1500, y: 960 }];
+      TURN_ORDER.forEach((i, k) => knots.push({ t: T.rot[k] - 0.05, x: SCAT[i].x + 30, y: SCAT[i].y + 26 }));
+      knots.push({ t: T.hop0, x: 1700, y: 1000 });
+      const cu = OM.cursor(t, knots, T.rot); cursor(cu.x, cu.y, cu.s, C.ink, 1 - sstep(T.rot[4] + 0.1, T.hop0, t));
+    }
+    TRACK.piece = { x: BIG.x, y: BIG.y, w: BIG.w, h: BIG.h };
+  }
+  // palavras
+  const gw = measure('Gire. ', 72), ew = measure('Encaixe. ', 72), vw = measure('Vença.', 72), x0 = 960 - (gw + ew + vw) / 2;
+  word('Gire.', x0, 960, t, T.gire, { size: 72, out: T.gather0 });
+  word('Encaixe.', x0 + gw, 960, t, T.encaixe, { size: 72, out: T.gather0 });
+  word('Vença.', x0 + gw + ew, 960, t, T.vença, { size: 72, color: C.accent, out: T.gather0 });
+  const st = OM.staccato(t, T.words2);
+  if (st.word && t < T.words2End) { g.save(); g.font = `800 66px ${DISPLAY}`; g.textAlign = 'center'; g.fillStyle = st.i === 2 ? C.accent : C.ink; g.fillText(st.word, 960, 190); g.restore(); }
+
+  ranking(t);
+  // a peça (já da cor da marca) sai da janela dobrada, salta e pousa como o ponto
+  if (t >= T.fold1 - 0.3 && t < T.dotLand) {
+    const knob = sstep(T.fold1 - 0.3, T.fold1, t), flying = t >= T.hopDot0;
+    const hop = OM.hop(t, T.hopDot0, T.dotLand, { x: 960, y: 530 }, DOT, { height: 220, curve: ease.smoother });
+    const cx = flying ? hop.x : 960, cy = flying ? hop.y : 530;
+    const scale = flying ? lerp(1, DOT.s / 120, ease.cubicInOut(seg(t, T.hopDot0, T.dotLand))) : 1;
+    const spin = flying ? -seg(t, T.hopDot0, T.dotLand) : 0;
+    g.save(); g.translate(cx, cy); g.rotate(spin * Math.PI / 2); g.scale(scale, scale);
+    piecePath(-60, -60, 120, [1, 1, -1, -1], knob); g.fillStyle = C.accent; g.fill(); g.restore();
+    TRACK.piece = { x: cx - 60 * scale, y: cy - 60 * scale, w: 120 * scale, h: 120 * scale };
+  }
+
+  // "puzzl.us": o ponto é a peça
+  if (t >= T.mark0) markDraw(t);
+}
+
+// o tabuleiro completo se abre na janela do ranking (gravado): o pódio, o clique na Ana, o perfil;
+// depois a janela se dobra num quadrado da cor da marca, que vira a peça
+function ranking(t) {
+  if (t < T.rk0 || t >= T.fold1) return;
+  const A = { x: BIG.x, y: BIG.y, w: BIG.w, h: BIG.h, r: 4 }, B = { ...WIN, r: 18 }, S = { x: 900, y: 470, w: 120, h: 120, r: 12 };
+  const R = t < T.fold0 ? OM.morphRect(t, T.rk0, T.rk1, A, B, { curve: ease.expoInOut })
+    : OM.morphRect(t, T.fold0, T.fold1 - 0.3, B, S, { curve: ease.expoInOut });
+  const footOp = sstep(T.rk0 + 0.2, T.rk1, t);
+  // a gravação; enquanto o perfil carrega (quadros em branco), segura o último quadro do ranking
+  const m = FOOT.ranking.mark;
+  let f = m - 6 + Math.round((t - T.rkFoot) * 30);
+  if (f > m + 58 && f < m + 88) f = m + 58;
+  siteWindow(R, 'ranking', f, footOp, () => {
+    const op = 1 - sstep(T.rk0 + 0.2, T.rk1, t);
+    if (op > 0 && img.complete) { g.globalAlpha = op; g.drawImage(img, BIG_PHOTO.x, BIG_PHOTO.y, BIG_PHOTO.w, BIG_PHOTO.h); g.globalAlpha = 1; }
+  });
+  const solid = sstep(T.solid0, T.solid1, t);
+  if (solid > 0) { g.save(); g.globalAlpha = solid; g.fillStyle = C.accent; g.beginPath(); g.roundRect(R.x, R.y, R.w, R.h, R.r); g.fill(); g.restore(); }
+  footCursor(t, T.rkMove, T.rkClick, t >= T.rk1 && t < T.fold0);
+  caption('Suba no ranking.', t, T.rkCap1, T.rkCap2 - 0.15);
+  caption('Seu perfil, suas conquistas.', t, T.rkCap2, T.fold0 - 0.05, C.accent);
+  TRACK.piece = { x: R.x, y: R.y, w: R.w, h: R.h };
+}
+
+// a marca: "puzzl" + ponto (a peça) + "us"
+const MARK = { size: 168, y: 620 };
+let DOT = { x: 960, y: 600, s: 40 }, MARK_X = { puzzl: 0, us: 0 };
+function measureMark() {
+  const wP = measure('puzzl', MARK.size), wD = measure('.', MARK.size), wU = measure('us', MARK.size);
+  const total = wP + wD + wU, x0 = 960 - total / 2;
+  MARK_X = { puzzl: x0, us: x0 + wP + wD };
+  DOT = { x: x0 + wP + wD / 2, y: MARK.y - MARK.size * 0.14, s: MARK.size * 0.27 };
+}
+function markDraw(t) {
+  const letters = [...'puzzl'], tail = [...'us'];
+  g.font = `800 ${MARK.size}px ${DISPLAY}`; g.textBaseline = 'alphabetic'; g.fillStyle = C.ink;
+  let x = MARK_X.puzzl;
+  letters.forEach((ch, i) => { const d = OM.letterDrop(t, T.mark0, i); drawLetter(ch, x, d); x += g.measureText(ch).width; });
+  x = MARK_X.us;
+  tail.forEach((ch, i) => { const d = OM.letterDrop(t, T.us0, i); drawLetter(ch, x, d); x += g.measureText(ch).width; });
+  // a peça pousada é o ponto
+  if (t >= T.dotLand) {
+    const im = OM.impact(t, T.dotLand, { decay: 8, omega: 24, sqx: 0.22, sqy: 0.26 });
+    g.save(); g.translate(DOT.x, DOT.y + DOT.s * 0.5); g.scale(im.sx, im.sy); g.translate(0, -DOT.s * 0.5);
+    g.scale(DOT.s / 120, DOT.s / 120); piecePath(-60, -60, 120, [1, 1, -1, -1]); g.fillStyle = C.accent; g.fill(); g.restore();
+  }
+  word('quebra-cabeça online, pra montar junto', 960, MARK.y + 110, t, T.tag, { size: 44, weight: 500, color: C.mute, align: 'center', font: BODY });
+  TRACK.mark = { x: MARK_X.puzzl - 10, y: MARK.y - MARK.size * 0.85, w: MARK_X.us + measure('us', MARK.size) - MARK_X.puzzl + 20, h: MARK.size * 1.1 };
+}
+function drawLetter(ch, x, d) {
+  if (d.op <= 0.001) return;
+  g.save(); g.globalAlpha = d.op; g.translate(x, MARK.y + d.y); g.scale(d.sx, d.sy); g.fillText(ch, 0, 0); g.restore();
+}
+
+// ════════════════════════════════════════ seek ════════════════════════════════════════════════
+function seek(t) {
+  if (t >= SA && t < SB) return seekSala(t);
+  AFTER_SALA = t >= SB;
+  return seekOld(old(t));
+}
+function seekOld(t) {
+  TRACK = {}; PENDING = [];
+  CAM = camOld(t); zoomNow = CAM.zoom;
+  if (t < T.iris0) {
+    const dark = t >= T.dive1 - 0.05;
+    ground(CAM, dark ? C.ink : C.ground);
+    if (!dark) { setM(OM.view(CAM)); act1(t); }
+  } else {
+    // a íris: do escuro da pupila abre o outro lado
+    const ir = OM.iris(t, T.iris0, T.iris1, 960, 540, { curve: ease.expoOut });
+    screen(); g.fillStyle = C.ink; g.fillRect(0, 0, W, H);
+    g.save(); screen(); g.beginPath(); g.arc(960, 540, ir.r, 0, Math.PI * 2); g.clip();
+    ground(CAM); setM(OM.view(CAM)); act2(t); g.restore();
+  }
+  // grão fixo contra faixas no degradê (determinístico)
+  screen();
+  document.getElementById('hud').textContent = 't=' + t.toFixed(3);
+  return Promise.all(PENDING);
+}
+
+// ── contrato onetake ─────────────────────────────────────────────────────────────────────────
+// um quadro gravado que ainda não decodificou: espera e desenha de novo (o render nunca pega meio quadro)
+window.__seek = async t => { const p = seek(t); if (PENDING.length) { await p; await seek(t); } return true; };
+window.__track = t => {
+  seek(t); const M = OM.view(CAM), out = {};
+  for (const [k, b] of Object.entries(TRACK)) out[k] = OM.projectBox(M, b);
+  return out;
+};
+window.__motion = (t0, t1) => {
+  const a = camAt(t0), b = camAt(t1), m = camAt((t0 + t1) / 2);
+  let d = OM.screenTravel(a, b, m);
+  const box = t => { seek(t); const p = TRACK.piece; return p ? OM.projectBox(OM.view(CAM), p) : null; };
+  const A = box(t0), B = box(t1);
+  if (A && B) d = Math.max(d, Math.hypot(A.x - B.x, A.y - B.y), Math.hypot(A.x + A.w - B.x - B.w, A.y + A.h - B.y - B.h));
+  return d;
+};
+// eventos para a trilha de efeitos (score.py lê daqui)
+window.__events = () => [
+  ['land', T.land], ['rotate', T.rclick], ...T.snaps.map(s => ['snap', s]),
+  ['window', T.win0], ...T.expClick.map(s => ['click', s]), ['ring', T.ring0],
+  ...[6.3, 6.75, 7.05, 7.35, 7.58, 7.76, 7.9].map(L).map(s => ['plus', s]), ['fire', T.fire], ...[8.5, 9.0].map(L).map(s => ['tick', s]),
+  ['collapse', T.collapse0], ['battle', T.battle], ['fog', T.fog], ['ice', T.ice],
+  ['flash', T.flash], ...T.slides.map(s => ['slide', s]), ['solved', T.tileIn], ['dive', T.dive0], ['iris', T.iris0],
+  ...T.rot.map(s => ['rotate', s]), ['snapAll', T.hop0 + 0.45], ['win', T.vença],
+  ...T.words2.map(([s]) => ['word', s]), ...Array.from({ length: 8 }, (_, j) => ['snap', T.gather0 + j * 0.22 + 0.55]),
+  ['window', T.rk0], ...T.rkClick.map(s => ['click', s]), ['fold', T.fold0], ['dot', T.dotLand], ['mark', T.mark0],
+].map(([k, s]) => [k, s >= SA ? s + DS : s]).concat([
+  ...SALA_CLICK.map(s => ['click', s]), ['window', SA + 0.6], ...SALA_JOIN.map(s => ['join', s]), ['go', SALA_GO],
+]);
+window.__ready = Promise.all([document.fonts.ready, img.decode().catch(() => {}),
+  document.fonts.load(`800 100px ${DISPLAY}`), document.fonts.load(`500 40px ${BODY}`)]).then(() => { measureMark(); return seek(0); });
+const q = new URLSearchParams(location.search);
+if (q.has('t')) __ready.then(() => seek(parseFloat(q.get('t'))));
+if (q.has('hud')) document.getElementById('hud').style.display = 'block';
+if (q.has('play')) __ready.then(() => { const t0 = performance.now(); (function loop() { seek(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })(); });
+</script>
+</body>
+</html>

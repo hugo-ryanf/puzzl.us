@@ -1,0 +1,148 @@
+{
+  "viewport": [
+    1920,
+    1080
+  ],
+  "settle_ms": 1800,
+  "preroll_ms": 600,
+  "tail_ms": 1200,
+  "cases": [
+    {
+      "name": "explorar",
+      "url": "http://localhost:5181/",
+      "drive": [
+        {
+          "wheel": {
+            "n": 8,
+            "dy": 320,
+            "gap_ms": 320
+          }
+        },
+        {
+          "wait": 400
+        },
+        {
+          "sweep": [
+            [
+              960,
+              540
+            ],
+            [
+              875,
+              430
+            ]
+          ],
+          "dur": 0.9
+        },
+        {
+          "click": [
+            875,
+            430
+          ]
+        },
+        {
+          "wait": 700
+        },
+        {
+          "sweep": [
+            [
+              875,
+              430
+            ],
+            [
+              1210,
+              365
+            ]
+          ],
+          "dur": 0.7
+        },
+        {
+          "click": [
+            1210,
+            365
+          ]
+        },
+        {
+          "wait": 400
+        },
+        {
+          "sweep": [
+            [
+              1210,
+              365
+            ],
+            [
+              1074,
+              484
+            ]
+          ],
+          "dur": 0.45
+        },
+        {
+          "click": [
+            1074,
+            484
+          ]
+        },
+        {
+          "wait": 900
+        }
+      ]
+    },
+    {
+      "name": "ranking",
+      "url": "http://localhost:5181/",
+      "prep": [
+        {
+          "eval": "[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Ranking').click()"
+        },
+        {
+          "wait": 1300
+        },
+        {
+          "eval": "(() => { const s = [...document.querySelectorAll('label.rk-select')].find(l => l.textContent.includes('Modalidade')).querySelector('select'); Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, '1'); s.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "wait": 1500
+        }
+      ],
+      "drive": [
+        {
+          "wait": 1200
+        },
+        {
+          "sweep": [
+            [
+              960,
+              540
+            ],
+            [
+              559,
+              640
+            ]
+          ],
+          "dur": 0.9
+        },
+        {
+          "click": [
+            559,
+            640
+          ]
+        },
+        {
+          "wait": 1500
+        },
+        {
+          "wheel": {
+            "n": 3,
+            "dy": 200,
+            "gap_ms": 300
+          }
+        },
+        {
+          "wait": 1200
+        }
+      ]
+    }
+  ]
+}
