@@ -1,4 +1,4 @@
-import { CATALOG } from '@puzzle/shared';
+import { CATALOG, type CommunityPuzzle } from '@puzzle/shared';
 import {
   useEffect,
   useRef,
@@ -22,6 +22,16 @@ import {
 } from '../../ui/icons';
 import { useTheme } from '../../ui/theme';
 import type { PuzzleChoice } from '../explore/CreateRoomDialog';
+import {
+  CommunitySection,
+  FaqSection,
+  FinalCta,
+  HowSection,
+  ModesSection,
+  ProfileSection,
+  TogetherSection,
+  type StartPlaying,
+} from './LandingSections';
 import { DARK_ART, LIGHT_ART, type BannerArt, type Mover } from './landingArt';
 
 /**
@@ -41,8 +51,10 @@ const GALLERY: PuzzleChoice[] = CATALOG.filter((image) => image.width / image.he
   });
 
 export interface LandingScreenProps {
-  /** Entra no app: com uma foto, abre o "Criar sala" dela; sem, o "Criar sala" livre. */
-  onStart: (choice?: PuzzleChoice) => void;
+  /** Entra no app: com uma foto (e um modo), o "Criar sala" dela; sem, o "Criar sala" livre. */
+  onStart: StartPlaying;
+  /** Fotos publicadas pelos jogadores (a seção da comunidade). */
+  community: CommunityPuzzle[];
   /** A tela de Ranking do app (pódio, filtros e lista), mostrada como uma seção. */
   ranking: ReactNode;
   /** Login com Google disponível neste servidor. */
@@ -51,10 +63,11 @@ export interface LandingScreenProps {
 
 /**
  * Página de quem chega sem login: o banner do camaleão com peças sendo montadas (com a marca, o
- * tema e o idioma por cima), a galeria, o ranking e o rodapé. O tema claro (verde) e o escuro
- * (neon) trocam pelo CSS, junto com o resto do site.
+ * tema e o idioma por cima), os modos, o multiplayer, a galeria, a comunidade, o
+ * ranking, o perfil, como funciona, perguntas e o convite final. O tema claro (verde) e o escuro
+ * (azul) trocam pelo CSS, junto com o resto do site.
  */
-export function LandingScreen({ onStart, ranking, googleLogin }: LandingScreenProps) {
+export function LandingScreen({ onStart, ranking, googleLogin, community }: LandingScreenProps) {
   return (
     <div className="landing">
       <section className="lp-hero" aria-label={t('Apresentação')}>
@@ -106,10 +119,17 @@ export function LandingScreen({ onStart, ranking, googleLogin }: LandingScreenPr
         </div>
       </section>
 
-      <Gallery onPlay={onStart} />
+      <ModesSection onStart={onStart} />
+      <TogetherSection onStart={onStart} />
+      <Gallery onPlay={(choice) => onStart(choice)} />
+      <CommunitySection puzzles={community} onStart={onStart} />
       <section id="ranking" className="lp-ranking-section">
         <div className="lp-container">{ranking}</div>
       </section>
+      <ProfileSection googleLogin={googleLogin} />
+      <HowSection />
+      <FaqSection />
+      <FinalCta onStart={onStart} />
 
       <footer className="lp-footer">
         <div className="lp-container lp-footer-row">
