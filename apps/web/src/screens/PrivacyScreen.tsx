@@ -1,8 +1,27 @@
+import { useState } from 'react';
 import { locale, t } from '../i18n';
+import { isRecordingOptedOut, setRecordingOptOut } from '../net/analytics';
 import { ArrowLeftIcon } from '../ui/icons';
 
 /** Onde pedir para apagar dados ou tirar dúvidas (o repositório é público). */
 const CONTACT_URL = 'https://github.com/hugo-ryanf/puzzl.us/issues';
+
+/** Ligar ou desligar o registro de uso (PostHog) neste navegador. */
+function RecordingChoice({ on, off, stopped }: { on: string; off: string; stopped: string }) {
+  const [out, setOut] = useState(isRecordingOptedOut);
+  const toggle = () => {
+    setRecordingOptOut(!out);
+    setOut(!out);
+  };
+  return (
+    <p className="legal-choice">
+      {out && <span>{stopped} </span>}
+      <button type="button" className="btn" onClick={toggle}>
+        {out ? on : off}
+      </button>
+    </p>
+  );
+}
 
 /**
  * Política de privacidade (exigida pelo Google para liberar o login a qualquer pessoa, e pela
@@ -31,7 +50,7 @@ function PolicyPt() {
       <p>
         O <strong>puzzl.us</strong> é um jogo de quebra-cabeça on-line, gratuito e sem anúncios,
         feito por um estudante como projeto pessoal. Guardamos o mínimo necessário para o jogo
-        funcionar. Não vendemos dados, não usamos ferramentas de rastreamento nem de publicidade.
+        funcionar e para entender como o site é usado. Não vendemos dados e não usamos publicidade.
       </p>
 
       <h2>O que guardamos</h2>
@@ -76,7 +95,27 @@ function PolicyPt() {
           convidado, para não precisar digitar de novo, o idioma escolhido, e a sala atual, para
           voltar a ela se a página recarregar.
         </li>
+        <li>
+          <strong>Análise de uso</strong> (cookie e localStorage do PostHog, que começam com{' '}
+          <code>ph_</code>): um identificador aleatório da visita, para juntar as páginas vistas na
+          mesma sessão.
+        </li>
       </ul>
+
+      <h2>Análise de uso</h2>
+      <p>
+        Para melhorar o jogo, usamos o <strong>PostHog</strong> para registrar como o site é usado:
+        páginas vistas, cliques, ações do jogo (como criar sala e concluir partida), desempenho e
+        gravações das sessões (o que aparece na tela e os movimentos do mouse). O que você digita
+        fica mascarado, a mesa do jogo não é gravada, e a chamada de voz e a câmera nunca entram.
+        Com login, as visitas ficam ligadas à identificação interna da sua conta, nunca ao seu
+        e-mail.
+      </p>
+      <RecordingChoice
+        off="Não registrar minhas visitas"
+        on="Voltar a registrar minhas visitas"
+        stopped="O registro está desligado neste navegador."
+      />
 
       <h2>Voz e câmera</h2>
       <p>
@@ -97,6 +136,9 @@ function PolicyPt() {
         </li>
         <li>
           <strong>LiveKit</strong> — transmissão da chamada de voz e da câmera.
+        </li>
+        <li>
+          <strong>PostHog</strong> — análise de uso e gravação das sessões (servidores nos EUA).
         </li>
       </ul>
 
@@ -122,8 +164,8 @@ function PolicyEn() {
 
       <p>
         <strong>puzzl.us</strong> is a free, ad-free online jigsaw puzzle game, made by a student as
-        a personal project. We keep the minimum needed for the game to work. We don't sell data, and
-        we don't use tracking or advertising tools.
+        a personal project. We keep the minimum needed for the game to work and to understand how
+        the site is used. We don't sell data and we don't use advertising.
       </p>
 
       <h2>What we store</h2>
@@ -167,7 +209,25 @@ function PolicyEn() {
           identifier, so you don't have to type them again, your chosen language, and the current
           room, so you can return to it if the page reloads.
         </li>
+        <li>
+          <strong>Usage analytics</strong> (PostHog cookie and localStorage, starting with{' '}
+          <code>ph_</code>): a random visit identifier, to group the pages seen in the same session.
+        </li>
       </ul>
+
+      <h2>Usage analytics</h2>
+      <p>
+        To improve the game, we use <strong>PostHog</strong> to record how the site is used: pages
+        viewed, clicks, game actions (such as creating a room and finishing a game), performance and
+        session recordings (what appears on screen and mouse movements). What you type is masked,
+        the game board is not recorded, and voice chat and camera are never included. When signed
+        in, visits are linked to your account's internal identifier, never to your email.
+      </p>
+      <RecordingChoice
+        off="Don't record my visits"
+        on="Record my visits again"
+        stopped="Recording is off in this browser."
+      />
 
       <h2>Voice and camera</h2>
       <p>
@@ -188,6 +248,9 @@ function PolicyEn() {
         </li>
         <li>
           <strong>LiveKit</strong> — streaming for voice chat and camera.
+        </li>
+        <li>
+          <strong>PostHog</strong> — usage analytics and session recording (servers in the US).
         </li>
       </ul>
 
