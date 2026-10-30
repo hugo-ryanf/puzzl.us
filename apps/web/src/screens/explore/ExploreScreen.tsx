@@ -5,7 +5,12 @@ import type { Community } from '../../net/community';
 import type { PuzzleRoom } from '../../net/connection';
 import type { Library } from '../../net/library';
 import { ChevronDownIcon, FilterIcon, SearchIcon } from '../../ui/icons';
-import { CreateRoomDialog, type CreateRoomSource, type PuzzleChoice } from './CreateRoomDialog';
+import {
+  CreateRoomDialog,
+  type CreateRoomMode,
+  type CreateRoomSource,
+  type PuzzleChoice,
+} from './CreateRoomDialog';
 import { JoinRoomDialog } from './JoinRoomDialog';
 import { PuzzleCard, orientationOf, type CommunityActions, type PuzzleImage } from './PuzzleCard';
 import { t } from '../../i18n';
@@ -66,8 +71,9 @@ export interface ExploreScreenProps {
   onNameChange: (name: string) => void;
   /** Diálogos abertos pela barra lateral (que fica no App). */
   createRequested: boolean;
-  /** Foto escolhida na landing: o "Criar sala" dela já abre. */
+  /** Foto escolhida na landing: o "Criar sala" dela já abre (no modo escolhido, se houver). */
   initialChoice?: PuzzleChoice | null;
+  initialMode?: CreateRoomMode;
   joinOpen: boolean;
   initialCode: string;
   onCloseCreate: () => void;
@@ -91,6 +97,7 @@ export function ExploreScreen({
   onNameChange,
   createRequested,
   initialChoice = null,
+  initialMode,
   joinOpen,
   initialCode,
   onCloseCreate,
@@ -244,6 +251,7 @@ export function ExploreScreen({
         name={name}
         onNameChange={onNameChange}
         nameLocked={signedIn}
+        initialMode={initialMode}
         onClose={() => {
           setChoice(null);
           onCloseCreate();
