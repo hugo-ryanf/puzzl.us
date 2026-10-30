@@ -40,6 +40,12 @@ const EN = {
 };
 const tr = text => (LANG === 'en' ? EN[text] ?? text : text);
 document.documentElement.lang = LANG === 'en' ? 'en' : 'pt-BR';
+// ?from=A&to=B: só o trecho de A a B (os trechos da landing); ?nocap: sem as legendas (o título da
+// seção na landing já diz o texto). As palavras que são a própria cena continuam.
+const CLIP = (() => {
+  const s = new URLSearchParams(location.search);
+  return { from: parseFloat(s.get('from') ?? '0'), to: s.has('to') ? parseFloat(s.get('to')) : null, nocap: s.has('nocap') };
+})();
 window.__meta = { dur: DUR, fps: 30, w: 1920, h: 1080,
   inFrame: { piece: [0.95, 31.9], mark: [47.7, 51.4, 'whole'] } };
 const { clamp, lerp, sstep, ssstep, seg, spring, ease } = OM;
@@ -141,7 +147,7 @@ function word(text, x, y, t, t0, { size = 96, weight = 800, color = C.ink, align
 const measure = (text, size, weight = 800, font = DISPLAY) => { g.font = `${weight} ${size}px ${font}`; return g.measureText(text).width; };
 /** Legenda das telas do site: no alto da tela (não do mundo), num cartão claro. */
 function caption(text, t, t0, out, color = C.ink) {
-  if (t < t0 - 0.05 || t > out + 0.4) return;
+  if (CLIP.nocap || t < t0 - 0.05 || t > out + 0.4) return;
   const op = OM.wordRise(t, t0).op * OM.liftOut(t, out, { dist: 40, blur: 0 }).op;
   if (op <= 0.001) return;
   screen();
@@ -375,7 +381,7 @@ function act1(t) {
     });
     TRACK.piece = { x: cx - rx, y: cy - ry, w: rx * 2, h: ry * 2 };
   }
-  word(tr('Contra o relógio.'), 1050, 360, t, T.relogio, { size: 72, align: 'center', out: T.collapse0 - 0.1 });
+  CLIP.nocap || word(tr('Contra o relógio.'), 1050, 360, t, T.relogio, { size: 72, align: 'center', out: T.collapse0 - 0.1 });
 
   // 3 · lado contra lado
   if (t >= T.collapse1 - 0.05 && t < T.grid1 + 0.05) battle(t);
@@ -570,7 +576,7 @@ function battle(t) {
     const wl = measure('Lado contra lado.', 80), op = OM.wordRise(t, T.lado).op;
     g.save(); g.globalAlpha = op; g.fillStyle = C.ground; g.beginPath(); g.roundRect(960 - wl / 2 - 28, 880, wl + 56, 112, 20); g.fill(); g.restore();
   }
-  word(tr('Lado contra lado.'), 960, 960, t, T.lado, { size: 80, align: 'center' });
+  CLIP.nocap || word(tr('Lado contra lado.'), 960, 960, t, T.lado, { size: 80, align: 'center' });
   // neblina: atravessa da esquerda para a mesa da Bia
   const fogK = ease.expoOut(seg(t, T.fog, T.fog + 0.7)), fogOp = sstep(T.fog, T.fog + 0.2, t) * (1 - sstep(L(12.7), L(13.1), t));
   if (fogOp > 0) {
@@ -641,7 +647,7 @@ function lightning(t) {
     const k = sstep(T.dive0 + 0.35, T.dive1 - 0.1, t);
     g.save(); g.globalAlpha = k; g.fillStyle = C.ink; g.beginPath(); g.arc(EYE.x, EYE.y, EYE.r * lerp(1, 1.6, k), 0, Math.PI * 2); g.fill(); g.restore();
   }
-  word(tr('Relâmpago.'), 960, 300, t, T.grid1 - 0.1, { size: 64, align: 'center', color: C.ink, out: T.dive0 });
+  CLIP.nocap || word(tr('Relâmpago.'), 960, 300, t, T.grid1 - 0.1, { size: 64, align: 'center', color: C.ink, out: T.dive0 });
   TRACK.piece = { x: m.x, y: Math.max(m.y, 0), w: m.w, h: Math.min(m.h, 1080) };
 }
 
@@ -810,6 +816,16 @@ window.__events = () => [
 ].map(([k, s]) => [k, s >= SA ? s + DS : s]).concat([
   ...SALA_CLICK.map(s => ['click', s]), ['window', SA + 0.6], ...SALA_JOIN.map(s => ['join', s]), ['go', SALA_GO],
 ]);
+// o trecho: o relógio do render começa em A (e as legendas de quadro e os eventos andam junto)
+if (CLIP.to !== null) {
+  const A = CLIP.from, base = { seek: window.__seek, track: window.__track, motion: window.__motion, events: window.__events };
+  window.__meta.dur = CLIP.to - A;
+  window.__meta.inFrame = {};
+  window.__seek = t => base.seek(t + A);
+  window.__track = t => base.track(t + A);
+  window.__motion = (t0, t1) => base.motion(t0 + A, t1 + A);
+  window.__events = () => base.events().map(([k, s]) => [k, s - A]).filter(([, s]) => s >= 0 && s <= CLIP.to - A);
+}
 window.__ready = Promise.all([document.fonts.ready, img.decode().catch(() => {}),
   document.fonts.load(`800 100px ${DISPLAY}`), document.fonts.load(`500 40px ${BODY}`)]).then(() => { measureMark(); return seek(0); });
 const q = new URLSearchParams(location.search);
